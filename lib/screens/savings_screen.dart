@@ -257,13 +257,21 @@ class _AddSavingsDialogState extends State<AddSavingsDialog> {
                 controller: _balanceController,
                 decoration: const InputDecoration(labelText: 'Current Balance'),
                 keyboardType: TextInputType.number,
-                validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Required';
+                  if (double.tryParse(value!) == null) return 'Enter a valid number';
+                  return null;
+                },
               ),
               TextFormField(
                 controller: _targetController,
                 decoration: const InputDecoration(labelText: 'Target Amount'),
                 keyboardType: TextInputType.number,
-                validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Required';
+                  if (double.tryParse(value!) == null) return 'Enter a valid number';
+                  return null;
+                },
               ),
               TextFormField(
                 controller: _descriptionController,
@@ -337,7 +345,11 @@ class _UpdateBalanceDialogState extends State<UpdateBalanceDialog> {
           controller: _balanceController,
           decoration: const InputDecoration(labelText: 'New Balance'),
           keyboardType: TextInputType.number,
-          validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+          validator: (value) {
+            if (value?.isEmpty ?? true) return 'Required';
+            if (double.tryParse(value!) == null) return 'Enter a valid number';
+            return null;
+          },
           autofocus: true,
         ),
       ),

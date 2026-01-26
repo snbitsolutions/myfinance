@@ -11,12 +11,17 @@ class DataService {
 
   // Loans
   Future<List<Loan>> getLoans() async {
-    final prefs = await SharedPreferences.getInstance();
-    final loansJson = prefs.getString(_loansKey);
-    if (loansJson == null) return [];
-    
-    final List<dynamic> decoded = json.decode(loansJson);
-    return decoded.map((item) => Loan.fromJson(item)).toList();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final loansJson = prefs.getString(_loansKey);
+      if (loansJson == null) return [];
+      
+      final List<dynamic> decoded = json.decode(loansJson);
+      return decoded.map((item) => Loan.fromJson(item)).toList();
+    } catch (e) {
+      // Return empty list if JSON is corrupted
+      return [];
+    }
   }
 
   Future<void> saveLoans(List<Loan> loans) async {
@@ -39,12 +44,17 @@ class DataService {
 
   // Savings
   Future<List<Savings>> getSavings() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savingsJson = prefs.getString(_savingsKey);
-    if (savingsJson == null) return [];
-    
-    final List<dynamic> decoded = json.decode(savingsJson);
-    return decoded.map((item) => Savings.fromJson(item)).toList();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savingsJson = prefs.getString(_savingsKey);
+      if (savingsJson == null) return [];
+      
+      final List<dynamic> decoded = json.decode(savingsJson);
+      return decoded.map((item) => Savings.fromJson(item)).toList();
+    } catch (e) {
+      // Return empty list if JSON is corrupted
+      return [];
+    }
   }
 
   Future<void> saveSavings(List<Savings> savings) async {
@@ -76,12 +86,17 @@ class DataService {
 
   // Payments
   Future<List<Payment>> getPayments() async {
-    final prefs = await SharedPreferences.getInstance();
-    final paymentsJson = prefs.getString(_paymentsKey);
-    if (paymentsJson == null) return [];
-    
-    final List<dynamic> decoded = json.decode(paymentsJson);
-    return decoded.map((item) => Payment.fromJson(item)).toList();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final paymentsJson = prefs.getString(_paymentsKey);
+      if (paymentsJson == null) return [];
+      
+      final List<dynamic> decoded = json.decode(paymentsJson);
+      return decoded.map((item) => Payment.fromJson(item)).toList();
+    } catch (e) {
+      // Return empty list if JSON is corrupted
+      return [];
+    }
   }
 
   Future<void> savePayments(List<Payment> payments) async {

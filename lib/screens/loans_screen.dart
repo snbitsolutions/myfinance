@@ -215,19 +215,31 @@ class _AddLoanDialogState extends State<AddLoanDialog> {
                 controller: _amountController,
                 decoration: const InputDecoration(labelText: 'Amount'),
                 keyboardType: TextInputType.number,
-                validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Required';
+                  if (double.tryParse(value!) == null) return 'Enter a valid number';
+                  return null;
+                },
               ),
               TextFormField(
                 controller: _interestRateController,
                 decoration: const InputDecoration(labelText: 'Interest Rate (%)'),
                 keyboardType: TextInputType.number,
-                validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Required';
+                  if (double.tryParse(value!) == null) return 'Enter a valid number';
+                  return null;
+                },
               ),
               TextFormField(
                 controller: _monthlyPaymentController,
                 decoration: const InputDecoration(labelText: 'Monthly Payment'),
                 keyboardType: TextInputType.number,
-                validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Required';
+                  if (double.tryParse(value!) == null) return 'Enter a valid number';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
               ListTile(

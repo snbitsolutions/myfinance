@@ -274,7 +274,11 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
                 controller: _amountController,
                 decoration: const InputDecoration(labelText: 'Amount'),
                 keyboardType: TextInputType.number,
-                validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Required';
+                  if (double.tryParse(value!) == null) return 'Enter a valid number';
+                  return null;
+                },
               ),
               DropdownButtonFormField<String>(
                 decoration: const InputDecoration(labelText: 'Category'),

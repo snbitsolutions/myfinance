@@ -243,7 +243,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildRecentPayments() {
-    final recentPayments = _payments.take(5).toList();
+    final sortedPayments = List<Payment>.from(_payments)
+      ..sort((a, b) => b.date.compareTo(a.date));
+    final recentPayments = sortedPayments.take(5).toList();
     final currencyFormat = NumberFormat.currency(symbol: '\$');
 
     return Column(
