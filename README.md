@@ -154,7 +154,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Contact
 
-**SNBit Solutions**
+**SNBitSolutions**
 
 - GitHub: [@snbitsolutions](https://github.com/snbitsolutions)
 - Project Link: [https://github.com/snbitsolutions/myfinance](https://github.com/snbitsolutions/myfinance)
