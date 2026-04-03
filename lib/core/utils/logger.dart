@@ -80,6 +80,7 @@ class AppLogger {
     dynamic error,
     StackTrace? stackTrace,
   ) {
-    this.error('API ERROR: $method $endpoint', error, stackTrace);
+    // Use the class static method instead of `this` to avoid instance reference
+    AppLogger.error('API ERROR: $method $endpoint', error, stackTrace);
   }
 }

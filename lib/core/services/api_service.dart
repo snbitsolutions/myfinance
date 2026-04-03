@@ -10,14 +10,15 @@ abstract class BaseService {
       final result = await apiCall();
       AppLogger.debug('API call successful');
       return result;
-    } on AppException {
-      rethrow;
     } on TimeoutException catch (e) {
+      // TimeoutException is not a subtype of AppException, so handle it first
       AppLogger.error('Timeout error', e);
       throw TimeoutException(
         message: AppConstants.timeoutErrorMessage,
         originalException: e,
       );
+    } on AppException {
+      rethrow;
     } catch (e, stackTrace) {
       AppLogger.error('Unexpected error in API call', e, stackTrace);
       throw GenericException(
@@ -41,9 +42,13 @@ class AuthService extends BaseService {
   Future<Map<String, dynamic>> login({
     required String email,
     required String password,
+    Map<String, dynamic>? deviceContext,
   }) async {
     return handleApiCall(() async {
-      AppLogger.logApiRequest('POST', ApiEndpoints.login, {'email': email});
+      AppLogger.logApiRequest('POST', ApiEndpoints.login, {
+        'email': email,
+        'device_context': ?deviceContext,
+      });
       await _simulateNetworkDelay();
 
       // Mock validation
@@ -73,9 +78,15 @@ class AuthService extends BaseService {
   }
 
   /// Send OTP to email/phone
-  Future<Map<String, dynamic>> sendOtp({required String email}) async {
+  Future<Map<String, dynamic>> sendOtp({
+    required String email,
+    Map<String, dynamic>? deviceContext,
+  }) async {
     return handleApiCall(() async {
-      AppLogger.logApiRequest('POST', ApiEndpoints.sendOtp, {'email': email});
+      AppLogger.logApiRequest('POST', ApiEndpoints.sendOtp, {
+        'email': email,
+        'device_context': ?deviceContext,
+      });
       await _simulateNetworkDelay();
 
       if (email.isEmpty) {
@@ -98,10 +109,12 @@ class AuthService extends BaseService {
   Future<Map<String, dynamic>> verifyOtp({
     required String otpId,
     required String otp,
+    Map<String, dynamic>? deviceContext,
   }) async {
     return handleApiCall(() async {
       AppLogger.logApiRequest('POST', ApiEndpoints.verifyOtp, {
         'otp_id': otpId,
+        'device_context': ?deviceContext,
       });
       await _simulateNetworkDelay();
 
@@ -125,9 +138,13 @@ class AuthService extends BaseService {
   Future<Map<String, dynamic>> setPin({
     required String userId,
     required String pin,
+    Map<String, dynamic>? deviceContext,
   }) async {
     return handleApiCall(() async {
-      AppLogger.logApiRequest('POST', ApiEndpoints.setPin, {'user_id': userId});
+      AppLogger.logApiRequest('POST', ApiEndpoints.setPin, {
+        'user_id': userId,
+        'device_context': ?deviceContext,
+      });
       await _simulateNetworkDelay();
 
       if (pin.isEmpty || pin.length != AppConstants.pinLength) {
@@ -177,6 +194,8 @@ class UserService extends BaseService {
         'data': {
           'user_id': userId,
           'name': 'Steven Boadu',
+          'branch': 'Accra Main',
+          'account_number': '0123456789',
           'email': 'steven@email.com',
           'phone': '0241234567',
           'balance': 4500.50,
@@ -233,7 +252,7 @@ class UserService extends BaseService {
         'status': 'success',
         'message': 'KYC submitted for review',
         'kyc_id': 'KYC_${DateTime.now().millisecondsSinceEpoch}',
-        'status': 'pending',
+        'kyc_status': 'pending', // renamed to avoid duplicate map key
       };
 
       AppLogger.logApiResponse('POST', ApiEndpoints.submitKyc, response);

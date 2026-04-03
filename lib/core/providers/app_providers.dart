@@ -5,7 +5,25 @@ import '../constants/app_constants.dart';
 import '../exceptions/app_exceptions.dart';
 import '../models/auth_state.dart';
 import '../services/api_service.dart';
+import '../services/device_identity_service.dart';
+import '../services/http_client.dart';
+import '../services/network_service.dart';
 import '../utils/logger.dart';
+
+// Core infrastructure providers
+final httpClientProvider = Provider<HttpClient>((ref) {
+  return HttpClient.instance;
+});
+
+final networkServiceProvider = Provider<NetworkService>((ref) {
+  return NetworkService.instance;
+});
+
+// Network connectivity state provider
+final connectivityProvider = StreamProvider<bool>((ref) {
+  final networkService = ref.watch(networkServiceProvider);
+  return networkService.connectivityStream;
+});
 
 // Service providers
 final authServiceProvider = Provider<AuthService>((ref) {
@@ -28,6 +46,10 @@ final transactionServiceProvider = Provider<TransactionService>((ref) {
   return TransactionService();
 });
 
+final deviceIdentityServiceProvider = Provider<DeviceIdentityService>((ref) {
+  return DeviceIdentityService();
+});
+
 // SharedPreferences provider
 final sharedPreferencesProvider = FutureProvider<SharedPreferences>((
   ref,
@@ -39,30 +61,39 @@ final sharedPreferencesProvider = FutureProvider<SharedPreferences>((
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService authService;
   final UserService userService;
-  final SharedPreferences prefs;
+  final DeviceIdentityService deviceIdentityService;
+  SharedPreferences? _prefs;
 
   AuthNotifier({
     required this.authService,
     required this.userService,
-    required this.prefs,
+    required this.deviceIdentityService,
+    SharedPreferences? prefs,
   }) : super(AuthState.unauthenticated()) {
+    _prefs = prefs;
     _loadStoredAuth();
+  }
+
+  Future<SharedPreferences> _getPrefs() async {
+    return _prefs ??= await SharedPreferences.getInstance();
   }
 
   /// Load stored authentication from SharedPreferences
   void _loadStoredAuth() {
-    final token = prefs.getString(AppConstants.sharedPrefKeyUserToken);
-    final userId = prefs.getString(AppConstants.sharedPrefKeyUserId);
-    final email = prefs.getString(AppConstants.sharedPrefKeyUserEmail);
+    _getPrefs().then((prefs) {
+      final token = prefs.getString(AppConstants.sharedPrefKeyUserToken);
+      final userId = prefs.getString(AppConstants.sharedPrefKeyUserId);
+      final email = prefs.getString(AppConstants.sharedPrefKeyUserEmail);
 
-    if (token != null && userId != null && email != null) {
-      state = AuthState.authenticated(
-        userId: userId,
-        userEmail: email,
-        authToken: token,
-      );
-      AppLogger.info('Loaded stored authentication');
-    }
+      if (token != null && userId != null && email != null) {
+        state = AuthState.authenticated(
+          userId: userId,
+          userEmail: email,
+          authToken: token,
+        );
+        AppLogger.info('Loaded stored authentication');
+      }
+    });
   }
 
   /// Login user
@@ -70,14 +101,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = AuthState.loading();
 
     try {
+      final deviceContext = await deviceIdentityService.getSecurityPayload(
+        action: 'login',
+      );
       final response = await authService.login(
         email: email,
         password: password,
+        deviceContext: deviceContext,
       );
 
       final data = response['data'] as Map<String, dynamic>;
       final token = data['auth_token'] as String;
       final userId = data['user_id'] as String;
+      final prefs = await _getPrefs();
 
       // Save to SharedPreferences
       await prefs.setString(AppConstants.sharedPrefKeyUserToken, token);
@@ -101,7 +137,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Send OTP
   Future<String> sendOtp({required String email}) async {
     try {
-      final response = await authService.sendOtp(email: email);
+      final deviceContext = await deviceIdentityService.getSecurityPayload(
+        action: 'send_otp',
+      );
+      final response = await authService.sendOtp(
+        email: email,
+        deviceContext: deviceContext,
+      );
       final otpId = response['otp_id'] as String;
       AppLogger.info('OTP sent to $email');
       return otpId;
@@ -114,7 +156,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Verify OTP
   Future<String> verifyOtp({required String otpId, required String otp}) async {
     try {
-      final response = await authService.verifyOtp(otpId: otpId, otp: otp);
+      final deviceContext = await deviceIdentityService.getSecurityPayload(
+        action: 'verify_otp',
+      );
+      final response = await authService.verifyOtp(
+        otpId: otpId,
+        otp: otp,
+        deviceContext: deviceContext,
+      );
       final verificationToken = response['verification_token'] as String;
       AppLogger.info('OTP verified successfully');
       return verificationToken;
@@ -127,7 +176,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Set PIN
   Future<void> setPin({required String userId, required String pin}) async {
     try {
-      await authService.setPin(userId: userId, pin: pin);
+      final deviceContext = await deviceIdentityService.getSecurityPayload(
+        action: 'set_pin',
+      );
+      await authService.setPin(
+        userId: userId,
+        pin: pin,
+        deviceContext: deviceContext,
+      );
       AppLogger.info('PIN set successfully for user: $userId');
     } on AppException catch (e) {
       AppLogger.error('Set PIN failed', e);
@@ -142,6 +198,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (userId != null) {
         await authService.logout(userId: userId);
       }
+
+      final prefs = await _getPrefs();
 
       // Clear from SharedPreferences
       await prefs.remove(AppConstants.sharedPrefKeyUserToken);
@@ -168,24 +226,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final authService = ref.watch(authServiceProvider);
   final userService = ref.watch(userServiceProvider);
-  final prefsAsync = ref.watch(sharedPreferencesProvider);
+  final deviceIdentityService = ref.watch(deviceIdentityServiceProvider);
+  final prefs = ref
+      .watch(sharedPreferencesProvider)
+      .maybeWhen(data: (prefs) => prefs, orElse: () => null);
 
-  return prefsAsync.when(
-    data: (prefs) => AuthNotifier(
-      authService: authService,
-      userService: userService,
-      prefs: prefs,
-    ),
-    loading: () => AuthNotifier(
-      authService: authService,
-      userService: userService,
-      prefs: SharedPreferences.getInstance() as SharedPreferences,
-    ),
-    error: (error, stack) => AuthNotifier(
-      authService: authService,
-      userService: userService,
-      prefs: SharedPreferences.getInstance() as SharedPreferences,
-    ),
+  return AuthNotifier(
+    authService: authService,
+    userService: userService,
+    deviceIdentityService: deviceIdentityService,
+    prefs: prefs,
   );
 });
 

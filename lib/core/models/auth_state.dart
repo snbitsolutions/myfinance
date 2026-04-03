@@ -1,4 +1,3 @@
-
 /// Represents the current authentication state of the app
 class AuthState {
   final bool isAuthenticated;
@@ -9,7 +8,7 @@ class AuthState {
   final bool isLoading;
   final String? error;
 
-  AuthState({
+  const AuthState({
     this.isAuthenticated = false,
     this.userId,
     this.userEmail,

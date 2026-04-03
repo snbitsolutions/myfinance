@@ -209,7 +209,7 @@ flutter pub get          # Install dependencies
 
 - **flutter_test** is available but no tests written yet
 - Focus on manual testing with `flutter run`
-- Common debug: Use debugPrint() for console output; enable debug banner in MyFinanceApp
+- Common debug: Use debugPrint() for console output; enable debug banner in AdepaTeachersApp
 
 ## File Structure Quick Reference
 

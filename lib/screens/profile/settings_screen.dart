@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
+import '../../core/color_ext.dart';
 import '../../core/constants/app_constants.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -32,6 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Account Settings Section
             _buildSectionTitle(context, 'Account', Icons.person),
             AppCard(
+              margin: EdgeInsets.zero,
               child: Column(
                 children: [
                   _buildSettingTile(
@@ -43,7 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   Divider(
                     height: 1,
-                    color: theme.colorScheme.outline.withOpacity(0.2),
+                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
                   ),
                   _buildSettingTile(
                     context,
@@ -54,7 +56,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   Divider(
                     height: 1,
-                    color: theme.colorScheme.outline.withOpacity(0.2),
+                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
                   ),
                   _buildSettingTile(
                     context,
@@ -71,6 +73,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Preferences Section
             _buildSectionTitle(context, 'Preferences', Icons.tune),
             AppCard(
+              margin: EdgeInsets.zero,
               child: Column(
                 children: [
                   _buildSettingTile(
@@ -81,12 +84,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: () => _showLanguageDialog(context),
                     trailing: Icon(
                       Icons.chevron_right,
-                      color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      color: theme.colorScheme.onSurface.withOpacitySafe(0.5),
                     ),
                   ),
                   Divider(
                     height: 1,
-                    color: theme.colorScheme.outline.withOpacity(0.2),
+                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
                   ),
                   _buildSettingTile(
                     context,
@@ -96,12 +99,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: () => _showCurrencyDialog(context),
                     trailing: Icon(
                       Icons.chevron_right,
-                      color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      color: theme.colorScheme.onSurface.withOpacitySafe(0.5),
                     ),
                   ),
                   Divider(
                     height: 1,
-                    color: theme.colorScheme.outline.withOpacity(0.2),
+                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
                   ),
                   _buildSwitchTile(
                     context,
@@ -121,6 +124,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Security Section
             _buildSectionTitle(context, 'Security', Icons.security),
             AppCard(
+              margin: EdgeInsets.zero,
               child: Column(
                 children: [
                   _buildSettingTile(
@@ -132,7 +136,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   Divider(
                     height: 1,
-                    color: theme.colorScheme.outline.withOpacity(0.2),
+                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
                   ),
                   _buildSettingTile(
                     context,
@@ -143,7 +147,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   Divider(
                     height: 1,
-                    color: theme.colorScheme.outline.withOpacity(0.2),
+                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
                   ),
                   _buildSwitchTile(
                     context,
@@ -163,6 +167,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Support Section
             _buildSectionTitle(context, 'Support', Icons.help),
             AppCard(
+              margin: EdgeInsets.zero,
               child: Column(
                 children: [
                   _buildSettingTile(
@@ -174,7 +179,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   Divider(
                     height: 1,
-                    color: theme.colorScheme.outline.withOpacity(0.2),
+                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
                   ),
                   _buildSettingTile(
                     context,
@@ -185,7 +190,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   Divider(
                     height: 1,
-                    color: theme.colorScheme.outline.withOpacity(0.2),
+                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
                   ),
                   _buildSettingTile(
                     context,
@@ -202,6 +207,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // About Section
             _buildSectionTitle(context, 'About', Icons.info),
             AppCard(
+              margin: EdgeInsets.zero,
               child: Column(
                 children: [
                   _buildSettingTile(
@@ -212,7 +218,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   Divider(
                     height: 1,
-                    color: theme.colorScheme.outline.withOpacity(0.2),
+                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
                   ),
                   _buildSettingTile(
                     context,
@@ -222,7 +228,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   Divider(
                     height: 1,
-                    color: theme.colorScheme.outline.withOpacity(0.2),
+                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
                   ),
                   _buildSettingTile(
                     context,
@@ -238,7 +244,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             // Danger Zone
             AppCard(
-              backgroundColor: theme.colorScheme.error.withOpacity(0.1),
+              margin: EdgeInsets.zero,
+              backgroundColor: theme.colorScheme.error.withOpacitySafe(0.1),
               child: _buildSettingTile(
                 context,
                 icon: Icons.delete_forever,
@@ -265,7 +272,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: theme.colorScheme.primary.withOpacity(0.1),
+              color: theme.colorScheme.primary.withOpacitySafe(0.1),
             ),
             child: Icon(icon, size: 16, color: theme.colorScheme.primary),
           ),
@@ -318,7 +325,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Text(
                       subtitle,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
                       ),
                     ),
                 ],
@@ -359,7 +366,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Text(
                   subtitle,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
                   ),
                 ),
               ],
@@ -451,7 +458,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildRadioTile('₵ GHS', 'GHS'),
+            _buildRadioTile('GH₵ GHS', 'GHS'),
             _buildRadioTile('\$ USD', 'USD'),
             _buildRadioTile('€ EUR', 'EUR'),
             _buildRadioTile('£ GBP', 'GBP'),
@@ -520,7 +527,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Text(
                 'Version ${AppConstants.appVersion}',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
                 ),
               ),
             ),
@@ -533,7 +540,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Text(
               'A mobile app for personal finance management, featuring loan applications, savings tracking, and payment processing.',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withOpacitySafe(0.7),
               ),
             ),
           ],

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
+import '../../core/color_ext.dart';
 import '../../core/modern_input.dart';
 import 'savings_model.dart';
 
@@ -72,7 +74,7 @@ class _CreateSavingsScreenState extends State<CreateSavingsScreen> {
                       border: Border.all(
                         color: isSelected
                             ? theme.colorScheme.primary
-                            : theme.colorScheme.outline.withOpacity(0.3),
+                            : theme.colorScheme.outline.withOpacitySafe(0.3),
                         width: isSelected ? 2 : 1,
                       ),
                       borderRadius: BorderRadius.circular(12),
@@ -103,7 +105,9 @@ class _CreateSavingsScreenState extends State<CreateSavingsScreen> {
                           type.description,
                           textAlign: TextAlign.center,
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacity(0.6),
+                            color: theme.colorScheme.onSurface.withOpacitySafe(
+                              0.6,
+                            ),
                           ),
                         ),
                       ],
@@ -132,7 +136,7 @@ class _CreateSavingsScreenState extends State<CreateSavingsScreen> {
                     hintText: 'e.g., 2000',
                     controller: _targetController,
                     keyboardType: TextInputType.number,
-                    prefixText: '₵ ',
+                    prefixText: 'GH₵ ',
                     onChanged: (_) => setState(() {}),
                   ),
                   if (_selectedType == SavingsType.fixedDeposit) ...[
@@ -171,7 +175,9 @@ class _CreateSavingsScreenState extends State<CreateSavingsScreen> {
                         ),
                         decoration: BoxDecoration(
                           border: Border.all(
-                            color: theme.colorScheme.outline.withOpacity(0.3),
+                            color: theme.colorScheme.outline.withOpacitySafe(
+                              0.3,
+                            ),
                           ),
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -190,7 +196,7 @@ class _CreateSavingsScreenState extends State<CreateSavingsScreen> {
                                   'Maturity Date',
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: theme.colorScheme.onSurface
-                                        .withOpacity(0.6),
+                                        .withOpacitySafe(0.6),
                                   ),
                                 ),
                                 Text(
@@ -210,12 +216,11 @@ class _CreateSavingsScreenState extends State<CreateSavingsScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer.withOpacity(
-                          0.3,
-                        ),
+                        color: theme.colorScheme.primaryContainer
+                            .withOpacitySafe(0.3),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: theme.colorScheme.primary.withOpacity(0.2),
+                          color: theme.colorScheme.primary.withOpacitySafe(0.2),
                         ),
                       ),
                       child: Row(
@@ -240,7 +245,7 @@ class _CreateSavingsScreenState extends State<CreateSavingsScreen> {
                                   'Automatically save amounts monthly',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: theme.colorScheme.onSurface
-                                        .withOpacity(0.6),
+                                        .withOpacitySafe(0.6),
                                   ),
                                 ),
                               ],
@@ -263,7 +268,27 @@ class _CreateSavingsScreenState extends State<CreateSavingsScreen> {
                 onPressed:
                     _nameController.text.trim().isNotEmpty &&
                         (_targetController.text.trim().isNotEmpty)
-                    ? () => Navigator.pop(context)
+                    ? () {
+                        // Create the savings object
+                        final newSavings = Savings(
+                          id: DateTime.now().millisecondsSinceEpoch.toString(),
+                          title: _nameController.text.trim(),
+                          balance: 0, // Start with zero balance
+                          target: double.tryParse(_targetController.text) ?? 0,
+                          type: _selectedType,
+                          interestRate:
+                              _selectedType == SavingsType.fixedDeposit
+                              ? double.tryParse(_interestController.text)
+                              : null,
+                          maturityDate:
+                              _selectedType == SavingsType.fixedDeposit
+                              ? _maturityDate
+                              : null,
+                        );
+
+                        // Return the new savings goal
+                        context.pop(newSavings);
+                      }
                     : null,
                 child: const Text('Create Savings Goal'),
               ),

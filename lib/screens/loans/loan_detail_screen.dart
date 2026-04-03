@@ -1,15 +1,50 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
+import '../../core/color_ext.dart';
+import 'loan_application_provider.dart';
 
-class LoanDetailScreen extends StatelessWidget {
+String _fmtDate(DateTime d) {
+  const m = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${d.day} ${m[d.month - 1]} ${d.year}';
+}
+
+class LoanDetailScreen extends ConsumerWidget {
   const LoanDetailScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final loan = ref.watch(loanApplicationProvider);
+    final loanAmount = loan?.amount ?? 1000.0;
+    final outstanding = loan?.outstandingBalance ?? 0.0;
+    final repaid = loan?.repaidAmount ?? 0.0;
+    final nextInstallment = loan?.monthlyInstallment ?? outstanding;
+    final progressFraction = loan?.progressFraction ?? 0.0;
+    final progressPct = (progressFraction * 100).round();
+    final dueDate = loan != null
+        ? loan.submittedAt.add(Duration(days: loan.planMonths * 30))
+        : DateTime(2026, 3, 30);
+    final today = DateTime.now();
+    final dueInDays = dueDate
+        .difference(DateTime(today.year, today.month, today.day))
+        .inDays;
 
     return AppScaffold(
       title: 'Loan Details',
@@ -27,9 +62,8 @@ class LoanDetailScreen extends StatelessWidget {
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: theme.colorScheme.primaryContainer.withOpacity(
-                            0.3,
-                          ),
+                          color: theme.colorScheme.primaryContainer
+                              .withOpacitySafe(0.3),
                         ),
                         child: Icon(
                           Icons.account_balance,
@@ -38,10 +72,14 @@ class LoanDetailScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Text(
-                        'Loan Summary',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Text(
+                          'Loan Summary',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -50,14 +88,14 @@ class LoanDetailScreen extends StatelessWidget {
                   _DetailItem(
                     theme: theme,
                     label: 'Loan Amount',
-                    value: '₵1,000',
+                    value: 'GH₵${loanAmount.toStringAsFixed(2)}',
                     icon: Icons.attach_money,
                   ),
                   const SizedBox(height: 12),
                   _DetailItem(
                     theme: theme,
                     label: 'Outstanding Balance',
-                    value: '₵800',
+                    value: 'GH₵${outstanding.toStringAsFixed(2)}',
                     icon: Icons.warning_amber,
                     valueColor: theme.colorScheme.error,
                   ),
@@ -65,14 +103,15 @@ class LoanDetailScreen extends StatelessWidget {
                   _DetailItem(
                     theme: theme,
                     label: 'Interest Rate',
-                    value: '5% p.a.',
+                    value:
+                        '${((loan?.effectiveRate ?? 0.12) * 100).toStringAsFixed(0)}% flat (${loan?.repaymentPlan ?? '12 months'})',
                     icon: Icons.percent,
                   ),
                   const SizedBox(height: 12),
                   _DetailItem(
                     theme: theme,
                     label: 'Due Date',
-                    value: '30 Mar 2026',
+                    value: _fmtDate(dueDate),
                     icon: Icons.calendar_today,
                   ),
                 ],
@@ -82,33 +121,39 @@ class LoanDetailScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             AppCard(
-              backgroundColor: theme.colorScheme.primaryContainer.withOpacity(
-                0.1,
-              ),
+              backgroundColor: theme.colorScheme.primaryContainer
+                  .withOpacitySafe(0.1),
               child: Column(
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Progress',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface.withOpacity(
-                                0.6,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Progress',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurface
+                                    .withOpacitySafe(0.6),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                '$progressPct% Repaid',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '60% Repaid',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       Container(
                         width: 60,
@@ -124,16 +169,16 @@ class LoanDetailScreen extends StatelessWidget {
                           alignment: Alignment.center,
                           children: [
                             CircularProgressIndicator(
-                              value: 0.6,
+                              value: progressFraction,
                               strokeWidth: 4,
                               backgroundColor: theme.colorScheme.outline
-                                  .withOpacity(0.2),
+                                  .withOpacitySafe(0.2),
                               valueColor: AlwaysStoppedAnimation(
                                 theme.colorScheme.primary,
                               ),
                             ),
                             Text(
-                              '60%',
+                              '$progressPct%',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
@@ -142,6 +187,60 @@ class LoanDetailScreen extends StatelessWidget {
                         ),
                       ),
                     ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            AppCard(
+              margin: EdgeInsets.zero,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.event_note_rounded,
+                        size: 18,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Next Repayment Snapshot',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _DetailItem(
+                    theme: theme,
+                    label: 'Amount already repaid',
+                    value: 'GH₵${repaid.toStringAsFixed(2)}',
+                    icon: Icons.task_alt_rounded,
+                    valueColor: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(height: 10),
+                  _DetailItem(
+                    theme: theme,
+                    label: 'Suggested next installment',
+                    value: 'GH₵${nextInstallment.toStringAsFixed(2)}',
+                    icon: Icons.payments_outlined,
+                  ),
+                  const SizedBox(height: 10),
+                  _DetailItem(
+                    theme: theme,
+                    label: 'Time until due date',
+                    value: dueInDays < 0
+                        ? 'Past due by ${dueInDays.abs()} days'
+                        : '$dueInDays day${dueInDays == 1 ? '' : 's'} left',
+                    icon: Icons.schedule_rounded,
+                    valueColor: dueInDays <= 7
+                        ? theme.colorScheme.error
+                        : theme.colorScheme.onSurface,
                   ),
                 ],
               ),
@@ -183,29 +282,36 @@ class _DetailItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: theme.colorScheme.primary.withOpacity(0.6),
+        Icon(
+          icon,
+          size: 18,
+          color: theme.colorScheme.primary.withOpacitySafe(0.6),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacitySafe(0.7),
             ),
-            const SizedBox(width: 8),
-            Text(
-              label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 130),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerRight,
+            child: Text(
+              value,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                fontWeight: FontWeight.w600,
+                color: valueColor,
               ),
             ),
-          ],
-        ),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: valueColor,
           ),
         ),
       ],

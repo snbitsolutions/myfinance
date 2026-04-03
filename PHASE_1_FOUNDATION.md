@@ -277,13 +277,13 @@ Already present:
 // Before
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyFinanceApp());
+  runApp(const AdepaTeachersApp());
 }
 
 // After
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ProviderScope(child: MyFinanceApp()));
+  runApp(const ProviderScope(child: AdepaTeachersApp()));
 }
 ```
 
@@ -295,7 +295,7 @@ Wrapped entire app with `ProviderScope` to enable Riverpod state management glob
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      MyFinanceApp                            │
+│                      AdepaTeachersApp                            │
 │                    (ProviderScope)                           │
 └────────────────────────┬────────────────────────────────────┘
                          │
@@ -422,25 +422,21 @@ lib/
 ## 🎯 Next Steps (Phase 2)
 
 1. **Refactor screens to use Riverpod**
-
    - Replace local state with providers
    - Use `ConsumerWidget` instead of `StatefulWidget`
    - Leverage provider caching and invalidation
 
 2. **Implement Hive Database**
-
    - Install `hive` and `hive_flutter`
    - Create models with Hive adapters
    - Implement local persistence for loans, savings, transactions
 
 3. **Connect to Real API**
-
    - Replace mock data with actual HTTP calls
    - Use `dio` package for better HTTP handling
    - Implement token refresh mechanism
 
 4. **Add Error Boundaries**
-
    - Wrap screens with error boundary widgets
    - Implement crash reporting (Sentry)
    - Better user-facing error messages

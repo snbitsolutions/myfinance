@@ -1,4 +1,4 @@
-name: myfinance
+name: adepa_teachers
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -36,8 +36,12 @@ dependencies:
   go_router: ^17.0.1
   google_fonts: ^6.2.1
   shared_preferences: ^2.1.1
+  device_info_plus: ^11.1.1
   cupertino_icons: ^1.0.8
   intl: ^0.20.2
+  dio: ^5.4.0
+  connectivity_plus: ^5.0.2
+  pretty_dio_logger: ^1.3.1
 
 dev_dependencies:
   flutter_test:
@@ -62,8 +66,8 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-    - images/moneylogo.png
-  #   - images/a_dot_ham.jpeg
+    - images/adepa_teachers_logo.png
+    # TODO: add other image assets here as needed
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

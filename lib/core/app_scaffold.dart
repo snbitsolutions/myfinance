@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../router/navigation_history.dart';
+
 class AppScaffold extends StatelessWidget {
   final String title;
   final Widget child;
@@ -22,37 +24,49 @@ class AppScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        leading: showBack
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  // Prefer popping the Navigator; if nothing to pop, go home.
-                  if (Navigator.of(context).canPop()) {
-                    context.pop();
-                  } else {
-                    context.go('/home');
-                  }
-                },
-              )
-            : null,
-        title: Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: theme.colorScheme.primary,
+    Future<void> handleBackNavigation() async {
+      // Prefer popping the Navigator; if nothing to pop, go to tracked previous page.
+      if (Navigator.of(context).canPop()) {
+        context.pop();
+      } else {
+        await NavigationHistory.instance.goBack(context);
+      }
+    }
+
+    return WillPopScope(
+      onWillPop: () async {
+        if (Navigator.of(context).canPop()) {
+          return true;
+        }
+
+        await NavigationHistory.instance.goBack(context);
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: showBack
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: handleBackNavigation,
+                )
+              : null,
+          title: Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.primary,
+            ),
           ),
+          centerTitle: true,
+          elevation: 0.5,
+          backgroundColor: theme.colorScheme.surface,
+          foregroundColor: theme.colorScheme.primary,
+          actions: actions,
         ),
-        centerTitle: true,
-        elevation: 0.5,
-        backgroundColor: theme.colorScheme.surface,
-        foregroundColor: theme.colorScheme.primary,
-        actions: actions,
+        body: child,
+        bottomNavigationBar: bottomNavigationBar,
+        floatingActionButton: floatingActionButton,
       ),
-      body: child,
-      bottomNavigationBar: bottomNavigationBar,
-      floatingActionButton: floatingActionButton,
     );
   }
 }

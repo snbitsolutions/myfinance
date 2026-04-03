@@ -1,4 +1,5 @@
 import 'package:go_router/go_router.dart';
+import 'navigation_history.dart';
 
 // Core
 
@@ -15,6 +16,7 @@ import '../screens/auth/set_pin_screen.dart';
 // Dashboard Tabs
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/savings/savings_screen.dart';
+import '../screens/savings/savings_types_screen.dart';
 import '../screens/transactions/transactions_screen.dart';
 import '../screens/profile/profile_screen.dart';
 
@@ -29,105 +31,153 @@ import '../screens/payment/payment_success_screen.dart';
 import '../screens/payment/payment_failed_screen.dart';
 import '../screens/savings/create_savings_screen.dart';
 import '../screens/savings/savings_detail_screen.dart';
+import '../screens/savings/transfer_screen.dart';
+import '../screens/savings/withdraw_savings_screen.dart';
 import '../screens/profile/kyc_screen.dart';
 import '../screens/profile/settings_screen.dart';
+import '../screens/shares/shares_screen.dart';
+import '../screens/investment/investment_screen.dart';
 
 class AppRouter {
-  static final GoRouter router = GoRouter(
-    initialLocation: '/',
-    routes: [
-      // ===================
-      // Splash & Onboarding
-      // ===================
-      GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
-      GoRoute(
-        path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
-      ),
+  static final GoRouter router = _createRouter();
 
-      // ==========
-      // Auth Flow
-      // ==========
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/otp', builder: (context, state) => const OtpScreen()),
-      GoRoute(
-        path: '/set-pin',
-        builder: (context, state) => const SetPinScreen(),
-      ),
+  static GoRouter _createRouter() {
+    final configuredRouter = GoRouter(
+      initialLocation: '/',
+      routes: [
+        // ===================
+        // Splash & Onboarding
+        // ===================
+        GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
+        GoRoute(
+          path: '/onboarding',
+          builder: (context, state) => const OnboardingScreen(),
+        ),
 
-      // =========================
-      // MAIN APP (Bottom Nav)
-      // =========================
-      ShellRoute(
-        builder: (context, state, child) {
-          return MainShell(child: child);
-        },
-        routes: [
-          // Tabs
-          GoRoute(
-            path: '/home',
-            builder: (context, state) => const DashboardScreen(),
-          ),
-          GoRoute(
-            path: '/savings',
-            builder: (context, state) => const SavingsScreen(),
-          ),
-          GoRoute(
-            path: '/transactions',
-            builder: (context, state) => const TransactionsScreen(),
-          ),
-          GoRoute(
-            path: '/profile',
-            builder: (context, state) => const ProfileScreen(),
-          ),
+        // ==========
+        // Auth Flow
+        // ==========
+        GoRoute(
+          path: '/login',
+          builder: (context, state) => const LoginScreen(),
+        ),
+        GoRoute(path: '/otp', builder: (context, state) => const OtpScreen()),
+        GoRoute(
+          path: '/set-pin',
+          builder: (context, state) => const SetPinScreen(),
+        ),
 
-          // Sub-pages (still keep bottom nav)
-          GoRoute(
-            path: '/apply-loan',
-            builder: (context, state) => const ApplyLoanScreen(),
-          ),
-          GoRoute(
-            path: '/loan-status',
-            builder: (context, state) => const LoanStatusScreen(),
-          ),
-          GoRoute(
-            path: '/loan-detail',
-            builder: (context, state) => const LoanDetailScreen(),
-          ),
-          GoRoute(
-            path: '/repayment',
-            builder: (context, state) => const RepaymentScreen(),
-          ),
-          GoRoute(
-            path: '/payment',
-            builder: (context, state) => const PaymentScreen(),
-          ),
-          GoRoute(
-            path: '/payment-success',
-            builder: (context, state) => const PaymentSuccessScreen(),
-          ),
-          GoRoute(
-            path: '/payment-failed',
-            builder: (context, state) => const PaymentFailedScreen(),
-          ),
-          GoRoute(
-            path: '/savings/create',
-            builder: (context, state) => const CreateSavingsScreen(),
-          ),
-          GoRoute(
-            path: '/savings/:id',
-            builder: (context, state) {
-              final id = state.pathParameters['id']!;
-              return SavingsDetailScreen(savingsId: id);
-            },
-          ),
-          GoRoute(path: '/kyc', builder: (context, state) => const KycScreen()),
-          GoRoute(
-            path: '/settings',
-            builder: (context, state) => const SettingsScreen(),
-          ),
-        ],
-      ),
-    ],
-  );
+        // =========================
+        // MAIN APP (Bottom Nav)
+        // =========================
+        ShellRoute(
+          builder: (context, state, child) {
+            return MainShell(child: child);
+          },
+          routes: [
+            // Tabs
+            GoRoute(
+              path: '/home',
+              builder: (context, state) => const DashboardScreen(),
+            ),
+            GoRoute(
+              path: '/savings',
+              builder: (context, state) {
+                // if a type query parameter is provided we could filter inside
+                // the savings screen; currently ignored.
+                return const SavingsScreen();
+              },
+            ),
+            GoRoute(
+              path: '/savings/types',
+              builder: (context, state) => const SavingsTypesScreen(),
+            ),
+            GoRoute(
+              path: '/transactions',
+              builder: (context, state) => const TransactionsScreen(),
+            ),
+            GoRoute(
+              path: '/profile',
+              builder: (context, state) => const ProfileScreen(),
+            ),
+
+            // Sub-pages (still keep bottom nav)
+            GoRoute(
+              path: '/apply-loan',
+              builder: (context, state) => const ApplyLoanScreen(),
+            ),
+            GoRoute(
+              path: '/loan-status',
+              builder: (context, state) => const LoanStatusScreen(),
+            ),
+            GoRoute(
+              path: '/loan-detail',
+              builder: (context, state) => const LoanDetailScreen(),
+            ),
+            GoRoute(
+              path: '/repayment',
+              builder: (context, state) => const RepaymentScreen(),
+            ),
+            GoRoute(
+              path: '/payment',
+              builder: (context, state) => const PaymentScreen(),
+            ),
+            GoRoute(
+              path: '/payment-success',
+              builder: (context, state) => const PaymentSuccessScreen(),
+            ),
+            GoRoute(
+              path: '/payment-failed',
+              builder: (context, state) => const PaymentFailedScreen(),
+            ),
+            GoRoute(
+              path: '/savings/create',
+              builder: (context, state) => const CreateSavingsScreen(),
+            ),
+            GoRoute(
+              path: '/savings/transfer',
+              builder: (context, state) => const TransferScreen(),
+            ),
+            GoRoute(
+              path: '/savings/withdraw',
+              builder: (context, state) => const WithdrawSavingsScreen(),
+            ),
+            GoRoute(
+              path: '/savings/:id/withdraw',
+              builder: (context, state) {
+                final id = state.pathParameters['id']!;
+                return WithdrawSavingsScreen(savingsId: id);
+              },
+            ),
+            GoRoute(
+              path: '/savings/:id',
+              builder: (context, state) {
+                final id = state.pathParameters['id']!;
+                return SavingsDetailScreen(savingsId: id);
+              },
+            ),
+            GoRoute(
+              path: '/kyc',
+              builder: (context, state) => const KycScreen(),
+            ),
+            GoRoute(
+              path: '/settings',
+              builder: (context, state) => const SettingsScreen(),
+            ),
+            GoRoute(
+              path: '/shares',
+              builder: (context, state) => const SharesScreen(),
+            ),
+            GoRoute(
+              path: '/investment',
+              builder: (context, state) => const InvestmentScreen(),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    NavigationHistory.instance.attach(configuredRouter);
+    return configuredRouter;
+  }
 }

@@ -1,4 +1,4 @@
-# MyFinance
+# ADEPA TEACHERS
 
 A personal finance management Flutter mobile app featuring loan applications, savings tracking, and payment processing.
 
@@ -53,10 +53,10 @@ A personal finance management Flutter mobile app featuring loan applications, sa
 
 ```bash
 # Clone the repository
-git clone https://github.com/snbitsolutions/myfinance.git
+git clone https://github.com/snbitsolutions/adepa_teachers.git
 
 # Navigate to project directory
-cd myfinance
+cd adepa_teachers
 
 # Install dependencies
 flutter pub get
@@ -157,7 +157,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 **SNBitSolutions**
 
 - GitHub: [@snbitsolutions](https://github.com/snbitsolutions)
-- Project Link: [https://github.com/snbitsolutions/myfinance](https://github.com/snbitsolutions/myfinance)
+- Project Link: [https://github.com/snbitsolutions/adepa_teachers](https://github.com/snbitsolutions/adepa_teachers)
 
 ## Acknowledgments
 

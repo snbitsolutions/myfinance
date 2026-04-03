@@ -1,8 +1,12 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/app_scaffold.dart';
-import '../../core/constants/app_constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../core/app_scaffold.dart';
+import '../../core/color_ext.dart';
+import '../../core/constants/app_constants.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -11,92 +15,52 @@ class OnboardingScreen extends StatefulWidget {
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen>
-    with TickerProviderStateMixin {
-  final PageController _controller = PageController();
-  int index = 0;
-  late AnimationController _iconAnimationController;
-  late AnimationController _fadeAnimationController;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _fadeAnimation;
-
-  late final List<Map<String, dynamic>> pages = [
-    {
-      'title': 'Welcome to ${AppConstants.appName}',
-      'subtitle': 'Fast loans and smart savings in one app',
-      'icon': Icons.account_balance_wallet,
-      'color': Colors.blue,
-    },
-    {
-      'title': 'Quick Loans',
-      'subtitle':
-          'Apply and receive funds instantly with flexible repayment plans',
-      'icon': Icons.flash_on,
-      'color': Colors.orange,
-    },
-    {
-      'title': 'Smart Savings',
-      'subtitle': 'Set goals, track progress, and watch your money grow',
-      'icon': Icons.savings,
-      'color': Colors.green,
-    },
-    {
-      'title': 'Easy Payments',
-      'subtitle':
-          'Secure payments with multiple options and instant confirmation',
-      'icon': Icons.payment,
-      'color': Colors.purple,
-    },
-  ];
+class _OnboardingScreenState extends State<OnboardingScreen> {
+  final _pageCtrl = PageController();
+  int _page = 0;
+  double _pageOffset = 0;
 
   @override
   void initState() {
     super.initState();
-
-    // Icon animation controller
-    _iconAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-
-    // Fade animation controller
-    _fadeAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
-
-    _scaleAnimation = CurvedAnimation(
-      parent: _iconAnimationController,
-      curve: Curves.elasticOut,
-    );
-
-    _fadeAnimation = CurvedAnimation(
-      parent: _fadeAnimationController,
-      curve: Curves.easeIn,
-    );
-
-    // Start initial animation
-    _iconAnimationController.forward();
-    _fadeAnimationController.forward();
+    _pageCtrl.addListener(_handlePageScroll);
   }
 
-  @override
-  void dispose() {
-    _iconAnimationController.dispose();
-    _fadeAnimationController.dispose();
-    _controller.dispose();
-    super.dispose();
+  void _handlePageScroll() {
+    if (!_pageCtrl.hasClients || !mounted) return;
+    final nextOffset = _pageCtrl.page ?? _page.toDouble();
+    if ((nextOffset - _pageOffset).abs() < 0.0001) return;
+    setState(() => _pageOffset = nextOffset);
   }
 
-  void _onPageChanged(int newIndex) {
-    setState(() => index = newIndex);
-
-    // Reset and replay animations for new page
-    _iconAnimationController.reset();
-    _fadeAnimationController.reset();
-    _iconAnimationController.forward();
-    _fadeAnimationController.forward();
-  }
+  List<OnboardingPageData> _pages(ThemeData theme) => [
+    OnboardingPageData(
+      title: 'Welcome to ${AppConstants.appName}',
+      subtitle: 'Fast loans and smart savings in one app',
+      image: 'images/adepa_teachers_logo.png',
+      color: theme.colorScheme.primary,
+    ),
+    OnboardingPageData(
+      title: 'Quick Loans',
+      subtitle:
+          'Apply and receive funds instantly with flexible repayment plans',
+      icon: Icons.flash_on,
+      color: theme.colorScheme.secondary,
+    ),
+    OnboardingPageData(
+      title: 'Smart Savings',
+      subtitle: 'Set goals, track progress, and watch your money grow',
+      icon: Icons.savings,
+      color: theme.colorScheme.primary,
+    ),
+    OnboardingPageData(
+      title: 'Easy Payments',
+      subtitle:
+          'Secure payments with multiple options and instant confirmation',
+      icon: Icons.payment,
+      color: theme.colorScheme.secondary,
+    ),
+  ];
 
   Future<void> _finish() async {
     final prefs = await SharedPreferences.getInstance();
@@ -106,8 +70,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   @override
+  void dispose() {
+    _pageCtrl.removeListener(_handlePageScroll);
+    _pageCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final pages = _pages(theme);
+    final isCompact = MediaQuery.sizeOf(context).height < 760;
 
     return AppScaffold(
       title: '',
@@ -127,238 +100,339 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 ),
               ),
             ),
-
             Expanded(
               child: PageView.builder(
-                controller: _controller,
+                controller: _pageCtrl,
                 itemCount: pages.length,
-                onPageChanged: _onPageChanged,
-                itemBuilder: (_, i) {
-                  final page = pages[i];
-                  final pageColor = page['color'] as Color;
-
-                  return AnimatedBuilder(
-                    animation: _controller,
-                    builder: (context, child) {
-                      double value = 1.0;
-                      if (_controller.position.haveDimensions) {
-                        value = _controller.page! - i;
-                        value = (1 - (value.abs() * 0.3)).clamp(0.0, 1.0);
-                      }
-
-                      return Center(
-                        child: SizedBox(
-                          height: Curves.easeOut.transform(value) * 500,
-                          child: child,
-                        ),
-                      );
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            pageColor.withOpacity(0.05),
-                            pageColor.withOpacity(0.1),
-                          ],
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // Animated Icon
-                            ScaleTransition(
-                              scale: _scaleAnimation,
-                              child: Container(
-                                width: 140,
-                                height: 140,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      pageColor.withOpacity(0.2),
-                                      pageColor.withOpacity(0.4),
-                                    ],
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: pageColor.withOpacity(0.3),
-                                      blurRadius: 30,
-                                      offset: const Offset(0, 10),
-                                    ),
-                                  ],
-                                ),
-                                child: Icon(
-                                  page['icon'] as IconData,
-                                  size: 70,
-                                  color: pageColor,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 56),
-
-                            // Animated Title
-                            FadeTransition(
-                              opacity: _fadeAnimation,
-                              child: SlideTransition(
-                                position: Tween<Offset>(
-                                  begin: const Offset(0, 0.3),
-                                  end: Offset.zero,
-                                ).animate(_fadeAnimationController),
-                                child: Text(
-                                  page['title'] as String,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.headlineMedium
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: theme.colorScheme.onSurface,
-                                      ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Animated Subtitle
-                            FadeTransition(
-                              opacity: _fadeAnimation,
-                              child: SlideTransition(
-                                position:
-                                    Tween<Offset>(
-                                      begin: const Offset(0, 0.3),
-                                      end: Offset.zero,
-                                    ).animate(
-                                      CurvedAnimation(
-                                        parent: _fadeAnimationController,
-                                        curve: const Interval(
-                                          0.2,
-                                          1.0,
-                                          curve: Curves.easeOut,
-                                        ),
-                                      ),
-                                    ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                  ),
-                                  child: Text(
-                                    page['subtitle'] as String,
-                                    textAlign: TextAlign.center,
-                                    style: theme.textTheme.bodyLarge?.copyWith(
-                                      color: theme.colorScheme.onSurface
-                                          .withOpacity(0.7),
-                                      height: 1.5,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
+                onPageChanged: (p) => setState(() => _page = p),
+                itemBuilder: (_, i) => OnboardingPage(
+                  pages[i],
+                  isActive: _page == i,
+                  isCompact: isCompact,
+                  pageOffset: _pageOffset,
+                  pageIndex: i,
+                ),
               ),
             ),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      pages.length,
-                      (i) => GestureDetector(
-                        onTap: () => _controller.animateToPage(
-                          i,
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        ),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          width: index == i ? 28 : 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: index == i
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.outline.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Row(
-                    children: [
-                      if (index > 0)
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              _controller.previousPage(
-                                duration: const Duration(milliseconds: 400),
-                                curve: Curves.easeInOut,
-                              );
-                            },
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size(0, 52),
-                            ),
-                            child: const Text('Back'),
-                          ),
-                        ),
-                      if (index > 0) const SizedBox(width: 12),
-                      Expanded(
-                        flex: index > 0 ? 2 : 1,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          height: 52,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              if (index == pages.length - 1) {
-                                _finish();
-                              } else {
-                                _controller.nextPage(
-                                  duration: const Duration(milliseconds: 400),
-                                  curve: Curves.easeInOut,
-                                );
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size(double.infinity, 52),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  index == pages.length - 1
-                                      ? 'Get Started'
-                                      : 'Next',
-                                ),
-                                if (index < pages.length - 1) ...[
-                                  const SizedBox(width: 8),
-                                  const Icon(Icons.arrow_forward, size: 20),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                ],
-              ),
-            ),
+            _controls(theme, pages, isCompact: isCompact),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _controls(
+    ThemeData theme,
+    List<OnboardingPageData> pages, {
+    required bool isCompact,
+  }) {
+    final isLast = _page == pages.length - 1;
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 16 : 24),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              pages.length,
+              (i) => GestureDetector(
+                onTap: () => _pageCtrl.animateToPage(
+                  i,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                ),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: EdgeInsets.symmetric(horizontal: isCompact ? 3 : 4),
+                  width: _page == i ? (isCompact ? 24 : 28) : 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: _page == i
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.outline.withOpacitySafe(0.3),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: isCompact ? 20 : 32),
+          Row(
+            children: [
+              if (_page > 0)
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => _pageCtrl.previousPage(
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeInOut,
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: Size(0, isCompact ? 48 : 52),
+                    ),
+                    child: const Text('Back'),
+                  ),
+                ),
+              if (_page > 0) const SizedBox(width: 12),
+              Expanded(
+                flex: _page > 0 ? 2 : 1,
+                child: ElevatedButton(
+                  onPressed: isLast
+                      ? _finish
+                      : () => _pageCtrl.nextPage(
+                          duration: const Duration(milliseconds: 400),
+                          curve: Curves.easeInOut,
+                        ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isLast
+                        ? theme.colorScheme.secondary
+                        : theme.colorScheme.primary,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                    minimumSize: Size(double.infinity, isCompact ? 48 : 52),
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    transitionBuilder: (child, animation) =>
+                        FadeTransition(opacity: animation, child: child),
+                    child: Row(
+                      key: ValueKey<bool>(isLast),
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(isLast ? 'Get Started' : 'Next'),
+                        if (isLast) ...[
+                          const SizedBox(width: 8),
+                          const Icon(Icons.check_circle_outline, size: 20),
+                        ] else ...[
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_forward, size: 20),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: isCompact ? 20 : 32),
+        ],
+      ),
+    );
+  }
+}
+
+class OnboardingPageData {
+  const OnboardingPageData({
+    required this.title,
+    required this.subtitle,
+    this.icon,
+    this.image,
+    required this.color,
+  });
+  final String title;
+  final String subtitle;
+  final IconData? icon;
+  final String? image;
+  final Color color;
+}
+
+class OnboardingPage extends StatelessWidget {
+  const OnboardingPage(
+    this.data, {
+    super.key,
+    required this.isActive,
+    required this.isCompact,
+    required this.pageOffset,
+    required this.pageIndex,
+  });
+
+  final OnboardingPageData data;
+  final bool isActive;
+  final bool isCompact;
+  final double pageOffset;
+  final int pageIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final disableAnimations =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final pageColor = data.color;
+    final pageDelta = (pageOffset - pageIndex).clamp(-1.2, 1.2).toDouble();
+    final distance = pageDelta.abs().clamp(0.0, 1.0);
+    final intensity = disableAnimations ? 0.0 : (isCompact ? 0.55 : 0.8);
+    final depthScale = 1 - (distance * 0.035 * intensity);
+    final depthOpacity = 1 - (distance * 0.12 * intensity);
+    final depthBlur = distance * 1.0 * intensity;
+    final backgroundShift = pageDelta * (disableAnimations ? 0 : 18);
+    final contentShift = pageDelta * (disableAnimations ? 0 : -8);
+    final iconShift = pageDelta * (disableAnimations ? 0 : -5);
+    final titleStyle =
+        (isCompact
+                ? theme.textTheme.titleLarge
+                : theme.textTheme.headlineMedium)
+            ?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
+            );
+    final subtitleStyle =
+        (isCompact ? theme.textTheme.bodyMedium : theme.textTheme.bodyLarge)
+            ?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacitySafe(0.7),
+              height: 1.5,
+            );
+
+    return ClipRect(
+      child: Stack(
+        children: [
+          Transform.translate(
+            offset: Offset(backgroundShift, 0),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    pageColor.withOpacitySafe(0.05),
+                    pageColor.withOpacitySafe(0.1),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Transform.translate(
+            offset: Offset(contentShift, 0),
+            child: Opacity(
+              opacity: depthOpacity,
+              child: Transform.scale(
+                scale: depthScale,
+                child: ImageFiltered(
+                  imageFilter: ImageFilter.blur(
+                    sigmaX: depthBlur,
+                    sigmaY: depthBlur,
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isCompact ? 16 : 24,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        AnimatedScale(
+                          scale: isActive ? 1 : 0.92,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOutBack,
+                          child: AnimatedOpacity(
+                            opacity: isActive ? 1 : 0.75,
+                            duration: const Duration(milliseconds: 280),
+                            child: Transform.translate(
+                              offset: Offset(iconShift, 0),
+                              child: _buildIcon(pageColor),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: isCompact ? 28 : 56),
+                        AnimatedSlide(
+                          offset: isActive
+                              ? Offset.zero
+                              : const Offset(0, 0.04),
+                          duration: const Duration(milliseconds: 280),
+                          curve: Curves.easeOut,
+                          child: AnimatedOpacity(
+                            opacity: isActive ? 1 : 0.8,
+                            duration: const Duration(milliseconds: 240),
+                            child: Text(
+                              data.title,
+                              textAlign: TextAlign.center,
+                              style: titleStyle,
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: isCompact ? 12 : 16),
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isCompact ? 8 : 16,
+                          ),
+                          child: AnimatedSlide(
+                            offset: isActive
+                                ? Offset.zero
+                                : const Offset(0, 0.06),
+                            duration: const Duration(milliseconds: 320),
+                            curve: Curves.easeOut,
+                            child: AnimatedOpacity(
+                              opacity: isActive ? 1 : 0.78,
+                              duration: const Duration(milliseconds: 260),
+                              child: Text(
+                                data.subtitle,
+                                textAlign: TextAlign.center,
+                                style: subtitleStyle,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIcon(Color pageColor) {
+    final imageSize = isCompact ? 128.0 : 160.0;
+    final iconContainerSize = isCompact ? 112.0 : 140.0;
+    final iconSize = isCompact ? 54.0 : 70.0;
+
+    if (data.image != null) {
+      return Container(
+        width: imageSize,
+        height: imageSize,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              pageColor.withOpacitySafe(0.1),
+              pageColor.withOpacitySafe(0.15),
+            ],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: pageColor.withOpacitySafe(0.2),
+              blurRadius: 30,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Image.asset(data.image!, fit: BoxFit.contain),
+      );
+    }
+
+    return Container(
+      width: iconContainerSize,
+      height: iconContainerSize,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            pageColor.withOpacitySafe(0.2),
+            pageColor.withOpacitySafe(0.4),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: pageColor.withOpacitySafe(0.3),
+            blurRadius: 30,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Icon(data.icon, size: iconSize, color: pageColor),
     );
   }
 }

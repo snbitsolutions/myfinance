@@ -6,7 +6,7 @@ class AppConstants {
   static const String currencyCode = 'GHS';
 
   // App Info
-  static const String appName = 'MyFinance';
+  static const String appName = 'ADEPA TEACHERS';
   static const String appVersion = '1.0.0';
 
   // Timeouts
@@ -41,7 +41,7 @@ class AppConstants {
   static const double defaultCardBorderRadius = 20;
 
   // Durations
-  static const Duration splashDuration = Duration(seconds: 2);
+  static const Duration splashDuration = Duration(seconds: 5);
   static const Duration pageTransitionDuration = Duration(milliseconds: 300);
 
   // Error Messages
@@ -78,11 +78,14 @@ class AppConstants {
   // Shared Preferences Keys
   static const String sharedPrefKeyOnboarding = 'seenOnboarding';
   static const String sharedPrefKeyUserToken = 'userToken';
+  static const String sharedPrefKeyUserRefreshToken = 'userRefreshToken';
   static const String sharedPrefKeyUserId = 'userId';
   static const String sharedPrefKeyUserEmail = 'userEmail';
+  static const String sharedPrefKeyDeviceInstallId = 'deviceInstallId';
   static const String sharedPrefKeyRememberMe = 'rememberMe';
   static const String sharedPrefKeyDarkMode = 'darkMode';
   static const String sharedPrefKeyLanguage = 'language';
+  static const String sharedPrefKeyTransferFavorites = 'transferFavorites';
 
   // Loan Status
   static const String loanStatusPending = 'Pending';
@@ -103,7 +106,7 @@ class AppConstants {
 }
 
 class ApiEndpoints {
-  static const String baseUrl = 'https://api.myfinance.local';
+  static const String baseUrl = 'https://api.adepa_teachers.local';
 
   // Auth
   static const String login = '/auth/login';

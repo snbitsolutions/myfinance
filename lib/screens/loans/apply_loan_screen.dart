@@ -1,25 +1,56 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
+import '../../core/color_ext.dart';
 import '../../core/modern_input.dart';
+import 'loan_application_provider.dart';
 
-class ApplyLoanScreen extends StatefulWidget {
+class ApplyLoanScreen extends ConsumerStatefulWidget {
   const ApplyLoanScreen({super.key});
 
   @override
-  State<ApplyLoanScreen> createState() => _ApplyLoanScreenState();
+  ConsumerState<ApplyLoanScreen> createState() => _ApplyLoanScreenState();
 }
 
-class _ApplyLoanScreenState extends State<ApplyLoanScreen> {
+class _ApplyLoanScreenState extends ConsumerState<ApplyLoanScreen> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _purposeController = TextEditingController();
   String _repaymentPlan = '3 months';
 
+  double _parseAmount(String value) {
+    final normalized = value.replaceAll(',', '').trim();
+    return double.tryParse(normalized) ?? 0;
+  }
+
+  double get _loanAmount => _parseAmount(_amountController.text);
+
+  int get _planMonths => int.tryParse(_repaymentPlan.split(' ').first) ?? 3;
+
+  double get _effectiveRate {
+    switch (_planMonths) {
+      case 3:
+        return 0.06;
+      case 6:
+        return 0.10;
+      default:
+        return 0.12;
+    }
+  }
+
+  String? get _amountError {
+    if (_amountController.text.trim().isEmpty) return null;
+    if (_loanAmount <= 0) return 'Enter a valid loan amount.';
+    if (_loanAmount < 100) return 'Minimum loan amount is GH₵100.';
+    return null;
+  }
+
   bool get _canSubmit {
-    final amt = double.tryParse(_amountController.text) ?? 0;
-    return amt > 0 && _purposeController.text.trim().isNotEmpty;
+    return _loanAmount >= 100 &&
+        _purposeController.text.trim().isNotEmpty &&
+        _amountError == null;
   }
 
   @override
@@ -45,13 +76,23 @@ class _ApplyLoanScreenState extends State<ApplyLoanScreen> {
                 children: [
                   ModernInput(
                     label: 'Loan Amount',
-                    hintText: 'e.g., 1000',
+                    hintText: 'e.g., 1,000 (Ghana cedis)',
                     controller: _amountController,
                     keyboardType: TextInputType.number,
-                    prefixText: '₵ ',
-                    prefixIcon: Icons.attach_money,
+                    prefixText: 'GH₵ ',
+                    prefixIcon: Icons.currency_exchange,
                     onChanged: (_) => setState(() {}),
                   ),
+                  if (_amountError != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      _amountError!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   ModernInput(
                     label: 'Purpose',
@@ -68,7 +109,7 @@ class _ApplyLoanScreenState extends State<ApplyLoanScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
                       border: Border.all(
-                        color: theme.colorScheme.outline.withOpacity(0.2),
+                        color: theme.colorScheme.outline.withOpacitySafe(0.2),
                       ),
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -90,22 +131,46 @@ class _ApplyLoanScreenState extends State<ApplyLoanScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer.withOpacity(
-                          0.2,
-                        ),
+                        color: theme.colorScheme.primaryContainer
+                            .withOpacitySafe(0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Estimated Interest (12%)',
+                            'Estimated Interest (${(_effectiveRate * 100).toStringAsFixed(0)}%)',
                             style: theme.textTheme.bodySmall,
                           ),
                           Text(
-                            '₵${(double.tryParse(_amountController.text) ?? 0) * 0.12}',
+                            'GH₵${(_loanAmount * _effectiveRate).toStringAsFixed(2)}',
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.tertiaryContainer
+                            .withOpacitySafe(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Estimated monthly payment',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          Text(
+                            'GH₵${((_loanAmount + (_loanAmount * _effectiveRate)) / _planMonths).toStringAsFixed(2)}',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.tertiary,
                             ),
                           ),
                         ],
@@ -122,7 +187,18 @@ class _ApplyLoanScreenState extends State<ApplyLoanScreen> {
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: _canSubmit ? () => context.go('/loan-status') : null,
+                onPressed: _canSubmit
+                    ? () {
+                        ref
+                            .read(loanApplicationProvider.notifier)
+                            .submit(
+                              amount: _loanAmount,
+                              purpose: _purposeController.text.trim(),
+                              repaymentPlan: _repaymentPlan,
+                            );
+                        context.go('/loan-status');
+                      }
+                    : null,
                 child: const Text('Submit Application'),
               ),
             ),
