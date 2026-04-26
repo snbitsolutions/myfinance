@@ -345,7 +345,7 @@ class _SnbITSolutionsSheet extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.black.withOpacitySafe(0.12),
             blurRadius: 24,
             offset: const Offset(0, -4),
           ),
@@ -379,7 +379,7 @@ class _SnbITSolutionsSheet extends StatelessWidget {
               'Crafting smart digital experiences\nfor Africa\'s financial future.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
                 height: 1.55,
               ),
             ),
@@ -407,7 +407,7 @@ class _SnbITSolutionsSheet extends StatelessWidget {
             Text(
               '© 2025 SNB IT Solutions. All rights reserved.',
               style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.38),
+                color: theme.colorScheme.onSurface.withOpacitySafe(0.38),
               ),
             ),
           ],

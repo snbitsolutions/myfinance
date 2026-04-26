@@ -68,6 +68,8 @@ class AuthService extends BaseService {
           'email': email,
           'auth_token':
               'mock_jwt_token_${DateTime.now().millisecondsSinceEpoch}',
+          'refresh_token':
+              'mock_refresh_token_${DateTime.now().millisecondsSinceEpoch}',
           'token_expires_in': 3600, // 1 hour
         },
       };
@@ -373,10 +375,15 @@ class LoanService extends BaseService {
   Future<Map<String, dynamic>> repayLoan({
     required String loanId,
     required double amount,
+    required double currentOutstanding,
+    String paymentMethod = 'Mobile Money',
+    String? phoneNumber,
   }) async {
     return handleApiCall(() async {
       AppLogger.logApiRequest('POST', '${ApiEndpoints.repayLoan}/$loanId', {
         'amount': amount,
+        'payment_method': paymentMethod,
+        'phone_number': phoneNumber,
       });
       await _simulateNetworkDelay();
 
@@ -384,11 +391,32 @@ class LoanService extends BaseService {
         throw ValidationException(message: 'Amount must be greater than zero');
       }
 
+      if (amount > currentOutstanding) {
+        throw ValidationException(
+          message: 'Amount cannot exceed the outstanding balance.',
+        );
+      }
+
+      final now = DateTime.now();
+      final newOutstanding = (currentOutstanding - amount).clamp(
+        0,
+        currentOutstanding,
+      );
+
       final response = {
         'status': 'success',
         'message': 'Loan repayment successful',
-        'transaction_id': 'TXN_${DateTime.now().millisecondsSinceEpoch}',
-        'new_outstanding': 750.0,
+        'data': {
+          'loan_id': loanId,
+          'transaction_id': 'TXN_${now.millisecondsSinceEpoch}',
+          'amount': amount,
+          'previous_outstanding': currentOutstanding,
+          'new_outstanding': newOutstanding,
+          'processed_at': now.toIso8601String(),
+          'payment_method': 'momo',
+          'payment_method_label': paymentMethod,
+          'phone_number': phoneNumber,
+        },
       };
 
       AppLogger.logApiResponse('POST', ApiEndpoints.repayLoan, response);

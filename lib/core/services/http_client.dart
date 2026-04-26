@@ -1,17 +1,16 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/app_constants.dart';
 import '../exceptions/app_exceptions.dart';
+import 'secure_auth_storage.dart';
 import '../utils/logger.dart';
 
 /// HTTP client singleton for all API calls
 class HttpClient {
   static HttpClient? _instance;
   late Dio _dio;
-  SharedPreferences? _prefs;
 
   HttpClient._internal() {
     _dio = Dio(
@@ -45,7 +44,7 @@ class HttpClient {
 
   /// Initialize SharedPreferences
   Future<void> initializePreferences() async {
-    _prefs ??= await SharedPreferences.getInstance();
+    await SecureAuthStorage.instance.initialize();
   }
 
   /// Initialize interceptors
@@ -56,7 +55,7 @@ class HttpClient {
         onRequest: (options, handler) async {
           // Inject auth token if available
           await initializePreferences();
-          final token = _prefs?.getString(AppConstants.sharedPrefKeyUserToken);
+          final token = await SecureAuthStorage.instance.readAuthToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
@@ -85,9 +84,7 @@ class HttpClient {
             if (refreshed) {
               // Retry the original request
               final options = error.requestOptions;
-              final token = _prefs?.getString(
-                AppConstants.sharedPrefKeyUserToken,
-              );
+              final token = await SecureAuthStorage.instance.readAuthToken();
               options.headers['Authorization'] = 'Bearer $token';
 
               try {
@@ -113,7 +110,7 @@ class HttpClient {
       // Pretty logger (debug mode only)
       if (kDebugMode)
         PrettyDioLogger(
-          requestHeader: true,
+          requestHeader: false,
           requestBody: true,
           responseHeader: false,
           responseBody: true,
@@ -128,9 +125,7 @@ class HttpClient {
   Future<bool> _refreshToken() async {
     try {
       await initializePreferences();
-      final refreshToken = _prefs?.getString(
-        AppConstants.sharedPrefKeyUserRefreshToken,
-      );
+      final refreshToken = await SecureAuthStorage.instance.readRefreshToken();
 
       if (refreshToken == null || refreshToken.isEmpty) {
         AppLogger.warning('No refresh token available');
@@ -149,12 +144,9 @@ class HttpClient {
         final newRefreshToken = data['refresh_token'] as String?;
 
         // Save new tokens
-        await _prefs?.setString(AppConstants.sharedPrefKeyUserToken, newToken);
+        await SecureAuthStorage.instance.writeAuthToken(newToken);
         if (newRefreshToken != null) {
-          await _prefs?.setString(
-            AppConstants.sharedPrefKeyUserRefreshToken,
-            newRefreshToken,
-          );
+          await SecureAuthStorage.instance.writeRefreshToken(newRefreshToken);
         }
 
         AppLogger.info('Token refreshed successfully');
@@ -400,8 +392,7 @@ class HttpClient {
   /// Clear all stored tokens (for logout)
   Future<void> clearTokens() async {
     await initializePreferences();
-    await _prefs?.remove(AppConstants.sharedPrefKeyUserToken);
-    await _prefs?.remove(AppConstants.sharedPrefKeyUserRefreshToken);
+    await SecureAuthStorage.instance.clearAuthSecrets();
     AppLogger.info('Tokens cleared');
   }
 

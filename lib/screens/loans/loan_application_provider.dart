@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoanApplicationState {
   final double amount;
@@ -26,6 +29,7 @@ class LoanApplicationState {
   double get outstandingBalance =>
       (totalWithInterest - repaidAmount).clamp(0, totalWithInterest);
   double get monthlyInstallment => totalWithInterest / planMonths;
+  DateTime get dueDate => submittedAt.add(Duration(days: planMonths * 30));
   double get progressFraction =>
       totalWithInterest > 0 ? repaidAmount / totalWithInterest : 0.0;
 
@@ -41,10 +45,42 @@ class LoanApplicationState {
       repaidAmount: repaidAmount ?? this.repaidAmount,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'amount': amount,
+      'purpose': purpose,
+      'repaymentPlan': repaymentPlan,
+      'planMonths': planMonths,
+      'effectiveRate': effectiveRate,
+      'submittedAt': submittedAt.toIso8601String(),
+      'referenceNumber': referenceNumber,
+      'repaidAmount': repaidAmount,
+    };
+  }
+
+  factory LoanApplicationState.fromJson(Map<String, dynamic> json) {
+    return LoanApplicationState(
+      amount: (json['amount'] as num).toDouble(),
+      purpose: json['purpose'] as String,
+      repaymentPlan: json['repaymentPlan'] as String,
+      planMonths: json['planMonths'] as int,
+      effectiveRate: (json['effectiveRate'] as num).toDouble(),
+      submittedAt:
+          DateTime.tryParse(json['submittedAt'] as String? ?? '') ??
+          DateTime.now(),
+      referenceNumber: json['referenceNumber'] as String,
+      repaidAmount: (json['repaidAmount'] as num?)?.toDouble() ?? 0,
+    );
+  }
 }
 
 class LoanApplicationNotifier extends StateNotifier<LoanApplicationState?> {
-  LoanApplicationNotifier() : super(null);
+  static const _storageKey = 'loan_application_state_v1';
+
+  LoanApplicationNotifier() : super(null) {
+    _restorePersistedState();
+  }
 
   void submit({
     required double amount,
@@ -68,6 +104,7 @@ class LoanApplicationNotifier extends StateNotifier<LoanApplicationState?> {
       submittedAt: now,
       referenceNumber: ref,
     );
+    _persistState();
   }
 
   void recordPayment(double paid) {
@@ -78,6 +115,34 @@ class LoanApplicationNotifier extends StateNotifier<LoanApplicationState?> {
         state!.totalWithInterest,
       ),
     );
+    _persistState();
+  }
+
+  Future<void> clear() async {
+    state = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_storageKey);
+  }
+
+  Future<void> _restorePersistedState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_storageKey);
+    if (raw == null || raw.isEmpty) return;
+
+    try {
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      state = LoanApplicationState.fromJson(data);
+    } catch (_) {
+      // Ignore invalid cached payloads.
+    }
+  }
+
+  Future<void> _persistState() async {
+    final current = state;
+    if (current == null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_storageKey, jsonEncode(current.toJson()));
   }
 
   static double _rateForMonths(int months) {

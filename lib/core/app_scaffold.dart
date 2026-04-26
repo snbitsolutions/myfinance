@@ -24,23 +24,24 @@ class AppScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final canPop = context.canPop();
     Future<void> handleBackNavigation() async {
       // Prefer popping the Navigator; if nothing to pop, go to tracked previous page.
-      if (Navigator.of(context).canPop()) {
+      if (!context.mounted) return;
+      if (context.canPop()) {
         context.pop();
       } else {
         await NavigationHistory.instance.goBack(context);
       }
     }
 
-    return WillPopScope(
-      onWillPop: () async {
-        if (Navigator.of(context).canPop()) {
-          return true;
+    return PopScope(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || !context.mounted) {
+          return;
         }
-
-        await NavigationHistory.instance.goBack(context);
-        return false;
+        NavigationHistory.instance.goBack(context);
       },
       child: Scaffold(
         appBar: AppBar(

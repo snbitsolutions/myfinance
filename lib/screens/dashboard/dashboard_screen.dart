@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers/app_providers.dart';
+import '../../core/services/notification_service.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -59,27 +60,104 @@ class _DashboardContent extends StatelessWidget {
     final viewData = _DashboardProfileViewData.fromProfile(profile);
     final firstName = viewData.accountName.trim().split(RegExp(r'\s+')).first;
 
+    final quickActionsPanel = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 6, bottom: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'Quick Actions',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.1,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '4 services',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.45,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Tap a card to continue to a service',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.58),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 650),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value,
+                child: Transform.translate(
+                  offset: Offset(0, 24 * (1 - value)),
+                  child: child,
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: theme.colorScheme.outline.withValues(alpha: 0.22),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const _QuickActions(),
+            ),
+          ),
+        ),
+      ],
+    );
+
     return SafeArea(
-      child: Stack(
-        children: [
-          Positioned(
-            left: 0,
-            right: 0,
-            top: _DashboardUi.topBackgroundOffset,
-            child: IgnorePointer(
-              child: SizedBox(
-                height: _DashboardUi.topBackgroundHeight,
-                child: CustomPaint(
-                  painter: _ScaffoldCurvePainter(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.45),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isTablet = constraints.maxWidth >= 900;
+          return Stack(
+            children: [
+              Positioned(
+                left: 0,
+                right: 0,
+                top: _DashboardUi.topBackgroundOffset,
+                child: IgnorePointer(
+                  child: SizedBox(
+                    height: _DashboardUi.topBackgroundHeight,
+                    child: CustomPaint(
+                      painter: _ScaffoldCurvePainter(
+                        color: theme.colorScheme.outline.withValues(
+                          alpha: 0.45,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(
                   _DashboardUi.contentHorizontalPadding,
@@ -92,111 +170,59 @@ class _DashboardContent extends StatelessWidget {
                   children: [
                     _TopHeader(firstName: firstName),
                     const SizedBox(height: 16),
-                    TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0, end: 1),
-                      duration: const Duration(milliseconds: 450),
-                      curve: Curves.easeOutCubic,
-                      builder: (context, value, child) {
-                        return Opacity(
-                          opacity: value,
-                          child: Transform.translate(
-                            offset: Offset(0, 16 * (1 - value)),
-                            child: child,
-                          ),
-                        );
-                      },
-                      child: _AccountInfoCard(viewData: viewData),
-                    ),
+                    if (isTablet)
+                      Expanded(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 5,
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0, end: 1),
+                                duration: const Duration(milliseconds: 450),
+                                curve: Curves.easeOutCubic,
+                                builder: (context, value, child) {
+                                  return Opacity(
+                                    opacity: value,
+                                    child: Transform.translate(
+                                      offset: Offset(0, 16 * (1 - value)),
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: _AccountInfoCard(viewData: viewData),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(flex: 5, child: quickActionsPanel),
+                          ],
+                        ),
+                      )
+                    else ...[
+                      TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: 1),
+                        duration: const Duration(milliseconds: 450),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, value, child) {
+                          return Opacity(
+                            opacity: value,
+                            child: Transform.translate(
+                              offset: Offset(0, 16 * (1 - value)),
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: _AccountInfoCard(viewData: viewData),
+                      ),
+                      const SizedBox(height: 16),
+                      Expanded(child: quickActionsPanel),
+                    ],
                   ],
                 ),
               ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: _DashboardUi.contentHorizontalPadding,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6, bottom: 10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  'Quick Actions',
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.1,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Text(
-                                  '4 services',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: theme.colorScheme.onSurface
-                                        .withValues(alpha: 0.45),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Tap a card to continue to a service',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.58,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: TweenAnimationBuilder<double>(
-                          tween: Tween(begin: 0, end: 1),
-                          duration: const Duration(milliseconds: 650),
-                          curve: Curves.easeOutCubic,
-                          builder: (context, value, child) {
-                            return Opacity(
-                              opacity: value,
-                              child: Transform.translate(
-                                offset: Offset(0, 24 * (1 - value)),
-                                child: child,
-                              ),
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surface,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: theme.colorScheme.outline.withValues(
-                                  alpha: 0.22,
-                                ),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.04),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: const _QuickActions(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -210,6 +236,7 @@ class _TopHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final notificationService = NotificationService.instance;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -254,37 +281,64 @@ class _TopHeader extends StatelessWidget {
             ),
           ],
         ),
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: theme.colorScheme.outline.withValues(alpha: 0.30),
-            ),
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Icon(
-                Icons.notifications_none,
-                color: theme.colorScheme.onSurface,
-                size: 20,
-              ),
-              Positioned(
-                top: 10,
-                right: 11,
-                child: Container(
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
-                    shape: BoxShape.circle,
+        InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: () => context.go('/notifications'),
+          child: FutureBuilder<int>(
+            future: notificationService.getUnreadCount(),
+            builder: (context, snapshot) {
+              final unreadCount = snapshot.data ?? 0;
+
+              return Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.30),
                   ),
                 ),
-              ),
-            ],
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      unreadCount > 0
+                          ? Icons.notifications_active_outlined
+                          : Icons.notifications_none,
+                      color: theme.colorScheme.onSurface,
+                      size: 20,
+                    ),
+                    if (unreadCount > 0)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Center(
+                            child: Text(
+                              unreadCount > 9 ? '9+' : '$unreadCount',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 9,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
           ),
         ),
       ],
@@ -442,75 +496,6 @@ class _AccountInfoCard extends StatelessWidget {
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            // Verification badges
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.14),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.verified_rounded,
-                                        size: 12,
-                                        color: _DashboardUi.cardTextColor,
-                                      ),
-                                      const SizedBox(width: 3),
-                                      Text(
-                                        'Verified',
-                                        style: theme.textTheme.labelSmall?.copyWith(
-                                          color: _DashboardUi.cardTextColor
-                                              .withValues(alpha: 0.82),
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.mail_rounded,
-                                        size: 11,
-                                        color: _DashboardUi.cardTextColor
-                                            .withValues(alpha: 0.75),
-                                      ),
-                                      const SizedBox(width: 3),
-                                      Text(
-                                        'Email',
-                                        style: theme.textTheme.labelSmall?.copyWith(
-                                          color: _DashboardUi.cardTextColor
-                                              .withValues(alpha: 0.70),
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
                           ],
                         ),
                       ),
@@ -590,7 +575,9 @@ class _AccountInfoCard extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: statusStyle.backgroundColor,
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: statusStyle.borderColor),
+                              border: Border.all(
+                                color: statusStyle.borderColor,
+                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -717,9 +704,12 @@ class _CardCurvePainter extends CustomPainter {
     final path = Path()
       ..moveTo(0, size.height * 0.38)
       ..cubicTo(
-        size.width * 0.25, size.height * 0.08,
-        size.width * 0.68, size.height * 0.88,
-        size.width, size.height * 0.55,
+        size.width * 0.25,
+        size.height * 0.08,
+        size.width * 0.68,
+        size.height * 0.88,
+        size.width,
+        size.height * 0.55,
       );
     canvas.drawPath(path, paint);
 
@@ -732,9 +722,12 @@ class _CardCurvePainter extends CustomPainter {
     final path2 = Path()
       ..moveTo(size.width * 0.20, 0)
       ..cubicTo(
-        size.width * 0.50, size.height * 0.25,
-        size.width * 0.78, size.height * 0.04,
-        size.width, size.height * 0.32,
+        size.width * 0.50,
+        size.height * 0.25,
+        size.width * 0.78,
+        size.height * 0.04,
+        size.width,
+        size.height * 0.32,
       );
     canvas.drawPath(path2, paint2);
   }
@@ -938,7 +931,7 @@ const List<_QuickActionItem> _quickActionItems = [
   _QuickActionItem(
     icon: Icons.account_balance_outlined,
     label: 'Loans',
-    route: '/apply-loan',
+    route: '/loans',
     accentColor: Color(0xFFCC7A00),
   ),
 ];

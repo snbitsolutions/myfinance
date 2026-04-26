@@ -63,4 +63,35 @@ class Savings {
     this.interestRate,
     this.maturityDate,
   }) : createdAt = createdAt ?? DateTime.now();
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'balance': balance,
+      'target': target,
+      'type': type.name,
+      'createdAt': createdAt.toIso8601String(),
+      'interestRate': interestRate,
+      'maturityDate': maturityDate?.toIso8601String(),
+    };
+  }
+
+  factory Savings.fromJson(Map<String, dynamic> json) {
+    final typeName = json['type'] as String?;
+    final parsedType = SavingsType.values.where((t) => t.name == typeName);
+
+    return Savings(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      balance: (json['balance'] as num).toDouble(),
+      target: (json['target'] as num).toDouble(),
+      type: parsedType.isNotEmpty ? parsedType.first : SavingsType.memberSaving,
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
+      interestRate: (json['interestRate'] as num?)?.toDouble(),
+      maturityDate: json['maturityDate'] != null
+          ? DateTime.tryParse(json['maturityDate'] as String)
+          : null,
+    );
+  }
 }

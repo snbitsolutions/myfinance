@@ -5,6 +5,10 @@ import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
 import '../../core/color_ext.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/layout/responsive.dart';
+import '../../core/services/device_identity_service.dart';
+import '../../core/services/notification_service.dart';
+import '../../core/services/secure_auth_storage.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -18,6 +22,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _bioAuth = false;
   String _currency = AppConstants.currencyCode;
   String _language = 'English';
+  late final Future<_DeviceSecurityDetails> _deviceSecurityFuture;
+  final _notificationService = NotificationService.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _deviceSecurityFuture = _loadDeviceSecurityDetails();
+    _loadNotificationPreferences();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,239 +38,421 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return AppScaffold(
       title: 'Settings',
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Account Settings Section
-            _buildSectionTitle(context, 'Account', Icons.person),
-            AppCard(
-              margin: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.email,
-                    title: 'Email',
-                    subtitle: 'steven@email.com',
-                    onTap: () => _showEditDialog(context, 'Email Address'),
-                  ),
-                  Divider(
-                    height: 1,
-                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
-                  ),
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.phone,
-                    title: 'Phone Number',
-                    subtitle: '0241234567',
-                    onTap: () => _showEditDialog(context, 'Phone Number'),
-                  ),
-                  Divider(
-                    height: 1,
-                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
-                  ),
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.person_outline,
-                    title: 'Full Name',
-                    subtitle: 'Steven Boadu',
-                    onTap: () => _showEditDialog(context, 'Full Name'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isTablet = constraints.maxWidth >= Responsive.medium;
 
-            // Preferences Section
-            _buildSectionTitle(context, 'Preferences', Icons.tune),
-            AppCard(
-              margin: EdgeInsets.zero,
-              child: Column(
+          // Build section groups as named widgets
+          final accountSection = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle(context, 'Account', Icons.person),
+              AppCard(
+                margin: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.email,
+                      title: 'Email',
+                      subtitle: 'steven@email.com',
+                      onTap: () => _showEditDialog(context, 'Email Address'),
+                    ),
+                    Divider(
+                      height: 1,
+                      color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                    ),
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.phone,
+                      title: 'Phone Number',
+                      subtitle: '0241234567',
+                      onTap: () => _showEditDialog(context, 'Phone Number'),
+                    ),
+                    Divider(
+                      height: 1,
+                      color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                    ),
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.person_outline,
+                      title: 'Full Name',
+                      subtitle: 'Steven Boadu',
+                      onTap: () => _showEditDialog(context, 'Full Name'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          );
+
+          final securitySection = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle(context, 'Security', Icons.security),
+              AppCard(
+                margin: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.lock,
+                      title: 'PIN',
+                      subtitle: 'Change your PIN',
+                      onTap: () => context.go('/set-pin'),
+                    ),
+                    Divider(
+                      height: 1,
+                      color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                    ),
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.password,
+                      title: 'Password',
+                      subtitle: 'Change your password',
+                      onTap: () => _showEditDialog(context, 'Password'),
+                    ),
+                    Divider(
+                      height: 1,
+                      color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                    ),
+                    _buildSwitchTile(
+                      context,
+                      icon: Icons.fingerprint,
+                      title: 'Biometric Authentication',
+                      subtitle: 'Use fingerprint or face ID',
+                      value: _bioAuth,
+                      onChanged: (value) {
+                        setState(() => _bioAuth = value);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              FutureBuilder<_DeviceSecurityDetails>(
+                future: _deviceSecurityFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return AppCard(
+                      margin: EdgeInsets.zero,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Loading device security details...',
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  if (snapshot.hasError || !snapshot.hasData) {
+                    return AppCard(
+                      margin: EdgeInsets.zero,
+                      child: _buildSettingTile(
+                        context,
+                        icon: Icons.phonelink_lock,
+                        title: 'Device Security',
+                        subtitle: 'Device details are unavailable right now',
+                      ),
+                    );
+                  }
+
+                  final details = snapshot.data!;
+                  return AppCard(
+                    margin: EdgeInsets.zero,
+                    child: Column(
+                      children: [
+                        _buildSettingTile(
+                          context,
+                          icon: Icons.phonelink_lock,
+                          title: 'Masked Device ID',
+                          subtitle: details.maskedInstallationId,
+                        ),
+                        Divider(
+                          height: 1,
+                          color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                        ),
+                        _buildSettingTile(
+                          context,
+                          icon: Icons.verified_user,
+                          title: 'Session Binding',
+                          subtitle: details.sessionBindingLabel,
+                          trailing: Icon(
+                            details.sessionBound
+                                ? Icons.check_circle
+                                : Icons.error_outline,
+                            color: details.sessionBound
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.error,
+                          ),
+                        ),
+                        Divider(
+                          height: 1,
+                          color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                        ),
+                        _buildSettingTile(
+                          context,
+                          icon: Icons.lock_person,
+                          title: 'Secure Token Vault',
+                          subtitle: 'Enabled for login and refresh tokens',
+                          trailing: Icon(
+                            Icons.lock,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                        Divider(
+                          height: 1,
+                          color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                        ),
+                        _buildSettingTile(
+                          context,
+                          icon: Icons.devices,
+                          title: details.deviceModel,
+                          subtitle: details.platformSummary,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+            ],
+          );
+
+          final dangerSection = AppCard(
+            margin: EdgeInsets.zero,
+            backgroundColor: theme.colorScheme.error.withOpacitySafe(0.1),
+            child: _buildSettingTile(
+              context,
+              icon: Icons.delete_forever,
+              title: 'Delete Account',
+              subtitle: 'Permanently delete your account',
+              titleColor: theme.colorScheme.error,
+              onTap: () => _showDeleteAccountDialog(context),
+            ),
+          );
+
+          final preferencesSection = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle(context, 'Preferences', Icons.tune),
+              AppCard(
+                margin: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.language,
+                      title: 'Language',
+                      subtitle: _language,
+                      onTap: () => _showLanguageDialog(context),
+                      trailing: Icon(
+                        Icons.chevron_right,
+                        color: theme.colorScheme.onSurface.withOpacitySafe(0.5),
+                      ),
+                    ),
+                    Divider(
+                      height: 1,
+                      color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                    ),
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.attach_money,
+                      title: 'Currency',
+                      subtitle: _currency,
+                      onTap: () => _showCurrencyDialog(context),
+                      trailing: Icon(
+                        Icons.chevron_right,
+                        color: theme.colorScheme.onSurface.withOpacitySafe(0.5),
+                      ),
+                    ),
+                    Divider(
+                      height: 1,
+                      color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                    ),
+                    _buildSwitchTile(
+                      context,
+                      icon: Icons.notifications_active,
+                      title: 'Notifications',
+                      subtitle: 'Enable alerts across the app',
+                      value: _notificationsEnabled,
+                      onChanged: _handleNotificationToggle,
+                    ),
+                    Divider(
+                      height: 1,
+                      color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                    ),
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.notifications_none_outlined,
+                      title: 'Notification Center',
+                      subtitle: 'Manage alerts, reminders, and unread updates',
+                      onTap: () => context.go('/notifications'),
+                      trailing: Icon(
+                        Icons.chevron_right,
+                        color: theme.colorScheme.onSurface.withOpacitySafe(0.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          );
+
+          final supportSection = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle(context, 'Support', Icons.help),
+              AppCard(
+                margin: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.help_outline,
+                      title: 'Help & FAQ',
+                      subtitle: 'Get answers to common questions',
+                      onTap: () => _showComingSoon(context),
+                    ),
+                    Divider(
+                      height: 1,
+                      color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                    ),
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.chat_bubble_outline,
+                      title: 'Contact Support',
+                      subtitle: 'Chat with our support team',
+                      onTap: () => _showComingSoon(context),
+                    ),
+                    Divider(
+                      height: 1,
+                      color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                    ),
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.bug_report_outlined,
+                      title: 'Report an Issue',
+                      subtitle: 'Help us improve the app',
+                      onTap: () => _showComingSoon(context),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          );
+
+          final aboutSection = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle(context, 'About', Icons.info),
+              AppCard(
+                margin: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.description_outlined,
+                      title: 'Terms & Conditions',
+                      onTap: () => _showComingSoon(context),
+                    ),
+                    Divider(
+                      height: 1,
+                      color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                    ),
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.privacy_tip_outlined,
+                      title: 'Privacy Policy',
+                      onTap: () => _showComingSoon(context),
+                    ),
+                    Divider(
+                      height: 1,
+                      color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                    ),
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.info_outline,
+                      title: 'About',
+                      subtitle: 'v${AppConstants.appVersion}',
+                      onTap: () => _showAboutDialog(context),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          );
+
+          if (isTablet) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.language,
-                    title: 'Language',
-                    subtitle: _language,
-                    onTap: () => _showLanguageDialog(context),
-                    trailing: Icon(
-                      Icons.chevron_right,
-                      color: theme.colorScheme.onSurface.withOpacitySafe(0.5),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        accountSection,
+                        securitySection,
+                        dangerSection,
+                        const SizedBox(height: 32),
+                      ],
                     ),
                   ),
-                  Divider(
-                    height: 1,
-                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
-                  ),
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.attach_money,
-                    title: 'Currency',
-                    subtitle: _currency,
-                    onTap: () => _showCurrencyDialog(context),
-                    trailing: Icon(
-                      Icons.chevron_right,
-                      color: theme.colorScheme.onSurface.withOpacitySafe(0.5),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        preferencesSection,
+                        supportSection,
+                        aboutSection,
+                        const SizedBox(height: 32),
+                      ],
                     ),
                   ),
-                  Divider(
-                    height: 1,
-                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
-                  ),
-                  _buildSwitchTile(
-                    context,
-                    icon: Icons.notifications_active,
-                    title: 'Notifications',
-                    subtitle: 'Receive transaction alerts',
-                    value: _notificationsEnabled,
-                    onChanged: (value) {
-                      setState(() => _notificationsEnabled = value);
-                    },
-                  ),
                 ],
               ),
-            ),
-            const SizedBox(height: 24),
+            );
+          }
 
-            // Security Section
-            _buildSectionTitle(context, 'Security', Icons.security),
-            AppCard(
-              margin: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.lock,
-                    title: 'PIN',
-                    subtitle: 'Change your PIN',
-                    onTap: () => context.go('/set-pin'),
-                  ),
-                  Divider(
-                    height: 1,
-                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
-                  ),
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.password,
-                    title: 'Password',
-                    subtitle: 'Change your password',
-                    onTap: () => _showEditDialog(context, 'Password'),
-                  ),
-                  Divider(
-                    height: 1,
-                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
-                  ),
-                  _buildSwitchTile(
-                    context,
-                    icon: Icons.fingerprint,
-                    title: 'Biometric Authentication',
-                    subtitle: 'Use fingerprint or face ID',
-                    value: _bioAuth,
-                    onChanged: (value) {
-                      setState(() => _bioAuth = value);
-                    },
-                  ),
-                ],
-              ),
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                accountSection,
+                preferencesSection,
+                securitySection,
+                supportSection,
+                aboutSection,
+                dangerSection,
+                const SizedBox(height: 32),
+              ],
             ),
-            const SizedBox(height: 24),
-
-            // Support Section
-            _buildSectionTitle(context, 'Support', Icons.help),
-            AppCard(
-              margin: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.help_outline,
-                    title: 'Help & FAQ',
-                    subtitle: 'Get answers to common questions',
-                    onTap: () => _showComingSoon(context),
-                  ),
-                  Divider(
-                    height: 1,
-                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
-                  ),
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.chat_bubble_outline,
-                    title: 'Contact Support',
-                    subtitle: 'Chat with our support team',
-                    onTap: () => _showComingSoon(context),
-                  ),
-                  Divider(
-                    height: 1,
-                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
-                  ),
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.bug_report_outlined,
-                    title: 'Report an Issue',
-                    subtitle: 'Help us improve the app',
-                    onTap: () => _showComingSoon(context),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // About Section
-            _buildSectionTitle(context, 'About', Icons.info),
-            AppCard(
-              margin: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.description_outlined,
-                    title: 'Terms & Conditions',
-                    onTap: () => _showComingSoon(context),
-                  ),
-                  Divider(
-                    height: 1,
-                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
-                  ),
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.privacy_tip_outlined,
-                    title: 'Privacy Policy',
-                    onTap: () => _showComingSoon(context),
-                  ),
-                  Divider(
-                    height: 1,
-                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
-                  ),
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.info_outline,
-                    title: 'About',
-                    subtitle: 'v${AppConstants.appVersion}',
-                    onTap: () => _showAboutDialog(context),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Danger Zone
-            AppCard(
-              margin: EdgeInsets.zero,
-              backgroundColor: theme.colorScheme.error.withOpacitySafe(0.1),
-              child: _buildSettingTile(
-                context,
-                icon: Icons.delete_forever,
-                title: 'Delete Account',
-                subtitle: 'Permanently delete your account',
-                titleColor: theme.colorScheme.error,
-                onTap: () => _showDeleteAccountDialog(context),
-              ),
-            ),
-            const SizedBox(height: 32),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -591,25 +786,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _loadNotificationPreferences() async {
+    final preferences = await _notificationService.getPreferences();
+    if (!mounted) return;
+    setState(() => _notificationsEnabled = preferences.enabled);
+  }
+
+  Future<void> _handleNotificationToggle(bool value) async {
+    final preferences = await _notificationService.getPreferences();
+    await _notificationService.savePreferences(
+      preferences.copyWith(enabled: value),
+    );
+    if (!mounted) return;
+    setState(() => _notificationsEnabled = value);
+  }
+
   Widget _buildRadioTile(String label, String value) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Radio<String>(
-            value: value,
-            groupValue: _currency,
-            onChanged: (value) {
-              if (value != null) {
-                setState(() => _currency = value);
-              }
-            },
-            activeColor: theme.colorScheme.primary,
-          ),
-          Text(label),
-        ],
+      child: RadioGroup<String>(
+        groupValue: _currency,
+        onChanged: (value) {
+          if (value == null) return;
+          setState(() => _currency = value);
+        },
+        child: Row(
+          children: [
+            Radio<String>(value: value, activeColor: theme.colorScheme.primary),
+            Text(label),
+          ],
+        ),
       ),
     );
   }
+
+  Future<_DeviceSecurityDetails> _loadDeviceSecurityDetails() async {
+    final deviceIdentityService = DeviceIdentityService();
+    final identity = await deviceIdentityService.collectIdentity();
+    final fingerprint =
+        identity['installation_fingerprint'] as String? ??
+        await deviceIdentityService.getInstallationFingerprint();
+    final sessionBound = await SecureAuthStorage.instance
+        .hasSessionBoundToFingerprint(fingerprint);
+    final manufacturer = identity['manufacturer'] as String? ?? 'Unknown';
+    final osVersion = identity['os_version'] as String? ?? 'Unknown OS';
+
+    return _DeviceSecurityDetails(
+      maskedInstallationId:
+          identity['installation_id_masked'] as String? ??
+          await deviceIdentityService.getMaskedInstallationId(),
+      sessionBound: sessionBound,
+      sessionBindingLabel: sessionBound
+          ? 'Bound to ${DeviceIdentityService.shortenFingerprint(fingerprint)}'
+          : 'No active session is bound to this device',
+      deviceModel: identity['device_model'] as String? ?? 'Current device',
+      platformSummary: '$manufacturer • $osVersion',
+    );
+  }
+}
+
+class _DeviceSecurityDetails {
+  const _DeviceSecurityDetails({
+    required this.maskedInstallationId,
+    required this.sessionBound,
+    required this.sessionBindingLabel,
+    required this.deviceModel,
+    required this.platformSummary,
+  });
+
+  final String maskedInstallationId;
+  final bool sessionBound;
+  final String sessionBindingLabel;
+  final String deviceModel;
+  final String platformSummary;
 }

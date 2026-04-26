@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_card.dart';
-import '../../core/balance_card_shell.dart';
 import '../../core/app_scaffold.dart';
+import '../../core/layout/responsive.dart';
 
 class SharesScreen extends StatelessWidget {
   const SharesScreen({super.key});
@@ -41,105 +41,68 @@ class SharesScreen extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          // Portfolio Hero Card
-          BalanceCardShell(
-            gradientColors: const [Color(0xFF8E44AD), Color(0xFF5B2C6F)],
-            shadowColor: const Color(0x338E44AD),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
+          const SizedBox(height: 12),
+          Text(
+            'Buy shares directly from your existing account.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.72),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Portfolio Value',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.78),
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Current holdings',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.68),
-                              fontSize: 10,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'GH₵8,450.75',
-                              style: theme.textTheme.headlineMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.45,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+          ),
+          const SizedBox(height: 16),
+          AppCard(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.trending_up,
-                        color: Colors.white,
-                        size: 20,
-                      ),
+                    child: Icon(
+                      Icons.account_balance_rounded,
+                      color: theme.colorScheme.primary,
+                      size: 24,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
                   ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.trending_up,
-                        color: Colors.white,
-                        size: 12,
-                      ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          '+5.2% from last month',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textScaler: const TextScaler.linear(1.0),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.white,
-                            fontSize: 11,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Source account',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        Text(
+                          '**** 0123 4567 89',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.72,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Your active account will fund share purchases.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.58,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 10),
+                  Icon(Icons.check_circle, color: theme.colorScheme.primary),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -150,11 +113,11 @@ class SharesScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          ..._shareItems.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: AppCard(
-                onTap: () => context.go('/payment'),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isTablet = constraints.maxWidth >= Responsive.medium;
+              Widget buildShareCard(_ShareItem item) => AppCard(
+                onTap: () => context.go('/payment?source=existing_account'),
                 child: Row(
                   children: [
                     CircleAvatar(
@@ -212,14 +175,31 @@ class SharesScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-            ),
+              );
+
+              if (isTablet) {
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: _shareItems.map((item) => SizedBox(
+                    width: (constraints.maxWidth - 12) / 2,
+                    child: buildShareCard(item),
+                  )).toList(),
+                );
+              }
+              return Column(
+                children: _shareItems.map((item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: buildShareCard(item),
+                )).toList(),
+              );
+            },
           ),
           const SizedBox(height: 4),
           ElevatedButton.icon(
-            onPressed: () => context.go('/payment'),
+            onPressed: () => context.go('/payment?source=existing_account'),
             icon: const Icon(Icons.show_chart),
-            label: const Text('Buy Shares'),
+            label: const Text('Buy Shares from Account'),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(

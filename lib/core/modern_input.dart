@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'color_ext.dart';
+import 'layout/responsive.dart';
 
 class ModernInput extends StatelessWidget {
   final String label;
@@ -11,6 +12,9 @@ class ModernInput extends StatelessWidget {
   final int? maxLength;
   final int? maxLines;
   final ValueChanged<String>? onChanged;
+  final String? errorText;
+  final String? helperText;
+  final bool enableInteractiveSelection;
 
   const ModernInput({
     super.key,
@@ -23,18 +27,30 @@ class ModernInput extends StatelessWidget {
     this.maxLength,
     this.maxLines = 1,
     this.onChanged,
+    this.errorText,
+    this.helperText,
+    this.enableInteractiveSelection = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isExpanded = Responsive.isExpanded(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.bodyLarge),
+        Text(
+          label,
+          style: isExpanded
+              ? theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                )
+              : theme.textTheme.bodyLarge,
+        ),
         const SizedBox(height: 8),
         TextField(
           controller: controller,
+          enableInteractiveSelection: enableInteractiveSelection,
           keyboardType: keyboardType,
           maxLength: maxLength,
           maxLines: maxLines,
@@ -47,23 +63,32 @@ class ModernInput extends StatelessWidget {
               color: theme.colorScheme.onSurface.withOpacitySafe(0.4),
             ),
             filled: true,
-            fillColor: theme.colorScheme.surface,
+            fillColor: errorText != null
+                ? theme.colorScheme.error.withOpacitySafe(0.05)
+                : theme.colorScheme.surface,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                color: errorText != null
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.outline.withOpacitySafe(0.2),
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                color: errorText != null
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.outline.withOpacitySafe(0.2),
+                width: errorText != null ? 1.5 : 1,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: theme.colorScheme.primary,
+                color: errorText != null
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.primary,
                 width: 2,
               ),
             ),
@@ -73,6 +98,18 @@ class ModernInput extends StatelessWidget {
             ),
           ),
         ),
+        if (errorText != null || helperText != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            errorText ?? helperText!,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: errorText != null
+                  ? theme.colorScheme.error
+                  : theme.colorScheme.onSurface.withOpacitySafe(0.6),
+              fontSize: 11,
+            ),
+          ),
+        ],
       ],
     );
   }

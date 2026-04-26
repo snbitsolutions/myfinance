@@ -268,6 +268,7 @@ class _SetPinScreenState extends State<SetPinScreen> {
                               child: ElevatedButton(
                                 onPressed: _canSubmit
                                     ? () async {
+                                        final router = GoRouter.of(context);
                                         final prefs =
                                             await SharedPreferences.getInstance();
                                         await prefs.setString(
@@ -275,7 +276,7 @@ class _SetPinScreenState extends State<SetPinScreen> {
                                           _pinController.text.trim(),
                                         );
                                         if (!mounted) return;
-                                        context.go('/home');
+                                        router.go('/home');
                                       }
                                     : null,
                                 style: ElevatedButton.styleFrom(

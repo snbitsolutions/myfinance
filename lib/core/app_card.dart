@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'color_ext.dart';
+import 'layout/responsive.dart';
 
 class AppCard extends StatelessWidget {
   static const _radius = 24.0;
@@ -28,6 +29,10 @@ class AppCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isExpanded = Responsive.isExpanded(context);
+    final adaptivePadding =
+        padding ?? (isExpanded ? const EdgeInsets.all(20) : _defaultPadding);
+    final adaptiveBlur = isExpanded ? (blurSigma + 2) : blurSigma;
     final borderRadius = BorderRadius.circular(_radius);
     final cardDecoration = BoxDecoration(
       color: (backgroundColor ?? theme.colorScheme.surface).withValues(
@@ -47,7 +52,7 @@ class AppCard extends StatelessWidget {
     );
 
     Widget cardContent = Ink(
-      padding: padding ?? _defaultPadding,
+      padding: adaptivePadding,
       decoration: cardDecoration,
       child: child,
     );
@@ -68,7 +73,7 @@ class AppCard extends StatelessWidget {
       child: ClipRRect(
         borderRadius: borderRadius,
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+          filter: ImageFilter.blur(sigmaX: adaptiveBlur, sigmaY: adaptiveBlur),
           child: cardContent,
         ),
       ),

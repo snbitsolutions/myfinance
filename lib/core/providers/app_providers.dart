@@ -4,10 +4,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_constants.dart';
 import '../exceptions/app_exceptions.dart';
 import '../models/auth_state.dart';
+import '../repositories/notification_repository.dart';
 import '../services/api_service.dart';
 import '../services/device_identity_service.dart';
 import '../services/http_client.dart';
 import '../services/network_service.dart';
+import '../services/notification_service.dart';
+import '../services/secure_auth_storage.dart';
 import '../utils/logger.dart';
 
 // Core infrastructure providers
@@ -46,6 +49,10 @@ final transactionServiceProvider = Provider<TransactionService>((ref) {
   return TransactionService();
 });
 
+final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
+  return NotificationService.instance;
+});
+
 final deviceIdentityServiceProvider = Provider<DeviceIdentityService>((ref) {
   return DeviceIdentityService();
 });
@@ -80,20 +87,38 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Load stored authentication from SharedPreferences
   void _loadStoredAuth() {
-    _getPrefs().then((prefs) {
-      final token = prefs.getString(AppConstants.sharedPrefKeyUserToken);
-      final userId = prefs.getString(AppConstants.sharedPrefKeyUserId);
-      final email = prefs.getString(AppConstants.sharedPrefKeyUserEmail);
+    _restoreStoredAuth();
+  }
 
-      if (token != null && userId != null && email != null) {
-        state = AuthState.authenticated(
-          userId: userId,
-          userEmail: email,
-          authToken: token,
-        );
-        AppLogger.info('Loaded stored authentication');
-      }
-    });
+  Future<void> _restoreStoredAuth() async {
+    final prefs = await _getPrefs();
+    final token = await SecureAuthStorage.instance.readAuthToken();
+    final userId = prefs.getString(AppConstants.sharedPrefKeyUserId);
+    final email = prefs.getString(AppConstants.sharedPrefKeyUserEmail);
+
+    if (token == null || token.isEmpty || userId == null || email == null) {
+      return;
+    }
+
+    final currentFingerprint = await deviceIdentityService
+        .getInstallationFingerprint();
+    final isBoundToCurrentDevice = await SecureAuthStorage.instance
+        .hasSessionBoundToFingerprint(currentFingerprint);
+
+    if (!isBoundToCurrentDevice) {
+      await _clearStoredAuth(prefs: prefs);
+      AppLogger.warning(
+        'Stored authentication rejected due to device fingerprint mismatch.',
+      );
+      return;
+    }
+
+    state = AuthState.authenticated(
+      userId: userId,
+      userEmail: email,
+      authToken: token,
+    );
+    AppLogger.info('Loaded stored authentication');
   }
 
   /// Login user
@@ -112,11 +137,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       final data = response['data'] as Map<String, dynamic>;
       final token = data['auth_token'] as String;
+      final refreshToken = data['refresh_token'] as String?;
       final userId = data['user_id'] as String;
       final prefs = await _getPrefs();
+      final currentFingerprint = await deviceIdentityService
+          .getInstallationFingerprint();
 
-      // Save to SharedPreferences
-      await prefs.setString(AppConstants.sharedPrefKeyUserToken, token);
+      await SecureAuthStorage.instance.storeSession(
+        authToken: token,
+        refreshToken: refreshToken,
+        deviceFingerprint: currentFingerprint,
+      );
+
       await prefs.setString(AppConstants.sharedPrefKeyUserId, userId);
       await prefs.setString(AppConstants.sharedPrefKeyUserEmail, email);
 
@@ -199,12 +231,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await authService.logout(userId: userId);
       }
 
-      final prefs = await _getPrefs();
-
-      // Clear from SharedPreferences
-      await prefs.remove(AppConstants.sharedPrefKeyUserToken);
-      await prefs.remove(AppConstants.sharedPrefKeyUserId);
-      await prefs.remove(AppConstants.sharedPrefKeyUserEmail);
+      await _clearStoredAuth();
 
       state = AuthState.unauthenticated();
       AppLogger.info('User logged out');
@@ -219,6 +246,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (state.error != null) {
       state = state.copyWith(error: null);
     }
+  }
+
+  Future<void> _clearStoredAuth({SharedPreferences? prefs}) async {
+    final resolvedPrefs = prefs ?? await _getPrefs();
+    await SecureAuthStorage.instance.clearAuthSecrets();
+    await resolvedPrefs.remove(AppConstants.sharedPrefKeyUserId);
+    await resolvedPrefs.remove(AppConstants.sharedPrefKeyUserEmail);
+    await resolvedPrefs.remove(AppConstants.sharedPrefKeyUserToken);
+    await resolvedPrefs.remove(AppConstants.sharedPrefKeyUserRefreshToken);
   }
 }
 

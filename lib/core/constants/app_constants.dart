@@ -86,6 +86,20 @@ class AppConstants {
   static const String sharedPrefKeyDarkMode = 'darkMode';
   static const String sharedPrefKeyLanguage = 'language';
   static const String sharedPrefKeyTransferFavorites = 'transferFavorites';
+  static const String sharedPrefKeyNotificationsEnabled =
+      'notificationsEnabled';
+  static const String sharedPrefKeyTransactionAlerts = 'transactionAlerts';
+  static const String sharedPrefKeyLoanUpdates = 'loanUpdates';
+  static const String sharedPrefKeySavingsReminders = 'savingsReminders';
+  static const String sharedPrefKeyMarketingUpdates = 'marketingUpdates';
+  static const String sharedPrefKeyReadNotificationIds = 'readNotificationIds';
+
+  // Secure storage keys
+  static const String secureStorageKeyUserToken = 'secure.userToken';
+  static const String secureStorageKeyUserRefreshToken =
+      'secure.userRefreshToken';
+  static const String secureStorageKeySessionDeviceFingerprint =
+      'secure.sessionDeviceFingerprint';
 
   // Loan Status
   static const String loanStatusPending = 'Pending';

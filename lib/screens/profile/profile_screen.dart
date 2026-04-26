@@ -161,69 +161,84 @@ class ProfileScreen extends ConsumerWidget {
 
               // Content
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      // KYC Status Card
-                      _KYCStatusCard(user: user),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isTablet = constraints.maxWidth >= 900;
 
-                      const SizedBox(height: 16),
+                    final accountActions = Column(
+                      children: [
+                        _KYCStatusCard(user: user),
+                        const SizedBox(height: 16),
+                        _MenuCard(
+                          items: [
+                            _MenuItem(
+                              icon: Icons.logout,
+                              title: 'Logout',
+                              subtitle: 'Sign out of your account',
+                              onTap: () => context.go('/login'),
+                              isDestructive: true,
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
 
-                      // Menu Items
-                      _MenuCard(
-                        items: [
-                          _MenuItem(
-                            icon: Icons.verified_user_outlined,
-                            title: 'KYC Verification',
-                            subtitle: 'Complete your verification',
-                            onTap: () => context.go('/kyc'),
-                          ),
-                          _MenuItem(
-                            icon: Icons.lock_outline,
-                            title: 'Security & PIN',
-                            subtitle: 'Manage your security settings',
-                            onTap: () => context.go('/set-pin'),
-                          ),
-                          _MenuItem(
-                            icon: Icons.notifications_outlined,
-                            title: 'Notifications',
-                            subtitle: 'Manage your notifications',
-                            onTap: () {},
-                          ),
-                          _MenuItem(
-                            icon: Icons.help_outline,
-                            title: 'Help & Support',
-                            subtitle: 'Get help when you need it',
-                            onTap: () {},
-                          ),
-                          _MenuItem(
-                            icon: Icons.info_outline,
-                            title: 'About',
-                            subtitle: 'Version 1.0.0',
-                            onTap: () {},
-                          ),
-                        ],
-                      ),
+                    final mainMenu = _MenuCard(
+                      items: [
+                        _MenuItem(
+                          icon: Icons.verified_user_outlined,
+                          title: 'KYC Verification',
+                          subtitle: 'Complete your verification',
+                          onTap: () => context.go('/kyc'),
+                        ),
+                        _MenuItem(
+                          icon: Icons.lock_outline,
+                          title: 'Security & PIN',
+                          subtitle: 'Manage your security settings',
+                          onTap: () => context.go('/set-pin'),
+                        ),
+                        _MenuItem(
+                          icon: Icons.notifications_outlined,
+                          title: 'Notifications',
+                          subtitle: 'Manage your notifications',
+                          onTap: () => context.go('/notifications'),
+                        ),
+                        _MenuItem(
+                          icon: Icons.help_outline,
+                          title: 'Help & Support',
+                          subtitle: 'Get help when you need it',
+                          onTap: () {},
+                        ),
+                        _MenuItem(
+                          icon: Icons.info_outline,
+                          title: 'About',
+                          subtitle: 'Version 1.0.0',
+                          onTap: () {},
+                        ),
+                      ],
+                    );
 
-                      const SizedBox(height: 16),
-
-                      // Logout Button
-                      _MenuCard(
-                        items: [
-                          _MenuItem(
-                            icon: Icons.logout,
-                            title: 'Logout',
-                            subtitle: 'Sign out of your account',
-                            onTap: () => context.go('/login'),
-                            isDestructive: true,
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 24),
-                    ],
-                  ),
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.all(20),
+                      child: isTablet
+                          ? Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(flex: 4, child: accountActions),
+                                const SizedBox(width: 16),
+                                Expanded(flex: 6, child: mainMenu),
+                              ],
+                            )
+                          : Column(
+                              children: [
+                                accountActions,
+                                const SizedBox(height: 16),
+                                mainMenu,
+                                const SizedBox(height: 24),
+                              ],
+                            ),
+                    );
+                  },
                 ),
               ),
             ],

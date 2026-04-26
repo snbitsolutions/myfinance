@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../core/color_ext.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/services/device_identity_service.dart';
+import '../../core/services/secure_auth_storage.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,11 +15,15 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _animationController;
+  late AnimationController _logoLoopController;
   late Animation<double> _logoScale;
   late Animation<double> _contentFade;
-  late Animation<double> _logoPulse;
+  late Animation<double> _logoIntroPulse;
+  late Animation<double> _logoLoopScale;
+  late Animation<double> _logoFloatY;
+  late Animation<double> _logoTilt;
 
   @override
   void initState() {
@@ -24,6 +31,10 @@ class _SplashScreenState extends State<SplashScreen>
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
+    );
+    _logoLoopController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
     );
     _logoScale = Tween<double>(begin: 0.86, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack),
@@ -34,19 +45,33 @@ class _SplashScreenState extends State<SplashScreen>
         curve: const Interval(0.35, 1.0, curve: Curves.easeOut),
       ),
     );
-    _logoPulse = Tween<double>(begin: 0.98, end: 1.02).animate(
+    _logoIntroPulse = Tween<double>(begin: 0.98, end: 1.02).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: const Interval(0.45, 1.0, curve: Curves.easeInOut),
       ),
     );
-    _animationController.forward();
+    _logoLoopScale = Tween<double>(begin: 0.985, end: 1.015).animate(
+      CurvedAnimation(parent: _logoLoopController, curve: Curves.easeInOut),
+    );
+    _logoFloatY = Tween<double>(begin: 0.0, end: -8.0).animate(
+      CurvedAnimation(parent: _logoLoopController, curve: Curves.easeInOut),
+    );
+    _logoTilt = Tween<double>(begin: -0.018, end: 0.018).animate(
+      CurvedAnimation(parent: _logoLoopController, curve: Curves.easeInOut),
+    );
+
+    _animationController.forward().whenComplete(() {
+      if (!mounted) return;
+      _logoLoopController.repeat(reverse: true);
+    });
     _navigate();
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _logoLoopController.dispose();
     super.dispose();
   }
 
@@ -58,14 +83,29 @@ class _SplashScreenState extends State<SplashScreen>
       final prefs = await SharedPreferences.getInstance();
       final seenOnboarding =
           prefs.getBool(AppConstants.sharedPrefKeyOnboarding) ?? false;
-      final userToken =
-          prefs.getString(AppConstants.sharedPrefKeyUserToken) ?? '';
+      final secureAuthStorage = SecureAuthStorage.instance;
+      final userToken = await secureAuthStorage.readAuthToken() ?? '';
+      var hasBoundSession = false;
+
+      if (userToken.isNotEmpty) {
+        final currentFingerprint = await DeviceIdentityService()
+            .getInstallationFingerprint();
+        hasBoundSession = await secureAuthStorage.hasSessionBoundToFingerprint(
+          currentFingerprint,
+        );
+
+        if (!hasBoundSession) {
+          await secureAuthStorage.clearAuthSecrets();
+          await prefs.remove(AppConstants.sharedPrefKeyUserId);
+          await prefs.remove(AppConstants.sharedPrefKeyUserEmail);
+        }
+      }
 
       if (!mounted) return;
 
       if (!seenOnboarding) {
         context.go('/onboarding');
-      } else if (userToken.isNotEmpty) {
+      } else if (hasBoundSession) {
         context.go('/home');
       } else {
         context.go('/login');
@@ -82,106 +122,88 @@ class _SplashScreenState extends State<SplashScreen>
 
     return Scaffold(
       body: SafeArea(
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                theme.colorScheme.primary.withOpacitySafe(0.1),
-                theme.colorScheme.secondary.withOpacitySafe(0.1),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedBuilder(
+                  animation: Listenable.merge([
+                    _animationController,
+                    _logoLoopController,
+                  ]),
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale:
+                          _logoScale.value *
+                          _logoIntroPulse.value *
+                          (_logoLoopController.isAnimating
+                              ? _logoLoopScale.value
+                              : 1.0),
+                      child: Transform.translate(
+                        offset: Offset(
+                          0,
+                          _logoLoopController.isAnimating
+                              ? _logoFloatY.value
+                              : 0,
+                        ),
+                        child: Transform.rotate(
+                          angle: _logoLoopController.isAnimating
+                              ? _logoTilt.value
+                              : 0,
+                          child: child,
+                        ),
+                      ),
+                    );
+                  },
+                  child: SizedBox(
+                    width: 320,
+                    height: 320,
+                    child: Image.asset(
+                      'images/adepa_teachers_logo.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                FadeTransition(
+                  opacity: _contentFade,
+                  child: Column(
+                    children: [
+                      Text(
+                        'Smart Finance, Smart Future',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacitySafe(
+                            0.38,
+                          ),
+                          fontWeight: FontWeight.w400,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 36),
+                SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor: AlwaysStoppedAnimation(
+                      theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Getting things ready…',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacitySafe(0.55),
+                  ),
+                ),
               ],
-            ),
-          ),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  AnimatedBuilder(
-                    animation: _animationController,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: _logoScale.value * _logoPulse.value,
-                        child: child,
-                      );
-                    },
-                    child: Container(
-                      width: 320,
-                      height: 320,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            theme.colorScheme.primary.withOpacitySafe(0.1),
-                            theme.colorScheme.primary.withOpacitySafe(0.16),
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: theme.colorScheme.primary.withOpacitySafe(
-                              0.26,
-                            ),
-                            blurRadius: 24,
-                            spreadRadius: 6,
-                          ),
-                        ],
-                      ),
-                      child: Image.asset(
-                        'images/adepa_teachers_logo.png',
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  FadeTransition(
-                    opacity: _contentFade,
-                    child: Column(
-                      children: [
-                        Text(
-                          AppConstants.appName,
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.displayMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Smart Finance, Smart Future',
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacitySafe(
-                              0.64,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 42),
-                  SizedBox(
-                    width: 36,
-                    height: 36,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      valueColor: AlwaysStoppedAnimation(
-                        theme.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Getting things ready…',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacitySafe(0.55),
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
         ),

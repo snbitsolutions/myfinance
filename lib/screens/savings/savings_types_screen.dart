@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/color_ext.dart';
+import 'savings_model.dart';
 
 /// A simple menu showing the different savings products/types a user can choose.
 /// Tapping an item navigates directly to that type's detail screen.
@@ -66,89 +67,203 @@ class SavingsTypesScreen extends StatelessWidget {
     ),
   ];
 
+  Future<void> _showCreateTypePicker(BuildContext context) async {
+    final selected = await showModalBottomSheet<SavingsType>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        final maxListHeight = MediaQuery.sizeOf(sheetContext).height * 0.45;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Choose Savings Type',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Pick the type you want to create before continuing.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacitySafe(0.62),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: maxListHeight),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: SavingsType.values
+                          .map(
+                            (type) => ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: CircleAvatar(
+                                backgroundColor: theme.colorScheme.primary
+                                    .withOpacitySafe(0.12),
+                                child: Icon(
+                                  type.icon,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                              title: Text(type.label),
+                              subtitle: Text(type.description),
+                              trailing: const Icon(Icons.chevron_right_rounded),
+                              onTap: () => Navigator.of(sheetContext).pop(type),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!context.mounted || selected == null) return;
+
+    final typeQuery = switch (selected) {
+      SavingsType.memberSaving => 'member',
+      SavingsType.currentSaving => 'current',
+      SavingsType.kiddySaving => 'kiddy',
+      SavingsType.fixedDeposit => 'fixed',
+    };
+    context.go('/savings/create?type=$typeQuery');
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final backgroundTop = theme.colorScheme.primary.withOpacitySafe(0.10);
+    final backgroundMid = theme.colorScheme.secondary.withOpacitySafe(0.06);
+    final backgroundBottom = theme.colorScheme.surface;
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.secondary,
+      backgroundColor: backgroundBottom,
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [theme.colorScheme.secondary, theme.colorScheme.primary],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [backgroundTop, backgroundMid, backgroundBottom],
           ),
         ),
         child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              // Custom header
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () {
-                        if (context.canPop()) {
-                          context.pop();
-                        } else {
-                          context.go('/home');
-                        }
-                      },
+              Positioned(
+                top: -90,
+                right: -40,
+                child: IgnorePointer(
+                  child: Container(
+                    width: 220,
+                    height: 220,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: theme.colorScheme.primary.withOpacitySafe(0.08),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Choose Savings Type',
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Select the type that suits your needs',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => context.go('/savings/create'),
-                      tooltip: 'Create New Savings',
-                      icon: const Icon(
-                        Icons.add_circle_outline,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-
-              // List of savings types
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _types.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 16),
-                  itemBuilder: (context, index) {
-                    final type = _types[index];
-                    return _SavingsTypeCard(
-                      type: type,
-                      onTap: () {
-                        context.go('/savings/${Uri.encodeComponent(type.id)}');
-                      },
-                    );
-                  },
+              Positioned(
+                top: 120,
+                left: -60,
+                child: IgnorePointer(
+                  child: Container(
+                    width: 180,
+                    height: 180,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: theme.colorScheme.secondary.withOpacitySafe(0.07),
+                    ),
+                  ),
                 ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.arrow_back,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          onPressed: () {
+                            if (context.canPop()) {
+                              context.pop();
+                            } else {
+                              context.go('/home');
+                            }
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Choose Savings Type',
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  color: theme.colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Select the type that suits your needs',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacitySafe(0.68),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => _showCreateTypePicker(context),
+                          tooltip: 'Create New Savings',
+                          icon: Icon(
+                            Icons.add_circle_outline,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _types.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 16),
+                      itemBuilder: (context, index) {
+                        final type = _types[index];
+                        return _SavingsTypeCard(
+                          type: type,
+                          onTap: () {
+                            context.go('/savings/${Uri.encodeComponent(type.id)}');
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,15 +28,32 @@ class DeviceIdentityService {
       'security': {
         'action': action,
         'captured_at': DateTime.now().toUtc().toIso8601String(),
+        'session_binding_fingerprint': deviceData['installation_fingerprint'],
       },
     };
   }
 
+  Future<String> getInstallationFingerprint() async {
+    final installationId = await _getOrCreateInstallationId();
+    return fingerprintIdentifier('$installationId|$_platformName');
+  }
+
+  Future<String> getMaskedInstallationId() async {
+    final installationId = await _getOrCreateInstallationId();
+    return maskIdentifier(installationId);
+  }
+
   Future<Map<String, dynamic>> collectIdentity() async {
     final installationId = await _getOrCreateInstallationId();
+    final maskedInstallationId = maskIdentifier(installationId);
+    final installationFingerprint = fingerprintIdentifier(
+      '$installationId|$_platformName',
+    );
 
     final base = <String, dynamic>{
-      'installation_id': installationId,
+      'installation_id_masked': maskedInstallationId,
+      'installation_fingerprint': installationFingerprint,
+      'identifier_source': 'app_installation_id',
       'platform': _platformName,
       'is_physical_device': true,
     };
@@ -128,12 +147,54 @@ class DeviceIdentityService {
       return existing;
     }
 
-    final random = Random.secure();
+    final random = kIsWeb ? Random() : Random.secure();
+    const max32BitExclusive = 0x100000000; // 2^32
     final value =
-        'dev_${DateTime.now().microsecondsSinceEpoch}_${random.nextInt(1 << 32).toRadixString(16)}';
+        'dev_${DateTime.now().microsecondsSinceEpoch}_${random.nextInt(max32BitExclusive).toRadixString(16)}';
 
     await prefs.setString(AppConstants.sharedPrefKeyDeviceInstallId, value);
     return value;
+  }
+
+  @visibleForTesting
+  static String maskIdentifier(
+    String value, {
+    int leading = 4,
+    int trailing = 4,
+  }) {
+    if (value.isEmpty) return value;
+
+    final visibleCharacters = leading + trailing;
+    if (value.length <= visibleCharacters) {
+      return List.filled(value.length, '*').join();
+    }
+
+    final start = value.substring(0, leading);
+    final end = value.substring(value.length - trailing);
+    final middle = List.filled(value.length - visibleCharacters, '*').join();
+    return '$start$middle$end';
+  }
+
+  @visibleForTesting
+  static String fingerprintIdentifier(String value) {
+    return sha256.convert(utf8.encode(value)).toString();
+  }
+
+  static String shortenFingerprint(
+    String value, {
+    int leading = 8,
+    int trailing = 6,
+  }) {
+    if (value.isEmpty) return value;
+
+    final visibleCharacters = leading + trailing;
+    if (value.length <= visibleCharacters) {
+      return value;
+    }
+
+    final start = value.substring(0, leading);
+    final end = value.substring(value.length - trailing);
+    return '$start...$end';
   }
 
   String get _platformName {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/color_ext.dart';
 import '../../core/app_scaffold.dart';
@@ -7,7 +8,16 @@ import '../../core/balance_card_shell.dart';
 import 'transaction_model.dart';
 
 class TransactionsScreen extends StatefulWidget {
-  const TransactionsScreen({super.key});
+  final String? savingsId;
+  final String? savingsTitle;
+  final List<Map<String, dynamic>>? savingsTransactions;
+
+  const TransactionsScreen({
+    super.key,
+    this.savingsId,
+    this.savingsTitle,
+    this.savingsTransactions,
+  });
 
   @override
   State<TransactionsScreen> createState() => _TransactionsScreenState();
@@ -39,82 +49,96 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isSavingsFiltered = (widget.savingsId ?? '').isNotEmpty;
+
+    if (isSavingsFiltered && _selectedFilter == 'Repayment') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _selectedFilter = 'All');
+      });
+    }
 
     // Mock transactions with more variety
-    final allTransactions = [
-      AppTransaction(
-        id: '1',
-        title: 'Savings Deposit',
-        description: 'Emergency Fund',
-        amount: 500,
-        type: TransactionType.deposit,
-        date: DateTime.now(),
-        category: 'Savings',
-      ),
-      AppTransaction(
-        id: '2',
-        title: 'Loan Repayment',
-        description: 'Personal Loan - Monthly Payment',
-        amount: 300,
-        type: TransactionType.repayment,
-        date: DateTime.now().subtract(const Duration(days: 1)),
-        category: 'Loans',
-      ),
-      AppTransaction(
-        id: '3',
-        title: 'Coffee Shop',
-        description: 'Starbucks - Downtown',
-        amount: 10.50,
-        type: TransactionType.withdrawal,
-        date: DateTime.now().subtract(const Duration(days: 2)),
-        category: 'Food & Drink',
-      ),
-      AppTransaction(
-        id: '4',
-        title: 'Salary Deposit',
-        description: 'Monthly Salary',
-        amount: 2500,
-        type: TransactionType.deposit,
-        date: DateTime.now().subtract(const Duration(days: 5)),
-        category: 'Income',
-      ),
-      AppTransaction(
-        id: '5',
-        title: 'Grocery Shopping',
-        description: 'Shoprite',
-        amount: 85.00,
-        type: TransactionType.withdrawal,
-        date: DateTime.now().subtract(const Duration(days: 7)),
-        category: 'Shopping',
-      ),
-      AppTransaction(
-        id: '6',
-        title: 'Fixed Deposit',
-        description: '12-Month FD',
-        amount: 2000,
-        type: TransactionType.deposit,
-        date: DateTime.now().subtract(const Duration(days: 10)),
-        category: 'Savings',
-      ),
-      AppTransaction(
-        id: '7',
-        title: 'Electricity Bill',
-        description: 'ECG Payment',
-        amount: 120,
-        type: TransactionType.withdrawal,
-        date: DateTime.now().subtract(const Duration(days: 12)),
-        category: 'Bills',
-      ),
-      AppTransaction(
-        id: '8',
-        title: 'Interest Earned',
-        description: 'Savings Account Interest',
-        amount: 15.50,
-        type: TransactionType.deposit,
-        date: DateTime.now().subtract(const Duration(days: 15)),
-        category: 'Interest',
-      ),
-    ];
+    final allTransactions = isSavingsFiltered
+        ? _buildSavingsTransactions(
+            widget.savingsId!,
+            widget.savingsTitle,
+            widget.savingsTransactions,
+          )
+        : [
+            AppTransaction(
+              id: '1',
+              title: 'Savings Deposit',
+              description: 'Emergency Fund',
+              amount: 500,
+              type: TransactionType.deposit,
+              date: DateTime.now(),
+              category: 'Savings',
+            ),
+            AppTransaction(
+              id: '2',
+              title: 'Loan Repayment',
+              description: 'Personal Loan - Monthly Payment',
+              amount: 300,
+              type: TransactionType.repayment,
+              date: DateTime.now().subtract(const Duration(days: 1)),
+              category: 'Loans',
+            ),
+            AppTransaction(
+              id: '3',
+              title: 'Coffee Shop',
+              description: 'Starbucks - Downtown',
+              amount: 10.50,
+              type: TransactionType.withdrawal,
+              date: DateTime.now().subtract(const Duration(days: 2)),
+              category: 'Food & Drink',
+            ),
+            AppTransaction(
+              id: '4',
+              title: 'Salary Deposit',
+              description: 'Monthly Salary',
+              amount: 2500,
+              type: TransactionType.deposit,
+              date: DateTime.now().subtract(const Duration(days: 5)),
+              category: 'Income',
+            ),
+            AppTransaction(
+              id: '5',
+              title: 'Grocery Shopping',
+              description: 'Shoprite',
+              amount: 85.00,
+              type: TransactionType.withdrawal,
+              date: DateTime.now().subtract(const Duration(days: 7)),
+              category: 'Shopping',
+            ),
+            AppTransaction(
+              id: '6',
+              title: 'Fixed Deposit',
+              description: '12-Month FD',
+              amount: 2000,
+              type: TransactionType.deposit,
+              date: DateTime.now().subtract(const Duration(days: 10)),
+              category: 'Savings',
+            ),
+            AppTransaction(
+              id: '7',
+              title: 'Electricity Bill',
+              description: 'ECG Payment',
+              amount: 120,
+              type: TransactionType.withdrawal,
+              date: DateTime.now().subtract(const Duration(days: 12)),
+              category: 'Bills',
+            ),
+            AppTransaction(
+              id: '8',
+              title: 'Interest Earned',
+              description: 'Savings Account Interest',
+              amount: 15.50,
+              type: TransactionType.deposit,
+              date: DateTime.now().subtract(const Duration(days: 15)),
+              category: 'Interest',
+            ),
+          ];
 
     // Filter transactions
     final transactions = allTransactions.where((tx) {
@@ -163,247 +187,410 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       groupedTransactions[dateKey]!.add(tx);
     }
 
+    final listContent = AnimatedSwitcher(
+      duration: const Duration(milliseconds: 280),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        final offsetAnimation = Tween<Offset>(
+          begin: const Offset(0, 0.03),
+          end: Offset.zero,
+        ).animate(animation);
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(position: offsetAnimation, child: child),
+        );
+      },
+      child: KeyedSubtree(
+        key: ValueKey(
+          'list-$_selectedFilter-$_selectedPeriod-${groupedTransactions.length}',
+        ),
+        child: ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: groupedTransactions.length,
+          itemBuilder: (context, index) {
+            final dateKey = groupedTransactions.keys.elementAt(index);
+            final dayTransactions = groupedTransactions[dateKey]!;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          dateKey,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface.withOpacitySafe(
+                              0.75,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${dayTransactions.length} item${dayTransactions.length > 1 ? 's' : ''}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacitySafe(
+                            0.55,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                AppCard(
+                  margin: EdgeInsets.zero,
+                  child: Column(
+                    children: dayTransactions.asMap().entries.map((entry) {
+                      final i = entry.key;
+                      final tx = entry.value;
+                      final isLast = i == dayTransactions.length - 1;
+                      return Column(
+                        children: [
+                          _buildTransactionTile(theme, tx),
+                          if (!isLast)
+                            Divider(
+                              height: 1,
+                              color: theme.colorScheme.outline.withOpacitySafe(
+                                0.1,
+                              ),
+                            ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+
     return AppScaffold(
-      title: 'Transactions',
+      title: isSavingsFiltered ? 'Savings Activity' : 'Transactions',
       child: transactions.isEmpty
           ? _buildEmptyState(theme)
-          : Column(
-              children: [
-                // Net Balance Hero
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: BalanceCardShell(
-                    gradientColors: [
-                      theme.colorScheme.primary,
-                      theme.colorScheme.secondary,
-                    ],
-                    shadowColor: theme.colorScheme.primary.withOpacitySafe(
-                      0.24,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final isTablet = constraints.maxWidth >= 900;
+
+                final summaryCards = isTablet
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                            _buildSummaryCard(
+                              theme,
+                              'Income',
+                              totalIncome,
+                              Icons.arrow_downward,
+                              Colors.green,
+                            ),
+                            _buildSummaryCard(
+                              theme,
+                              'Expense',
+                              totalExpense,
+                              Icons.arrow_upward,
+                              Colors.red,
+                            ),
+                            _buildSummaryCard(
+                              theme,
+                              'Repayment',
+                              totalRepayment,
+                              Icons.credit_card,
+                              Colors.orange,
+                            ),
+                            _buildSummaryCard(
+                              theme,
+                              'Balance',
+                              netBalance,
+                              Icons.account_balance_wallet,
+                              theme.colorScheme.primary,
+                            ),
+                          ],
+                        ),
+                      )
+                    : SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          children: [
+                            _buildSummaryCard(
+                              theme,
+                              'Income',
+                              totalIncome,
+                              Icons.arrow_downward,
+                              Colors.green,
+                            ),
+                            const SizedBox(width: 12),
+                            _buildSummaryCard(
+                              theme,
+                              'Expense',
+                              totalExpense,
+                              Icons.arrow_upward,
+                              Colors.red,
+                            ),
+                            const SizedBox(width: 12),
+                            _buildSummaryCard(
+                              theme,
+                              'Repayment',
+                              totalRepayment,
+                              Icons.credit_card,
+                              Colors.orange,
+                            ),
+                            const SizedBox(width: 12),
+                            _buildSummaryCard(
+                              theme,
+                              'Balance',
+                              netBalance,
+                              Icons.account_balance_wallet,
+                              theme.colorScheme.primary,
+                            ),
+                          ],
+                        ),
+                      );
+
+                final controlsPane = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (isSavingsFiltered)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: AppCard(
+                          margin: EdgeInsets.zero,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.filter_alt_rounded,
+                                size: 18,
+                                color: theme.colorScheme.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Viewing ${widget.savingsTitle ?? 'Savings'} only',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () => context.go('/transactions'),
+                                child: const Text('Clear'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: BalanceCardShell(
+                        gradientColors: [
+                          theme.colorScheme.primary,
+                          theme.colorScheme.secondary,
+                        ],
+                        shadowColor: theme.colorScheme.primary.withOpacitySafe(
+                          0.24,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Net Balance',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.78,
+                                              ),
+                                              fontSize: 12,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _selectedPeriod,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.68,
+                                              ),
+                                              fontSize: 10,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          'GH₵${netBalance.toStringAsFixed(2)}',
+                                          style: theme.textTheme.headlineMedium
+                                              ?.copyWith(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 0.4,
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.18),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.account_balance_wallet,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.14),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
                                 children: [
-                                  Text(
-                                    'Net Balance',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.78,
-                                      ),
-                                      fontSize: 12,
-                                    ),
+                                  const Icon(
+                                    Icons.receipt_long,
+                                    color: Colors.white,
+                                    size: 12,
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    _selectedPeriod,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.68,
-                                      ),
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.centerLeft,
+                                  const SizedBox(width: 4),
+                                  Flexible(
                                     child: Text(
-                                      'GH₵${netBalance.toStringAsFixed(2)}',
-                                      style: theme.textTheme.headlineMedium
+                                      '${transactions.length} transactions in view',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodySmall
                                           ?.copyWith(
                                             color: Colors.white,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 0.4,
+                                            fontSize: 11,
                                           ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(
-                                Icons.account_balance_wallet,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Search transactions...',
+                          hintStyle: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.45,
+                            ),
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(16),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.55,
+                            ),
+                            size: 20,
                           ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.receipt_long,
-                                color: Colors.white,
-                                size: 12,
-                              ),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  '${transactions.length} transactions in view',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: Colors.white,
-                                    fontSize: 11,
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? GestureDetector(
+                                  onTap: () => _searchController.clear(),
+                                  child: Icon(
+                                    Icons.close_rounded,
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.55),
+                                    size: 18,
                                   ),
-                                ),
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: theme.colorScheme.outline.withValues(
+                                alpha: 0.25,
                               ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Search Bar
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search transactions...',
-                      hintStyle: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.45,
-                        ),
-                      ),
-                      prefixIcon: Icon(
-                        Icons.search,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.55,
-                        ),
-                        size: 20,
-                      ),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? GestureDetector(
-                              onTap: () => _searchController.clear(),
-                              child: Icon(
-                                Icons.close_rounded,
-                                color: theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.55,
-                                ),
-                                size: 18,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: theme.colorScheme.outline.withValues(
+                                alpha: 0.25,
                               ),
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: theme.colorScheme.outline.withValues(
-                            alpha: 0.25,
+                            ),
                           ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: theme.colorScheme.primary.withValues(
+                                alpha: 0.4,
+                              ),
+                              width: 1.5,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          filled: true,
+                          fillColor: theme.colorScheme.surface,
                         ),
                       ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: theme.colorScheme.outline.withValues(
-                            alpha: 0.25,
-                          ),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: theme.colorScheme.primary.withValues(
-                            alpha: 0.4,
-                          ),
-                          width: 1.5,
-                        ),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      filled: true,
-                      fillColor: theme.colorScheme.surface,
                     ),
-                  ),
-                ),
-
-                // Summary Cards
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      _buildSummaryCard(
-                        theme,
-                        'Income',
-                        totalIncome,
-                        Icons.arrow_downward,
-                        Colors.green,
-                      ),
-                      const SizedBox(width: 12),
-                      _buildSummaryCard(
-                        theme,
-                        'Expense',
-                        totalExpense,
-                        Icons.arrow_upward,
-                        Colors.red,
-                      ),
-                      const SizedBox(width: 12),
-                      _buildSummaryCard(
-                        theme,
-                        'Repayment',
-                        totalRepayment,
-                        Icons.credit_card,
-                        Colors.orange,
-                      ),
-                      const SizedBox(width: 12),
-                      _buildSummaryCard(
-                        theme,
-                        'Balance',
-                        netBalance,
-                        Icons.account_balance_wallet,
-                        theme.colorScheme.primary,
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Filter Chips
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: AppCard(
-                    margin: EdgeInsets.zero,
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    summaryCards,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: AppCard(
+                        margin: EdgeInsets.zero,
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Filter & Sort',
@@ -415,189 +602,189 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                                 letterSpacing: 0.3,
                               ),
                             ),
-                            PopupMenuButton<String>(
-                              initialValue: _selectedPeriod,
-                              onSelected: (value) =>
-                                  setState(() => _selectedPeriod = value),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primary.withValues(
-                                    alpha: 0.12,
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: PopupMenuButton<String>(
+                                initialValue: _selectedPeriod,
+                                onSelected: (value) =>
+                                    setState(() => _selectedPeriod = value),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
                                   ),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
+                                  decoration: BoxDecoration(
                                     color: theme.colorScheme.primary.withValues(
-                                      alpha: 0.18,
+                                      alpha: 0.12,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: theme.colorScheme.primary
+                                          .withValues(alpha: 0.18),
                                     ),
                                   ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_today_rounded,
+                                        color: theme.colorScheme.primary,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        _selectedPeriod,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
+                                              color: theme.colorScheme.primary,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 12,
+                                            ),
+                                      ),
+                                      Icon(
+                                        Icons.arrow_drop_down,
+                                        color: theme.colorScheme.primary,
+                                        size: 18,
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.calendar_today_rounded,
-                                      color: theme.colorScheme.primary,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      _selectedPeriod,
-                                      style: theme.textTheme.labelSmall
-                                          ?.copyWith(
-                                            color: theme.colorScheme.primary,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 12,
+                                itemBuilder: (context) =>
+                                    [
+                                          'Today',
+                                          'This Week',
+                                          'This Month',
+                                          'Last Month',
+                                          'All Time',
+                                        ]
+                                        .map(
+                                          (period) => PopupMenuItem(
+                                            value: period,
+                                            child: Text(period),
                                           ),
-                                    ),
-                                    Icon(
-                                      Icons.arrow_drop_down,
-                                      color: theme.colorScheme.primary,
-                                      size: 18,
-                                    ),
-                                  ],
-                                ),
+                                        )
+                                        .toList(),
                               ),
-                              itemBuilder: (context) =>
-                                  [
-                                        'Today',
-                                        'This Week',
-                                        'This Month',
-                                        'Last Month',
-                                        'All Time',
-                                      ]
-                                      .map(
-                                        (period) => PopupMenuItem(
-                                          value: period,
-                                          child: Text(period),
-                                        ),
-                                      )
-                                      .toList(),
+                            ),
+                            const SizedBox(height: 14),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  _buildFilterChip(theme, 'All'),
+                                  const SizedBox(width: 10),
+                                  _buildFilterChip(theme, 'Income'),
+                                  const SizedBox(width: 10),
+                                  _buildFilterChip(theme, 'Expense'),
+                                  if (!isSavingsFiltered) ...[
+                                    const SizedBox(width: 10),
+                                    _buildFilterChip(theme, 'Repayment'),
+                                  ],
+                                ],
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 14),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _buildFilterChip(theme, 'All'),
-                              const SizedBox(width: 10),
-                              _buildFilterChip(theme, 'Income'),
-                              const SizedBox(width: 10),
-                              _buildFilterChip(theme, 'Expense'),
-                              const SizedBox(width: 10),
-                              _buildFilterChip(theme, 'Repayment'),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                // Transactions List
-                Expanded(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 280),
-                    switchInCurve: Curves.easeOutCubic,
-                    switchOutCurve: Curves.easeInCubic,
-                    transitionBuilder: (child, animation) {
-                      final offsetAnimation = Tween<Offset>(
-                        begin: const Offset(0, 0.03),
-                        end: Offset.zero,
-                      ).animate(animation);
-                      return FadeTransition(
-                        opacity: animation,
-                        child: SlideTransition(
-                          position: offsetAnimation,
-                          child: child,
-                        ),
-                      );
-                    },
-                    child: KeyedSubtree(
-                      key: ValueKey(
-                        'list-$_selectedFilter-$_selectedPeriod-${groupedTransactions.length}',
-                      ),
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: groupedTransactions.length,
-                        itemBuilder: (context, index) {
-                          final dateKey = groupedTransactions.keys.elementAt(
-                            index,
-                          );
-                          final dayTransactions = groupedTransactions[dateKey]!;
-
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 8,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      dateKey,
-                                      style: theme.textTheme.labelLarge
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                            color: theme.colorScheme.onSurface
-                                                .withOpacitySafe(0.75),
-                                          ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      '${dayTransactions.length} item${dayTransactions.length > 1 ? 's' : ''}',
-                                      style: theme.textTheme.labelSmall
-                                          ?.copyWith(
-                                            color: theme.colorScheme.onSurface
-                                                .withOpacitySafe(0.55),
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              AppCard(
-                                margin: EdgeInsets.zero,
-                                child: Column(
-                                  children: dayTransactions.asMap().entries.map(
-                                    (entry) {
-                                      final i = entry.key;
-                                      final tx = entry.value;
-                                      final isLast =
-                                          i == dayTransactions.length - 1;
-                                      return Column(
-                                        children: [
-                                          _buildTransactionTile(theme, tx),
-                                          if (!isLast)
-                                            Divider(
-                                              height: 1,
-                                              color: theme.colorScheme.outline
-                                                  .withOpacitySafe(0.1),
-                                            ),
-                                        ],
-                                      );
-                                    },
-                                  ).toList(),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                            ],
-                          );
-                        },
                       ),
                     ),
-                  ),
-                ),
-              ],
+                  ],
+                );
+
+                if (!isTablet) {
+                  return Column(
+                    children: [
+                      Flexible(
+                        fit: FlexFit.loose,
+                        child: SingleChildScrollView(child: controlsPane),
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(child: listContent),
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 360,
+                      child: SingleChildScrollView(child: controlsPane),
+                    ),
+                    const VerticalDivider(width: 1),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: listContent,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
     );
+  }
+
+  List<AppTransaction> _buildSavingsTransactions(
+    String savingsId,
+    String? savingsTitle,
+    List<Map<String, dynamic>>? savingsTransactions,
+  ) {
+    final title = (savingsTitle ?? '').trim().isEmpty
+        ? 'Savings Goal'
+        : savingsTitle!.trim();
+    final source = savingsTransactions ?? const [];
+
+    return source.asMap().entries.map((entry) {
+      final index = entry.key;
+      final tx = entry.value;
+
+      final rawType = (tx['type'] as String? ?? '').trim().toLowerCase();
+      final type = switch (rawType) {
+        'withdraw' || 'withdrawal' => TransactionType.withdrawal,
+        'repayment' => TransactionType.repayment,
+        _ => TransactionType.deposit,
+      };
+
+      final rawAmount = tx['amount'];
+      final amount = rawAmount is num
+          ? rawAmount.toDouble()
+          : double.tryParse(rawAmount?.toString() ?? '') ?? 0;
+
+      DateTime parsedDate = DateTime.now();
+      final rawDate = tx['date'];
+      if (rawDate is String) {
+        parsedDate =
+            DateTime.tryParse(rawDate) ??
+            _tryParseDisplayDate(rawDate) ??
+            parsedDate;
+      }
+
+      final displayType = (tx['type'] as String?)?.trim();
+      final normalizedTitle = (displayType == null || displayType.isEmpty)
+          ? 'Activity'
+          : displayType;
+
+      return AppTransaction(
+        id: '${savingsId}_${index + 1}',
+        title: normalizedTitle,
+        description: '$title activity',
+        amount: amount,
+        type: type,
+        date: parsedDate,
+        category: 'Savings',
+      );
+    }).toList();
+  }
+
+  DateTime? _tryParseDisplayDate(String value) {
+    try {
+      return DateFormat('MMM dd, yyyy').parse(value);
+    } catch (_) {
+      return null;
+    }
   }
 
   Widget _buildEmptyState(ThemeData theme) {
@@ -974,14 +1161,21 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Amount',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: Colors.white.withOpacitySafe(0.92),
+                    Expanded(
+                      child: Text(
+                        'Amount',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: Colors.white.withOpacitySafe(0.92),
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 12),
                     Text(
                       '${isCredit ? '+' : '-'}GH₵${transaction.amount.toStringAsFixed(2)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: Colors.white,

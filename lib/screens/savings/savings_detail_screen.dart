@@ -6,6 +6,7 @@ import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
 import '../../core/balance_card_shell.dart';
 import '../../core/color_ext.dart';
+import 'savings_model.dart';
 
 class _SavingsDetailData {
   final String id;
@@ -182,454 +183,502 @@ final Map<String, _SavingsDetailData> _savingsCatalog = {
 
 class SavingsDetailScreen extends StatefulWidget {
   final String savingsId;
+  final Savings? savings;
 
-  const SavingsDetailScreen({super.key, required this.savingsId});
+  const SavingsDetailScreen({super.key, required this.savingsId, this.savings});
 
   @override
   State<SavingsDetailScreen> createState() => _SavingsDetailScreenState();
 }
 
 class _SavingsDetailScreenState extends State<SavingsDetailScreen> {
+  _SavingsDetailData _fromSavedGoal(Savings goal) {
+    final accent = switch (goal.type) {
+      SavingsType.memberSaving => const Color(0xFF43A047),
+      SavingsType.currentSaving => const Color(0xFF3498DB),
+      SavingsType.kiddySaving => const Color(0xFFFF6B9D),
+      SavingsType.fixedDeposit => const Color(0xFF9B59B6),
+    };
+
+    final today = DateTime.now();
+    final createdLabel = 'Created ${today.day}/${today.month}/${today.year}';
+
+    return _SavingsDetailData(
+      id: goal.id,
+      title: goal.title,
+      icon: goal.type.icon,
+      accent: accent,
+      target: goal.target,
+      balance: goal.balance,
+      interest: goal.interestRate ?? 0,
+      monthlyDeposit: (goal.target / 12).clamp(0, goal.target),
+      createdLabel: createdLabel,
+      transactions: const [],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final savings =
-        _savingsCatalog[widget.savingsId] ?? _savingsCatalog.values.first;
+    final savings = widget.savings != null
+        ? _fromSavedGoal(widget.savings!)
+        : _savingsCatalog[widget.savingsId] ??
+              _savingsCatalog['custom-savings'] ??
+              _fromSavedGoal(
+                Savings(
+                  id: widget.savingsId,
+                  title: 'Savings Goal',
+                  balance: 0,
+                  target: 1,
+                  type: SavingsType.memberSaving,
+                ),
+              );
     final String title = savings.title;
     final double target = savings.target;
     final double balance = savings.balance;
     final progress = (balance / target).clamp(0.0, 1.0);
-    final remaining = target - balance;
+    final remaining = (target - balance).clamp(0.0, target);
     final transactions = savings.transactions;
-    return AppScaffold(
-      title: '$title Details',
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Main Balance Card
-            BalanceCardShell(
-              gradientColors: [
-                theme.colorScheme.primary,
-                theme.colorScheme.secondary,
-              ],
-              shadowColor: theme.colorScheme.primary.withOpacitySafe(0.30),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              textScaler: const TextScaler.linear(1.0),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.78),
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Current balance',
-                              textScaler: const TextScaler.linear(1.0),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.68),
-                                fontSize: 10,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                'GH₵${balance.toStringAsFixed(2)}',
-                                style: theme.textTheme.headlineMedium?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.45,
-                                  shadows: const [
-                                    Shadow(
-                                      color: Color(0x33000000),
-                                      blurRadius: 10,
-                                      offset: Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                              ),
+    final heroCard = BalanceCardShell(
+      gradientColors: [
+        savings.accent,
+        Color.lerp(savings.accent, theme.colorScheme.primary, 0.35) ??
+            theme.colorScheme.primary,
+      ],
+      shadowColor: savings.accent.withOpacitySafe(0.30),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      textScaler: const TextScaler.linear(1.0),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.78),
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Current balance',
+                      textScaler: const TextScaler.linear(1.0),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.68),
+                        fontSize: 10,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'GH₵${balance.toStringAsFixed(2)}',
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.45,
+                          shadows: const [
+                            Shadow(
+                              color: Color(0x33000000),
+                              blurRadius: 10,
+                              offset: Offset(0, 2),
                             ),
                           ],
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          savings.icon,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
                     ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.info_outline,
-                          color: Colors.white,
-                          size: 12,
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            'Target: GH₵${target.toStringAsFixed(0)} • Progress: ${(progress * 100).toStringAsFixed(1)}%',
-                            textScaler: const TextScaler.linear(1.0),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.white,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _SavingsCardMeta(
-                                label: 'Target',
-                                value: 'GH₵${target.toStringAsFixed(0)}',
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _SavingsCardMeta(
-                                label: 'Progress',
-                                value:
-                                    '${(progress * 100).toStringAsFixed(1)}%',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _SavingsCardMeta(
-                                label: 'Remaining',
-                                value: 'GH₵${remaining.toStringAsFixed(0)}',
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _SavingsCardMeta(
-                                label: 'Created',
-                                value: savings.createdLabel.replaceAll(
-                                  'Created ',
-                                  '',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(savings.icon, color: Colors.white, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(16),
             ),
-
-            const SizedBox(height: 16),
-
-            // Action Buttons
-            ActionTripleRow(
-              deposit: ActionItem(
-                label: 'Deposit',
-                icon: Icons.add_circle_outline,
-                color: theme.colorScheme.primary,
-                onTap: () => context.go('/payment'),
-              ),
-              withdraw: ActionItem(
-                label: 'Withdraw',
-                icon: Icons.remove_circle_outline,
-                color: Theme.of(context).colorScheme.error,
-                onTap: () => context.go('/savings/${savings.id}/withdraw'),
-              ),
-              transfer: ActionItem(
-                label: 'Transfer',
-                icon: Icons.swap_horiz_rounded,
-                color: const Color(0xFF1B8A9B),
-                onTap: () => context.go('/savings/transfer'),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Recent Activity Section
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Row(
               children: [
-                Expanded(
+                const Icon(Icons.info_outline, color: Colors.white, size: 12),
+                const SizedBox(width: 4),
+                Flexible(
                   child: Text(
-                    'Recent Activity',
+                    'Target: GH₵${target.toStringAsFixed(0)} • Progress: ${(progress * 100).toStringAsFixed(1)}%',
+                    textScaler: const TextScaler.linear(1.0),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.white,
+                      fontSize: 11,
                     ),
                   ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Coming soon!'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                  child: const Text('View All'),
                 ),
               ],
             ),
-
-            const SizedBox(height: 12),
-
-            // Transaction List
-            AppCard(
-              margin: EdgeInsets.zero,
-              child: Column(
-                children: transactions.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final tx = entry.value;
-                  final isDeposit = tx['type'] == 'Deposit';
-                  final isInterest = tx['type'] == 'Interest';
-                  final isLast = index == transactions.length - 1;
-
-                  // Mock extra detail fields
-                  final refNumber =
-                      'TXN${savings.id.hashCode.abs() % 90000 + 10000}${index + 1}';
-                  final method = isInterest ? 'Auto-credited' : 'Mobile Money';
-                  final status = 'Completed';
-                  final amountLabel =
-                      '${isDeposit || isInterest ? '+' : '-'}GH₵${(tx['amount'] as double).toStringAsFixed(2)}';
-                  final amountColor = isDeposit || isInterest
-                      ? Colors.green
-                      : theme.colorScheme.error;
-
-                  return Column(
-                    children: [
-                      InkWell(
-                        onTap: () => showModalBottomSheet(
-                          context: context,
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(20),
-                            ),
-                          ),
-                          builder: (_) => _TxDetailSheet(
-                            type: tx['type'] as String,
-                            date: tx['date'] as String,
-                            refNumber: refNumber,
-                            method: method,
-                            status: status,
-                            amountLabel: amountLabel,
-                            amountColor: amountColor,
-                            isDeposit: isDeposit,
-                            isInterest: isInterest,
-                          ),
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: isInterest
-                                      ? theme.colorScheme.secondaryContainer
-                                            .withOpacitySafe(0.5)
-                                      : isDeposit
-                                      ? theme.colorScheme.primaryContainer
-                                            .withOpacitySafe(0.5)
-                                      : theme.colorScheme.errorContainer
-                                            .withOpacitySafe(0.5),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  isInterest
-                                      ? Icons.percent
-                                      : isDeposit
-                                      ? Icons.arrow_downward
-                                      : Icons.arrow_upward,
-                                  color: isInterest
-                                      ? theme.colorScheme.secondary
-                                      : isDeposit
-                                      ? theme.colorScheme.primary
-                                      : theme.colorScheme.error,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      tx['type'] as String,
-                                      style: theme.textTheme.titleSmall
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                    Text(
-                                      tx['date'] as String,
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: theme.colorScheme.onSurface
-                                                .withOpacitySafe(0.6),
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 110,
-                                ),
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  alignment: Alignment.centerRight,
-                                  child: Text(
-                                    '${isDeposit || isInterest ? '+' : '-'}GH₵${(tx['amount'] as double).toStringAsFixed(2)}',
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: isDeposit || isInterest
-                                          ? Colors.green
-                                          : theme.colorScheme.error,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(
-                                Icons.chevron_right_rounded,
-                                size: 18,
-                                color: theme.colorScheme.onSurface
-                                    .withOpacitySafe(0.35),
-                              ),
-                            ],
-                          ),
-                        ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SavingsCardMeta(
+                        label: 'Target',
+                        value: 'GH₵${target.toStringAsFixed(0)}',
                       ),
-                      if (!isLast) ...[
-                        const SizedBox(height: 16),
-                        Divider(
-                          height: 1,
-                          color: theme.colorScheme.outline.withOpacitySafe(0.2),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                    ],
-                  );
-                }).toList(),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _SavingsCardMeta(
+                        label: 'Progress',
+                        value: '${(progress * 100).toStringAsFixed(1)}%',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SavingsCardMeta(
+                        label: 'Remaining',
+                        value: 'GH₵${remaining.toStringAsFixed(0)}',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _SavingsCardMeta(
+                        label: 'Created',
+                        value: savings.createdLabel.replaceAll('Created ', ''),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final actions = ActionTripleRow(
+      deposit: ActionItem(
+        label: 'Deposit',
+        icon: Icons.add_circle_outline,
+        color: theme.colorScheme.primary,
+        onTap: () => context.go('/payment'),
+      ),
+      withdraw: ActionItem(
+        label: 'Withdraw',
+        icon: Icons.remove_circle_outline,
+        color: Theme.of(context).colorScheme.error,
+        onTap: () => context.go('/savings/${savings.id}/withdraw'),
+      ),
+      transfer: ActionItem(
+        label: 'Transfer',
+        icon: Icons.swap_horiz_rounded,
+        color: const Color(0xFF1B8A9B),
+        onTap: () => context.go('/savings/transfer'),
+      ),
+    );
+
+    final activitySection = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                'Recent Activity',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-
-            const SizedBox(height: 24),
-
-            // Quick Insights
-            Text(
-              'Insights',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+            TextButton(
+              onPressed: () {
+                final encodedId = Uri.encodeComponent(savings.id);
+                final encodedTitle = Uri.encodeComponent(savings.title);
+                context.go(
+                  '/transactions?savingsId=$encodedId&savingsTitle=$encodedTitle',
+                  extra: {'savingsTransactions': transactions},
+                );
+              },
+              child: const Text('View All'),
             ),
-            const SizedBox(height: 12),
-
-            AppCard(
-              margin: EdgeInsets.zero,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withOpacitySafe(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.lightbulb_outline,
-                      color: Colors.blue,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'On track!',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'You need to save GH₵${(remaining / 5).toStringAsFixed(0)} per month for 5 months to reach your goal.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacitySafe(
-                              0.7,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 80), // Extra space for FAB
           ],
         ),
+        const SizedBox(height: 12),
+        AppCard(
+          margin: EdgeInsets.zero,
+          child: Column(
+            children: transactions.asMap().entries.map((entry) {
+              final index = entry.key;
+              final tx = entry.value;
+              final isDeposit = tx['type'] == 'Deposit';
+              final isInterest = tx['type'] == 'Interest';
+              final isLast = index == transactions.length - 1;
+
+              final refNumber =
+                  'TXN${savings.id.hashCode.abs() % 90000 + 10000}${index + 1}';
+              final method = isInterest ? 'Auto-credited' : 'Mobile Money';
+              final status = 'Completed';
+              final amountLabel =
+                  '${isDeposit || isInterest ? '+' : '-'}GH₵${(tx['amount'] as double).toStringAsFixed(2)}';
+              final amountColor = isDeposit || isInterest
+                  ? Colors.green
+                  : theme.colorScheme.error;
+
+              return Column(
+                children: [
+                  InkWell(
+                    onTap: () => showModalBottomSheet(
+                      context: context,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(20),
+                        ),
+                      ),
+                      builder: (_) => _TxDetailSheet(
+                        type: tx['type'] as String,
+                        date: tx['date'] as String,
+                        refNumber: refNumber,
+                        method: method,
+                        status: status,
+                        amountLabel: amountLabel,
+                        amountColor: amountColor,
+                        isDeposit: isDeposit,
+                        isInterest: isInterest,
+                      ),
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isInterest
+                                  ? theme.colorScheme.secondaryContainer
+                                        .withOpacitySafe(0.5)
+                                  : isDeposit
+                                  ? theme.colorScheme.primaryContainer
+                                        .withOpacitySafe(0.5)
+                                  : theme.colorScheme.errorContainer
+                                        .withOpacitySafe(0.5),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              isInterest
+                                  ? Icons.percent
+                                  : isDeposit
+                                  ? Icons.arrow_downward
+                                  : Icons.arrow_upward,
+                              color: isInterest
+                                  ? theme.colorScheme.secondary
+                                  : isDeposit
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.error,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  tx['type'] as String,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  tx['date'] as String,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurface
+                                        .withOpacitySafe(0.6),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 110),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                '${isDeposit || isInterest ? '+' : '-'}GH₵${(tx['amount'] as double).toStringAsFixed(2)}',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: isDeposit || isInterest
+                                      ? Colors.green
+                                      : theme.colorScheme.error,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            size: 18,
+                            color: theme.colorScheme.onSurface.withOpacitySafe(
+                              0.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (!isLast) ...[
+                    const SizedBox(height: 16),
+                    Divider(
+                      height: 1,
+                      color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+
+    final insightsSection = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Insights',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        AppCard(
+          margin: EdgeInsets.zero,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: savings.accent.withOpacitySafe(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.lightbulb_outline,
+                  color: savings.accent,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'On track!',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'You need to save GH₵${(remaining / 5).toStringAsFixed(0)} per month for 5 months to reach your goal.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacitySafe(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    return AppScaffold(
+      title: '$title Details',
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isTablet = constraints.maxWidth >= 900;
+          final content = SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                heroCard,
+                const SizedBox(height: 16),
+                actions,
+                const SizedBox(height: 24),
+                if (isTablet)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 6, child: activitySection),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        flex: 4,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [insightsSection],
+                        ),
+                      ),
+                    ],
+                  )
+                else ...[
+                  activitySection,
+                  const SizedBox(height: 24),
+                  insightsSection,
+                ],
+                const SizedBox(height: 80),
+              ],
+            ),
+          );
+
+          if (!isTablet) return content;
+          return Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 980),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }

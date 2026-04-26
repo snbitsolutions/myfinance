@@ -34,7 +34,9 @@ class NavigationHistory {
     BuildContext context, {
     String fallbackRoute = '/home',
   }) async {
-    if (Navigator.of(context).canPop()) {
+    if (!context.mounted) return;
+
+    if (context.canPop()) {
       context.pop();
       return;
     }

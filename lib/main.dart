@@ -4,12 +4,15 @@ import 'core/constants/app_constants.dart';
 import 'core/services/device_identity_service.dart';
 import 'core/services/http_client.dart';
 import 'core/services/network_service.dart';
+import 'core/services/secure_auth_storage.dart';
+import 'core/layout/responsive.dart';
 import 'router/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize core services
+  await SecureAuthStorage.instance.initialize();
   await HttpClient.instance.initializePreferences();
   await NetworkService.instance.initialize();
   await DeviceIdentityService().primeInstallationId();
@@ -42,6 +45,35 @@ class AdepaTeachersApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: AppConstants.appName,
       routerConfig: AppRouter.router,
+      builder: (context, child) {
+        if (child == null) return const SizedBox.shrink();
+
+        final media = MediaQuery.of(context);
+        final maxContentWidth = Responsive.maxContentWidth(context);
+        final horizontalPadding = Responsive.horizontalGutter(context);
+
+        return MediaQuery(
+          data: media.copyWith(
+            textScaler: media.textScaler.clamp(
+              minScaleFactor: 0.9,
+              maxScaleFactor: 1.15,
+            ),
+          ),
+          child: ColoredBox(
+            color: appColorScheme.surface,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxContentWidth),
+                  child: child,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: appColorScheme,

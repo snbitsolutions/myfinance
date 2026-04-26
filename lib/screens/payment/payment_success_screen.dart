@@ -6,14 +6,93 @@ import 'package:go_router/go_router.dart';
 import '../../core/app_scaffold.dart';
 
 class PaymentSuccessScreen extends StatelessWidget {
-  const PaymentSuccessScreen({super.key});
+  final double? amount;
+  final DateTime? processedAt;
+  final String? reference;
+  final String? title;
+  final String? message;
+  final String? primaryActionLabel;
+  final String? primaryActionRoute;
+  final String? secondaryActionLabel;
+  final String? secondaryActionRoute;
+
+  const PaymentSuccessScreen({
+    super.key,
+    this.amount,
+    this.processedAt,
+    this.reference,
+    this.title,
+    this.message,
+    this.primaryActionLabel,
+    this.primaryActionRoute,
+    this.secondaryActionLabel,
+    this.secondaryActionRoute,
+  });
+
+  String _formatAmount() {
+    final value = amount ?? 500;
+    return 'GH₵${value.toStringAsFixed(2)}';
+  }
+
+  String _formatProcessedAt() {
+    final value = processedAt ?? DateTime.now();
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
+    final minute = value.minute.toString().padLeft(2, '0');
+    final period = value.hour >= 12 ? 'PM' : 'AM';
+    return '${months[value.month - 1]} ${value.day}, ${value.year} • $hour:$minute $period';
+  }
+
+  String _formatReference() {
+    if (reference != null && reference!.trim().isNotEmpty) {
+      return reference!.trim();
+    }
+    return 'TXN#${DateTime.now().millisecondsSinceEpoch}';
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final resolvedTitle =
+        (title != null && title!.trim().isNotEmpty)
+        ? title!
+        : 'Payment Successful';
+    final resolvedMessage =
+        (message != null && message!.trim().isNotEmpty)
+        ? message!
+        : 'Your transaction was completed successfully.';
+    final resolvedPrimaryActionLabel =
+      (primaryActionLabel != null && primaryActionLabel!.trim().isNotEmpty)
+      ? primaryActionLabel!
+      : 'Go Home';
+    final resolvedPrimaryActionRoute =
+      (primaryActionRoute != null && primaryActionRoute!.trim().isNotEmpty)
+      ? primaryActionRoute!
+      : '/home';
+    final resolvedSecondaryActionLabel =
+      (secondaryActionLabel != null && secondaryActionLabel!.trim().isNotEmpty)
+      ? secondaryActionLabel!
+      : 'View Transactions';
+    final resolvedSecondaryActionRoute =
+      (secondaryActionRoute != null && secondaryActionRoute!.trim().isNotEmpty)
+      ? secondaryActionRoute!
+      : '/transactions';
 
     return AppScaffold(
-      title: 'Payment Successful',
+      title: resolvedTitle,
       showBack: false,
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -56,7 +135,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    'Payment Successful',
+                    resolvedTitle,
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
@@ -64,7 +143,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Your transaction was completed successfully.',
+                    resolvedMessage,
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: Colors.white.withOpacitySafe(0.92),
@@ -99,7 +178,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                   const SizedBox(height: 14),
                   _PaymentDetail(
                     label: 'Amount',
-                    value: 'GH₵500.00',
+                    value: _formatAmount(),
                     theme: theme,
                   ),
                   const SizedBox(height: 12),
@@ -109,7 +188,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   _PaymentDetail(
                     label: 'Processed On',
-                    value: 'Jan 19, 2026 • 2:30 PM',
+                    value: _formatProcessedAt(),
                     theme: theme,
                   ),
                   const SizedBox(height: 12),
@@ -119,7 +198,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   _PaymentDetail(
                     label: 'Reference',
-                    value: 'TXN#2026011923450',
+                    value: _formatReference(),
                     theme: theme,
                     isMonospace: true,
                   ),
@@ -131,9 +210,9 @@ class PaymentSuccessScreen extends StatelessWidget {
               width: double.infinity,
               height: 52,
               child: FilledButton.icon(
-                onPressed: () => context.go('/home'),
+                onPressed: () => context.go(resolvedPrimaryActionRoute),
                 icon: const Icon(Icons.home_rounded),
-                label: const Text('Go Home'),
+                label: Text(resolvedPrimaryActionLabel),
                 style: FilledButton.styleFrom(
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -147,9 +226,9 @@ class PaymentSuccessScreen extends StatelessWidget {
               width: double.infinity,
               height: 52,
               child: OutlinedButton.icon(
-                onPressed: () => context.go('/transactions'),
+                onPressed: () => context.go(resolvedSecondaryActionRoute),
                 icon: const Icon(Icons.receipt_long_rounded),
-                label: const Text('View Transactions'),
+                label: Text(resolvedSecondaryActionLabel),
                 style: OutlinedButton.styleFrom(
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),

@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'responsive.dart';
+
 class MainShell extends StatefulWidget {
   final Widget child;
 
@@ -44,6 +46,69 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final currentIndex = _getIndex(context);
     final theme = Theme.of(context);
+    final isExpanded = Responsive.isExpanded(context);
+
+    if (isExpanded) {
+      return Scaffold(
+        body: Row(
+          children: [
+            NavigationRail(
+              selectedIndex: currentIndex,
+              onDestinationSelected: (index) {
+                if (index == 0) context.go('/home');
+                if (index == 1) context.go('/savings');
+                if (index == 2) context.go('/transactions');
+                if (index == 3) context.go('/profile');
+              },
+              extended: Responsive.isLarge(context),
+              useIndicator: true,
+              leading: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: FloatingActionButton.small(
+                  onPressed: () => context.go('/home'),
+                  child: const Icon(Icons.home_rounded),
+                ),
+              ),
+              trailing: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: IconButton(
+                  tooltip: 'Savings types',
+                  onPressed: () {
+                    HapticFeedback.mediumImpact();
+                    context.go('/savings/types');
+                  },
+                  icon: const Icon(Icons.tune_rounded),
+                ),
+              ),
+              destinations: const [
+                NavigationRailDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home_rounded),
+                  label: Text('Home'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.savings_outlined),
+                  selectedIcon: Icon(Icons.savings_rounded),
+                  label: Text('Savings'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.swap_horiz_outlined),
+                  selectedIcon: Icon(Icons.swap_horiz_rounded),
+                  label: Text('Transactions'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.person_outline_rounded),
+                  selectedIcon: Icon(Icons.person_rounded),
+                  label: Text('Profile'),
+                ),
+              ],
+            ),
+            const VerticalDivider(width: 1),
+            Expanded(child: widget.child),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       body: widget.child,

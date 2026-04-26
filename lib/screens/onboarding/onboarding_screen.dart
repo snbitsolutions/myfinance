@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -261,7 +259,6 @@ class OnboardingPage extends StatelessWidget {
     final intensity = disableAnimations ? 0.0 : (isCompact ? 0.55 : 0.8);
     final depthScale = 1 - (distance * 0.035 * intensity);
     final depthOpacity = 1 - (distance * 0.12 * intensity);
-    final depthBlur = distance * 1.0 * intensity;
     final backgroundShift = pageDelta * (disableAnimations ? 0 : 18);
     final contentShift = pageDelta * (disableAnimations ? 0 : -8);
     final iconShift = pageDelta * (disableAnimations ? 0 : -5);
@@ -304,72 +301,66 @@ class OnboardingPage extends StatelessWidget {
               opacity: depthOpacity,
               child: Transform.scale(
                 scale: depthScale,
-                child: ImageFiltered(
-                  imageFilter: ImageFilter.blur(
-                    sigmaX: depthBlur,
-                    sigmaY: depthBlur,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isCompact ? 16 : 24,
                   ),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isCompact ? 16 : 24,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        AnimatedScale(
-                          scale: isActive ? 1 : 0.92,
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOutBack,
-                          child: AnimatedOpacity(
-                            opacity: isActive ? 1 : 0.75,
-                            duration: const Duration(milliseconds: 280),
-                            child: Transform.translate(
-                              offset: Offset(iconShift, 0),
-                              child: _buildIcon(pageColor),
-                            ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AnimatedScale(
+                        scale: isActive ? 1 : 0.92,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutBack,
+                        child: AnimatedOpacity(
+                          opacity: isActive ? 1 : 0.75,
+                          duration: const Duration(milliseconds: 280),
+                          child: Transform.translate(
+                            offset: Offset(iconShift, 0),
+                            child: _buildIcon(pageColor),
                           ),
                         ),
-                        SizedBox(height: isCompact ? 28 : 56),
-                        AnimatedSlide(
+                      ),
+                      SizedBox(height: isCompact ? 28 : 56),
+                      AnimatedSlide(
+                        offset: isActive
+                            ? Offset.zero
+                            : const Offset(0, 0.04),
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.easeOut,
+                        child: AnimatedOpacity(
+                          opacity: isActive ? 1 : 0.8,
+                          duration: const Duration(milliseconds: 240),
+                          child: Text(
+                            data.title,
+                            textAlign: TextAlign.center,
+                            style: titleStyle,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: isCompact ? 12 : 16),
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isCompact ? 8 : 16,
+                        ),
+                        child: AnimatedSlide(
                           offset: isActive
                               ? Offset.zero
-                              : const Offset(0, 0.04),
-                          duration: const Duration(milliseconds: 280),
+                              : const Offset(0, 0.06),
+                          duration: const Duration(milliseconds: 320),
                           curve: Curves.easeOut,
                           child: AnimatedOpacity(
-                            opacity: isActive ? 1 : 0.8,
-                            duration: const Duration(milliseconds: 240),
+                            opacity: isActive ? 1 : 0.78,
+                            duration: const Duration(milliseconds: 260),
                             child: Text(
-                              data.title,
+                              data.subtitle,
                               textAlign: TextAlign.center,
-                              style: titleStyle,
+                              style: subtitleStyle,
                             ),
                           ),
                         ),
-                        SizedBox(height: isCompact ? 12 : 16),
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isCompact ? 8 : 16,
-                          ),
-                          child: AnimatedSlide(
-                            offset: isActive
-                                ? Offset.zero
-                                : const Offset(0, 0.06),
-                            duration: const Duration(milliseconds: 320),
-                            curve: Curves.easeOut,
-                            child: AnimatedOpacity(
-                              opacity: isActive ? 1 : 0.78,
-                              duration: const Duration(milliseconds: 260),
-                              child: Text(
-                                data.subtitle,
-                                textAlign: TextAlign.center,
-                                style: subtitleStyle,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -382,57 +373,16 @@ class OnboardingPage extends StatelessWidget {
 
   Widget _buildIcon(Color pageColor) {
     final imageSize = isCompact ? 128.0 : 160.0;
-    final iconContainerSize = isCompact ? 112.0 : 140.0;
     final iconSize = isCompact ? 54.0 : 70.0;
 
     if (data.image != null) {
-      return Container(
+      return SizedBox(
         width: imageSize,
         height: imageSize,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              pageColor.withOpacitySafe(0.1),
-              pageColor.withOpacitySafe(0.15),
-            ],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: pageColor.withOpacitySafe(0.2),
-              blurRadius: 30,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
         child: Image.asset(data.image!, fit: BoxFit.contain),
       );
     }
 
-    return Container(
-      width: iconContainerSize,
-      height: iconContainerSize,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            pageColor.withOpacitySafe(0.2),
-            pageColor.withOpacitySafe(0.4),
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: pageColor.withOpacitySafe(0.3),
-            blurRadius: 30,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Icon(data.icon, size: iconSize, color: pageColor),
-    );
+    return Icon(data.icon, size: iconSize, color: pageColor);
   }
 }
