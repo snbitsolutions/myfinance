@@ -100,6 +100,7 @@ class AppConstants {
       'secure.userRefreshToken';
   static const String secureStorageKeySessionDeviceFingerprint =
       'secure.sessionDeviceFingerprint';
+  static const String secureStorageKeyUserPin = 'secure.userPin';
 
   // Loan Status
   static const String loanStatusPending = 'Pending';
@@ -120,9 +121,30 @@ class AppConstants {
 }
 
 class ApiEndpoints {
-  static const String baseUrl = 'https://api.adepa_teachers.local';
+    static const String baseUrl = 'https://adepaye.com/stccu-api';
 
-  // Auth
+  // STCCU auth endpoints
+  static const String confirmPhoneNumber = '/confirmPhoneNumber';
+  static const String confirmAccountNumber = '/confirmAccountNumber';
+  static const String confirmPin = '/confirmPin';
+  static const String register = '/register';
+  static const String changePin = '/changePin';
+
+  // STCCU account / data endpoints
+  static const String getAccountBalance = '/getAccountBalance';
+  static const String getLoans = '/getLoans';
+  static const String miniStatement = '/miniStatement';
+  static const String checkBalance = '/checkBalance';
+  static const String depositFunds = '/Deposit';
+  static const String withdrawFunds = '/Withdraw';
+  static const String stccuConfirmWithdrawal = '/confirmWithdrawal';
+  static const String repayLoanStccu = '/repayLoan';
+  static const String buyAirtime = '/buyAirtime';
+  static const String getBranches = '/getBranch';
+  static const String getSavingsProductsList = '/getSavingsProducts';
+  static const String getLoanProductsList = '/getLoanProducts';
+
+  // Legacy placeholder auth (kept for reference)
   static const String login = '/auth/login';
   static const String logout = '/auth/logout';
   static const String sendOtp = '/auth/send-otp';

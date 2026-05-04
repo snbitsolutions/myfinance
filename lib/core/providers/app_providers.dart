@@ -113,6 +113,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return;
     }
 
+    // Check if notifier is still mounted before setting state
+    // (e.g., it may have been disposed during async operations)
+    if (!mounted) {
+      return;
+    }
+
     state = AuthState.authenticated(
       userId: userId,
       userEmail: email,
@@ -162,6 +168,81 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } on AppException catch (e) {
       state = AuthState.error(e.message);
       AppLogger.error('Login failed', e);
+      rethrow;
+    }
+  }
+
+  Future<void> confirmPhoneNumber({required String phoneNumber}) async {
+    try {
+      await authService.confirmPhoneNumber(phoneNumber: phoneNumber);
+      AppLogger.info('Phone number confirmed: $phoneNumber');
+    } on AppException catch (e) {
+      AppLogger.error('Phone confirmation failed', e);
+      rethrow;
+    }
+  }
+
+  Future<void> confirmAccountNumber({
+    required String phoneNumber,
+    required String accountNumber,
+  }) async {
+    try {
+      await authService.confirmAccountNumber(
+        phoneNumber: phoneNumber,
+        accountNumber: accountNumber,
+      );
+      AppLogger.info('Account number confirmed: $accountNumber');
+    } on AppException catch (e) {
+      AppLogger.error('Account confirmation failed', e);
+      rethrow;
+    }
+  }
+
+  Future<void> signInWithPin({
+    required String phoneNumber,
+    required String accountNumber,
+    required String pin,
+  }) async {
+    state = AuthState.loading();
+
+    try {
+      final response = await authService.confirmPin(
+        phoneNumber: phoneNumber,
+        accountNumber: accountNumber,
+        pin: pin,
+      );
+      final status = (response['status'] as num?)?.toInt() ?? 0;
+      final message = response['message'] as String?;
+
+      if (status != 1) {
+        throw AuthException(
+          message: message ?? AppConstants.invalidCredentialsMessage,
+        );
+      }
+
+      final prefs = await _getPrefs();
+      final currentFingerprint = await deviceIdentityService
+          .getInstallationFingerprint();
+      final sessionToken = 'stccu-session:$accountNumber';
+
+      await SecureAuthStorage.instance.storeSession(
+        authToken: sessionToken,
+        deviceFingerprint: currentFingerprint,
+      );
+      await SecureAuthStorage.instance.storePin(pin);
+      await prefs.setString(AppConstants.sharedPrefKeyUserId, accountNumber);
+      await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
+
+      state = AuthState.authenticated(
+        userId: accountNumber,
+        userEmail: phoneNumber,
+        authToken: sessionToken,
+      );
+
+      AppLogger.info('User signed in successfully: $accountNumber');
+    } on AppException catch (e) {
+      state = AuthState.error(e.message);
+      AppLogger.error('PIN sign in failed', e);
       rethrow;
     }
   }
@@ -223,14 +304,93 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Login using OTP (OTP is sent when confirmAccountNumber is called; user
+  /// enters it here and we verify via /confirmPin).
+  Future<void> loginWithOtp({
+    required String phoneNumber,
+    required String accountNumber,
+    required String otp,
+  }) async {
+    state = AuthState.loading();
+    try {
+      final response = await authService.confirmPin(
+        phoneNumber: phoneNumber,
+        accountNumber: accountNumber,
+        pin: otp,
+      );
+      final status = (response['status'] as num?)?.toInt() ?? 0;
+      final message = response['message'] as String?;
+
+      if (status != 1) {
+        throw AuthException(
+          message: message ?? 'Invalid OTP. Please try again.',
+        );
+      }
+
+      final prefs = await _getPrefs();
+      final currentFingerprint =
+          await deviceIdentityService.getInstallationFingerprint();
+      final sessionToken = 'stccu-session:$accountNumber';
+
+      await SecureAuthStorage.instance.storeSession(
+        authToken: sessionToken,
+        deviceFingerprint: currentFingerprint,
+      );
+      await SecureAuthStorage.instance.storePin(otp);
+      await prefs.setString(AppConstants.sharedPrefKeyUserId, accountNumber);
+      await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
+
+      state = AuthState.authenticated(
+        userId: accountNumber,
+        userEmail: phoneNumber,
+        authToken: sessionToken,
+      );
+
+      AppLogger.info('User logged in via OTP: $accountNumber');
+    } on AppException catch (e) {
+      state = AuthState.error(e.message);
+      AppLogger.error('OTP login failed', e);
+      rethrow;
+    }
+  }
+
+  /// Register a new member (account number + PIN). No session is created —
+  /// the backend must approve the registration before the user can log in.
+  Future<String> submitRegistration({
+    required String accountNumber,
+    required String pin,
+  }) async {
+    try {
+      final response = await authService.register(
+        accountNumber: accountNumber,
+        pin: pin,
+      );
+
+      final status = response['status'];
+      final message = response['message'] as String? ?? '';
+      final isSuccess = status == 1 ||
+          status == '1' ||
+          (status is String && status.toLowerCase() == 'success');
+
+      if (!isSuccess) {
+        throw AuthException(
+          message: message.isNotEmpty
+              ? message
+              : 'Registration failed. Please try again.',
+        );
+      }
+
+      AppLogger.info('Registration submitted for: $accountNumber');
+      return message.isNotEmpty ? message : 'Registration submitted!';
+    } on AppException catch (e) {
+      AppLogger.error('Registration failed', e);
+      rethrow;
+    }
+  }
+
   /// Logout user
   Future<void> logout() async {
     try {
-      final userId = state.userId;
-      if (userId != null) {
-        await authService.logout(userId: userId);
-      }
-
       await _clearStoredAuth();
 
       state = AuthState.unauthenticated();
@@ -284,7 +444,15 @@ final userProfileProvider = FutureProvider<Map<String, dynamic>>((ref) async {
     throw AuthException(message: 'User not authenticated');
   }
 
-  final response = await userService.getUserProfile(userId: auth.userId!);
+  final pin = await SecureAuthStorage.instance.readPin() ?? '';
+  final phone = auth.userEmail ?? '';
+  final account = auth.userId!;
+
+  final response = await userService.getUserProfile(
+    phoneNumber: phone,
+    accountNumber: account,
+    pin: pin,
+  );
   return response['data'] as Map<String, dynamic>;
 });
 
@@ -297,7 +465,15 @@ final loansProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
     throw AuthException(message: 'User not authenticated');
   }
 
-  final response = await loanService.getLoansList(userId: auth.userId!);
+  final pin = await SecureAuthStorage.instance.readPin() ?? '';
+  final phone = auth.userEmail ?? '';
+  final account = auth.userId!;
+
+  final response = await loanService.getLoansList(
+    phoneNumber: phone,
+    accountNumber: account,
+    pin: pin,
+  );
   return List<Map<String, dynamic>>.from(response['data'] as List);
 });
 
@@ -310,14 +486,20 @@ final savingsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
     throw AuthException(message: 'User not authenticated');
   }
 
-  final response = await savingsService.getSavingsList(userId: auth.userId!);
+  final pin = await SecureAuthStorage.instance.readPin() ?? '';
+  final phone = auth.userEmail ?? '';
+  final account = auth.userId!;
+
+  final response = await savingsService.getSavingsList(
+    phoneNumber: phone,
+    accountNumber: account,
+    pin: pin,
+  );
   return List<Map<String, dynamic>>.from(response['data'] as List);
 });
 
 // Transactions provider
-final transactionsProvider = FutureProvider<List<Map<String, dynamic>>>((
-  ref,
-) async {
+final transactionsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final auth = ref.watch(authProvider);
   final transactionService = ref.watch(transactionServiceProvider);
 
@@ -325,8 +507,14 @@ final transactionsProvider = FutureProvider<List<Map<String, dynamic>>>((
     throw AuthException(message: 'User not authenticated');
   }
 
+  final pin = await SecureAuthStorage.instance.readPin() ?? '';
+  final phone = auth.userEmail ?? '';
+  final account = auth.userId!;
+
   final response = await transactionService.getTransactions(
-    userId: auth.userId!,
+    phoneNumber: phone,
+    accountNumber: account,
+    pin: pin,
   );
   return List<Map<String, dynamic>>.from(response['data'] as List);
 });

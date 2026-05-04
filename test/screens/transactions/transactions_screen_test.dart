@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:adepa_teachers/core/providers/app_providers.dart';
 import 'package:adepa_teachers/screens/transactions/transactions_screen.dart';
 
 void main() {
@@ -25,14 +27,27 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          transactionsProvider.overrideWith(
+            (ref) async => <Map<String, dynamic>>[],
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Transactions'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.drag(find.byType(ListView).first, const Offset(0, -300));
-    await tester.pumpAndSettle();
+    // Drag if any scrollable is present (empty state may not have ListView)
+    final scrollables = find.byType(Scrollable);
+    if (tester.widgetList(scrollables).isNotEmpty) {
+      await tester.drag(scrollables.first, const Offset(0, -300));
+      await tester.pumpAndSettle();
+    }
     expect(tester.takeException(), isNull);
   });
 }

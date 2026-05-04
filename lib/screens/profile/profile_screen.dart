@@ -12,11 +12,17 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final userProfileAsync = ref.watch(userProfileProvider);
+    final isLoading = userProfileAsync.isLoading;
+    final hasError = userProfileAsync.hasError;
     final profile = userProfileAsync.valueOrNull;
+    final authState = ref.watch(authProvider);
+
     final user = AppUser(
       name: _readProfileString(profile, 'name', 'Steven Boadu'),
-      email: _readProfileString(profile, 'email', 'steven@email.com'),
-      phone: _readProfileString(profile, 'phone', '024XXXXXXX'),
+      // Phone comes from auth state (stored at sign-in), not from profile API
+      email: authState.userEmail ?? _readProfileString(profile, 'email', ''),
+      phone: authState.userEmail ?? _readProfileString(profile, 'phone', '024XXXXXXX'),
+      accountNumber: _readProfileString(profile, 'account_number', authState.userId ?? ''),
       kycStatus: _parseKycStatus(profile?['kyc_status']),
     );
 
@@ -26,13 +32,50 @@ class ProfileScreen extends ConsumerWidget {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [theme.colorScheme.primary, Color(0xFFF6F8F7)],
-            stops: [0.0, 0.3],
+            colors: [theme.colorScheme.primary, const Color(0xFFF6F8F7)],
+            stops: const [0.0, 0.3],
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
+              // Error banner
+              if (hasError)
+                Material(
+                  color: theme.colorScheme.errorContainer,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.cloud_off_rounded,
+                          size: 16,
+                          color: theme.colorScheme.onErrorContainer,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Could not load profile data',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onErrorContainer,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            foregroundColor: theme.colorScheme.onErrorContainer,
+                          ),
+                          onPressed: () => ref.invalidate(userProfileProvider),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               // Header with gradient background
               Padding(
                 padding: const EdgeInsets.all(20),
@@ -60,7 +103,10 @@ class ProfileScreen extends ConsumerWidget {
                     const SizedBox(height: 24),
 
                     // Profile Avatar Card
-                    Container(
+                    Stack(
+                      alignment: Alignment.topRight,
+                      children: [
+                        Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -75,6 +121,9 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                       child: Column(
                         children: [
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
                           Container(
                             width: 100,
                             height: 100,
@@ -99,18 +148,30 @@ class ProfileScreen extends ConsumerWidget {
                               ],
                             ),
                             child: Center(
-                              child: Text(
-                                user.name
-                                    .split(' ')
-                                    .map((s) => s[0])
-                                    .take(2)
-                                    .join(),
-                                style: theme.textTheme.headlineMedium?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                              child: isLoading
+                                  ? const SizedBox(
+                                      width: 32,
+                                      height: 32,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Text(
+                                      user.name
+                                          .split(' ')
+                                          .map((s) => s[0])
+                                          .take(2)
+                                          .join(),
+                                      style: theme.textTheme.headlineMedium
+                                          ?.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
                             ),
+                          ),
+                            ],
                           ),
                           const SizedBox(height: 16),
                           Text(
@@ -121,18 +182,21 @@ class ProfileScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            user.email,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
                             user.phone,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: Colors.grey.shade600,
                             ),
                           ),
+                          if (user.accountNumber.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'Acc: ${user.accountNumber}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.grey.shade500,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 16),
                           SizedBox(
                             width: double.infinity,
@@ -155,9 +219,11 @@ class ProfileScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ),
+                  ],   // closes outer Stack.children
+                ),    // closes outer Stack
+                  ],  // closes header Column.children
+                ),    // closes header Column
+              ),      // closes Padding
 
               // Content
               Expanded(

@@ -1,5 +1,12 @@
+import 'dart:async';
+
+import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'navigation_history.dart';
+import '../core/constants/app_constants.dart';
+import '../core/services/device_identity_service.dart';
+import '../core/services/secure_auth_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Core
 
@@ -10,6 +17,8 @@ import '../screens/onboarding/onboarding_screen.dart';
 
 // Auth
 import '../screens/auth/login_screen.dart';
+import '../screens/auth/signup_screen.dart';
+import '../screens/auth/account_number_screen.dart';
 import '../screens/auth/otp_screen.dart';
 import '../screens/auth/set_pin_screen.dart';
 
@@ -47,9 +56,181 @@ import '../screens/error/app_error_screen.dart';
 class AppRouter {
   static final GoRouter router = _createRouter();
 
+  /// True while the async redirect guard is resolving.
+  static final redirectLoading = ValueNotifier<bool>(false);
+
+  static const Duration _loadingIndicatorDelay = Duration(milliseconds: 180);
+  static const Duration _sessionCacheTtl = Duration(seconds: 2);
+
+  static Future<bool>? _sessionCheckInFlight;
+  static bool? _cachedHasBoundSession;
+  static DateTime? _cachedHasBoundSessionAt;
+
+  /// Resets the session cache. Intended for use in tests only.
+  @visibleForTesting
+  static void resetSessionCache() {
+    _cachedHasBoundSession = null;
+    _cachedHasBoundSessionAt = null;
+    _sessionCheckInFlight = null;
+  }
+
+  static const Set<String> _authRoutes = {
+    '/login',
+    '/signup',
+    '/account-number',
+    '/otp',
+    '/set-pin',
+  };
+
+  static const Set<String> _preAuthRoutes = {
+    '/',
+    '/onboarding',
+    ..._authRoutes,
+  };
+
+  static bool _matchesRoute(String path, String route) {
+    return path == route || path.startsWith('$route/');
+  }
+
+  static bool _isInRouteSet(String path, Set<String> routeSet) {
+    for (final route in routeSet) {
+      if (_matchesRoute(path, route)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static Future<bool> _hasBoundSession() async {
+    final now = DateTime.now();
+    final cachedHasSession = _cachedHasBoundSession;
+    final cachedAt = _cachedHasBoundSessionAt;
+
+    if (cachedHasSession != null &&
+        cachedAt != null &&
+        now.difference(cachedAt) <= _sessionCacheTtl) {
+      if (!cachedHasSession) {
+        return false;
+      }
+
+      final token = await SecureAuthStorage.instance.readAuthToken() ?? '';
+      if (token.isNotEmpty) {
+        return true;
+      }
+
+      _cachedHasBoundSession = false;
+      _cachedHasBoundSessionAt = DateTime.now();
+      return false;
+    }
+
+    final inFlight = _sessionCheckInFlight;
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final check = _computeHasBoundSession();
+    _sessionCheckInFlight = check;
+
+    try {
+      final result = await check;
+      _cachedHasBoundSession = result;
+      _cachedHasBoundSessionAt = DateTime.now();
+      return result;
+    } finally {
+      _sessionCheckInFlight = null;
+    }
+  }
+
+  static Future<bool> _computeHasBoundSession() async {
+    final secureAuthStorage = SecureAuthStorage.instance;
+    final token = await secureAuthStorage.readAuthToken() ?? '';
+    if (token.isEmpty) {
+      return false;
+    }
+
+    final currentFingerprint = await DeviceIdentityService()
+        .getInstallationFingerprint();
+    final isBoundToCurrentDevice = await secureAuthStorage
+        .hasSessionBoundToFingerprint(currentFingerprint);
+
+    if (isBoundToCurrentDevice) {
+      return true;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await secureAuthStorage.clearAuthSecrets();
+    await prefs.remove(AppConstants.sharedPrefKeyUserId);
+    await prefs.remove(AppConstants.sharedPrefKeyUserEmail);
+    return false;
+  }
+
+  static Future<String?> _handleRedirect(GoRouterState state) async {
+    Timer? loadingTimer;
+    loadingTimer = Timer(_loadingIndicatorDelay, () {
+      _setRedirectLoading(true);
+    });
+
+    try {
+      return await _computeRedirect(state);
+    } finally {
+      loadingTimer.cancel();
+      _setRedirectLoading(false);
+    }
+  }
+
+  static void _setRedirectLoading(bool isLoading) {
+    if (redirectLoading.value == isLoading) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (redirectLoading.value != isLoading) {
+        redirectLoading.value = isLoading;
+      }
+    });
+  }
+
+  static Future<String?> _computeRedirect(GoRouterState state) async {
+    final path = state.uri.path;
+
+    // Keep splash navigation behavior intact.
+    if (path == '/') {
+      return null;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final seenOnboarding =
+        prefs.getBool(AppConstants.sharedPrefKeyOnboarding) ?? false;
+
+    if (!seenOnboarding) {
+      return path == '/onboarding' ? null : '/onboarding';
+    }
+
+    final hasSession = await _hasBoundSession();
+    final isPreAuthRoute = _isInRouteSet(path, _preAuthRoutes);
+    final isAuthRoute = _isInRouteSet(path, _authRoutes);
+
+    if (!hasSession) {
+      if (!isPreAuthRoute) {
+        return '/login';
+      }
+      if (path == '/onboarding') {
+        return '/login';
+      }
+      return null;
+    }
+
+    if (isAuthRoute || path == '/onboarding') {
+      return '/home';
+    }
+
+    return null;
+  }
+
   static GoRouter _createRouter() {
     final configuredRouter = GoRouter(
       initialLocation: '/',
+      redirect: (context, state) => _handleRedirect(state),
       errorBuilder: (context, state) {
         final errorMessage = state.error?.toString();
         return AppErrorScreen(message: errorMessage);
@@ -71,10 +252,41 @@ class AppRouter {
           path: '/login',
           builder: (context, state) => const LoginScreen(),
         ),
-        GoRoute(path: '/otp', builder: (context, state) => const OtpScreen()),
+        GoRoute(
+          path: '/signup',
+          builder: (context, state) => SignupScreen(
+            reason: state.uri.queryParameters['reason'],
+          ),
+        ),
+        GoRoute(
+          path: '/account-number',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>?;
+            return AccountNumberScreen(
+              phoneNumber: extra?['phoneNumber'] as String? ?? '',
+            );
+          },
+        ),
+        GoRoute(
+          path: '/otp',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>?;
+            return OtpScreen(
+              phoneNumber: extra?['phoneNumber'] as String? ?? '',
+              accountNumber: extra?['accountNumber'] as String? ?? '',
+            );
+          },
+        ),
         GoRoute(
           path: '/set-pin',
-          builder: (context, state) => const SetPinScreen(),
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>?;
+            return SetPinScreen(
+              phoneNumber: extra?['phoneNumber'] as String? ?? '',
+              accountNumber: extra?['accountNumber'] as String? ?? '',
+              mode: extra?['mode'] as String? ?? 'manage',
+            );
+          },
         ),
 
         // =========================

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/exceptions/app_exceptions.dart';
 import '../../core/models/loan_repayment_result.dart';
 import '../../core/providers/app_providers.dart';
+import '../../core/services/secure_auth_storage.dart';
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
 import '../../core/balance_card_shell.dart';
@@ -72,7 +73,7 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
     LoanApplicationState loan,
     double amount,
   ) async {
-    final phoneNumber = _phoneController.text.trim();
+      final momoPhone = _phoneController.text.trim();
     final navigator = GoRouter.of(context);
     final messenger = ScaffoldMessenger.of(context);
     if (_isSubmitting) return;
@@ -81,12 +82,18 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
 
     try {
       final loanService = ref.read(loanServiceProvider);
+        final auth = ref.read(authProvider);
+        final pin = await SecureAuthStorage.instance.readPin() ?? '';
+        final account = auth.userId ?? '';
+
       final response = await loanService.repayLoan(
         loanId: loan.referenceNumber,
         amount: amount,
         currentOutstanding: loan.outstandingBalance,
+          accountNumber: account,
+          pin: pin,
         paymentMethod: _momoProvider,
-        phoneNumber: phoneNumber,
+          momoPhoneNumber: momoPhone,
       );
       final result = LoanRepaymentResult.fromApiResponse(response);
 
@@ -103,7 +110,7 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
           'reference': result.transactionId,
           'title': 'Loan Repayment Successful',
           'message':
-              'Your repayment of GH₵${result.amount.toStringAsFixed(2)} via ${result.paymentMethod} from $phoneNumber was received. Remaining balance: GH₵${result.newOutstanding.toStringAsFixed(2)}.',
+              'Your repayment of GH₵${result.amount.toStringAsFixed(2)} via ${result.paymentMethod} from $momoPhone was received. Remaining balance: GH₵${result.newOutstanding.toStringAsFixed(2)}.',
           'primaryActionLabel': 'View Loan Details',
           'primaryActionRoute': '/loan-detail',
           'secondaryActionLabel': 'Back to Loans',

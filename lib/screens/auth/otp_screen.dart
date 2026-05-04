@@ -1,18 +1,60 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/color_ext.dart';
 
-class OtpScreen extends StatefulWidget {
-  const OtpScreen({super.key});
+import '../../core/color_ext.dart';
+import '../../core/exceptions/app_exceptions.dart';
+import '../../core/providers/app_providers.dart';
+
+class OtpScreen extends ConsumerStatefulWidget {
+  const OtpScreen({
+    super.key,
+    required this.phoneNumber,
+    required this.accountNumber,
+  });
+
+  final String phoneNumber;
+  final String accountNumber;
 
   @override
-  State<OtpScreen> createState() => _OtpScreenState();
+  ConsumerState<OtpScreen> createState() => _OtpScreenState();
 }
 
-class _OtpScreenState extends State<OtpScreen> {
+class _OtpScreenState extends ConsumerState<OtpScreen> {
   final TextEditingController _otpController = TextEditingController();
+  bool _isSubmitting = false;
 
   bool get _isValid => _otpController.text.trim().length == 4;
+
+  Future<void> _handleVerify() async {
+    if (_isSubmitting || !_isValid) return;
+    setState(() => _isSubmitting = true);
+    try {
+      await ref.read(authProvider.notifier).loginWithOtp(
+            phoneNumber: widget.phoneNumber,
+            accountNumber: widget.accountNumber,
+            otp: _otpController.text.trim(),
+          );
+      ref.invalidate(userProfileProvider);
+      ref.invalidate(transactionsProvider);
+      ref.invalidate(loansProvider);
+      ref.invalidate(savingsProvider);
+      if (!mounted) return;
+      context.go('/home');
+    } on AppException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Verification failed. Please try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -73,8 +115,22 @@ class _OtpScreenState extends State<OtpScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const SizedBox(height: 40),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: IconButton(
+                          onPressed: () {
+                              if (context.canPop()) {
+                                context.pop();
+                              } else {
+                                context.go('/login');
+                              }
+                          },
+                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       Text(
-                        'Verify OTP',
+                        'Enter OTP',
                         style: theme.textTheme.displaySmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -82,7 +138,7 @@ class _OtpScreenState extends State<OtpScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Enter the 4-digit code sent to your phone',
+                        'A 4-digit code was sent to ${widget.phoneNumber}',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.white70,
@@ -161,6 +217,7 @@ class _OtpScreenState extends State<OtpScreen> {
                                     ),
                                   ),
                                   onChanged: (_) => setState(() {}),
+                                                                  onSubmitted: (_) => _handleVerify(),
                                 ),
                               ],
                             ),
@@ -169,29 +226,36 @@ class _OtpScreenState extends State<OtpScreen> {
                               width: double.infinity,
                               height: 52,
                               child: ElevatedButton(
-                                onPressed: _isValid
-                                    ? () => context.go('/set-pin')
+                                onPressed: _isValid && !_isSubmitting
+                                    ? _handleVerify
                                     : null,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: _isValid
+                                  backgroundColor: _isValid && !_isSubmitting
                                       ? Colors.white
                                       : Colors.white.withOpacitySafe(0.3),
                                 ),
-                                child: Text(
-                                  'Verify & Continue',
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    color: _isValid ? primary : Colors.white60,
-                                  ),
-                                ),
+                                child: _isSubmitting
+                                    ? SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(primary),
+                                        ),
+                                      )
+                                    : Text(
+                                        'Verify & Sign In',
+                                        style: theme.textTheme.labelLarge?.copyWith(
+                                          color: _isValid ? primary : Colors.white60,
+                                        ),
+                                      ),
                               ),
                             ),
                             const SizedBox(height: 16),
                             TextButton(
-                              onPressed: () {
-                                // TODO: implement resend logic
-                              },
+                              onPressed: () => context.go('/login'),
                               child: Text(
-                                'Didn\'t receive code? Resend',
+                                'Use a different number',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: Colors.white70,
                                 ),

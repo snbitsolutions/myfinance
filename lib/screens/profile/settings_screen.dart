@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_card.dart';
@@ -6,18 +7,20 @@ import '../../core/app_scaffold.dart';
 import '../../core/color_ext.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/layout/responsive.dart';
+import '../../core/providers/app_providers.dart';
 import '../../core/services/device_identity_service.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/services/secure_auth_storage.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  bool _isLoggingOut = false;
   bool _notificationsEnabled = true;
   bool _bioAuth = false;
   String _currency = AppConstants.currencyCode;
@@ -236,6 +239,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           );
 
+          final logoutSection = AppCard(
+            margin: EdgeInsets.zero,
+            child: _isLoggingOut
+                ? const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        SizedBox(width: 12),
+                        Text('Signing out…'),
+                      ],
+                    ),
+                  )
+                : _buildSettingTile(
+                    context,
+                    icon: Icons.logout,
+                    title: 'Sign Out',
+                    subtitle: 'Sign out of your account on this device',
+                    onTap: _handleLogout,
+                  ),
+          );
+
           final dangerSection = AppCard(
             margin: EdgeInsets.zero,
             backgroundColor: theme.colorScheme.error.withOpacitySafe(0.1),
@@ -415,6 +445,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         accountSection,
                         securitySection,
+                        logoutSection,
+                        const SizedBox(height: 12),
                         dangerSection,
                         const SizedBox(height: 32),
                       ],
@@ -447,6 +479,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 securitySection,
                 supportSection,
                 aboutSection,
+                logoutSection,
+                const SizedBox(height: 12),
                 dangerSection,
                 const SizedBox(height: 32),
               ],
@@ -799,6 +833,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (!mounted) return;
     setState(() => _notificationsEnabled = value);
+  }
+
+  Future<void> _handleLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text(
+          'Are you sure you want to sign out of your account?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Sign Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isLoggingOut = true);
+    try {
+      await ref.read(authProvider.notifier).logout();
+      if (!mounted) return;
+      context.go('/login');
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoggingOut = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sign out failed. Please try again.')),
+      );
+    }
   }
 
   Widget _buildRadioTile(String label, String value) {

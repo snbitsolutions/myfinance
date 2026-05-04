@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/color_ext.dart';
 import '../../core/app_scaffold.dart';
 import '../../core/app_card.dart';
 import '../../core/balance_card_shell.dart';
+import '../../core/providers/app_providers.dart';
 import 'transaction_model.dart';
 
-class TransactionsScreen extends StatefulWidget {
+class TransactionsScreen extends ConsumerStatefulWidget {
   final String? savingsId;
   final String? savingsTitle;
   final List<Map<String, dynamic>>? savingsTransactions;
@@ -20,10 +22,10 @@ class TransactionsScreen extends StatefulWidget {
   });
 
   @override
-  State<TransactionsScreen> createState() => _TransactionsScreenState();
+  ConsumerState<TransactionsScreen> createState() => _TransactionsScreenState();
 }
 
-class _TransactionsScreenState extends State<TransactionsScreen> {
+class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   String _selectedFilter = 'All';
   String _selectedPeriod = 'This Month';
   late TextEditingController _searchController;
@@ -58,87 +60,22 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       });
     }
 
-    // Mock transactions with more variety
+    // Use provider data for main transactions, savings data otherwise
+    final liveTransactionsAsync = isSavingsFiltered
+        ? const AsyncData<List<Map<String, dynamic>>>([])
+        : ref.watch(transactionsProvider);
+
+    final isLoadingLive = !isSavingsFiltered && liveTransactionsAsync.isLoading;
+
     final allTransactions = isSavingsFiltered
         ? _buildSavingsTransactions(
             widget.savingsId!,
             widget.savingsTitle,
             widget.savingsTransactions,
           )
-        : [
-            AppTransaction(
-              id: '1',
-              title: 'Savings Deposit',
-              description: 'Emergency Fund',
-              amount: 500,
-              type: TransactionType.deposit,
-              date: DateTime.now(),
-              category: 'Savings',
-            ),
-            AppTransaction(
-              id: '2',
-              title: 'Loan Repayment',
-              description: 'Personal Loan - Monthly Payment',
-              amount: 300,
-              type: TransactionType.repayment,
-              date: DateTime.now().subtract(const Duration(days: 1)),
-              category: 'Loans',
-            ),
-            AppTransaction(
-              id: '3',
-              title: 'Coffee Shop',
-              description: 'Starbucks - Downtown',
-              amount: 10.50,
-              type: TransactionType.withdrawal,
-              date: DateTime.now().subtract(const Duration(days: 2)),
-              category: 'Food & Drink',
-            ),
-            AppTransaction(
-              id: '4',
-              title: 'Salary Deposit',
-              description: 'Monthly Salary',
-              amount: 2500,
-              type: TransactionType.deposit,
-              date: DateTime.now().subtract(const Duration(days: 5)),
-              category: 'Income',
-            ),
-            AppTransaction(
-              id: '5',
-              title: 'Grocery Shopping',
-              description: 'Shoprite',
-              amount: 85.00,
-              type: TransactionType.withdrawal,
-              date: DateTime.now().subtract(const Duration(days: 7)),
-              category: 'Shopping',
-            ),
-            AppTransaction(
-              id: '6',
-              title: 'Fixed Deposit',
-              description: '12-Month FD',
-              amount: 2000,
-              type: TransactionType.deposit,
-              date: DateTime.now().subtract(const Duration(days: 10)),
-              category: 'Savings',
-            ),
-            AppTransaction(
-              id: '7',
-              title: 'Electricity Bill',
-              description: 'ECG Payment',
-              amount: 120,
-              type: TransactionType.withdrawal,
-              date: DateTime.now().subtract(const Duration(days: 12)),
-              category: 'Bills',
-            ),
-            AppTransaction(
-              id: '8',
-              title: 'Interest Earned',
-              description: 'Savings Account Interest',
-              amount: 15.50,
-              type: TransactionType.deposit,
-              date: DateTime.now().subtract(const Duration(days: 15)),
-              category: 'Interest',
-            ),
-          ];
+        : _normalizeApiTransactions(
+            liveTransactionsAsync.valueOrNull ?? const [],
+          );
 
     // Filter transactions
     final transactions = allTransactions.where((tx) {
@@ -276,9 +213,26 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
     return AppScaffold(
       title: isSavingsFiltered ? 'Savings Activity' : 'Transactions',
-      child: transactions.isEmpty
-          ? _buildEmptyState(theme)
-          : LayoutBuilder(
+      actions: !isSavingsFiltered
+          ? [
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded),
+                tooltip: 'Refresh',
+                onPressed: () => ref.invalidate(transactionsProvider),
+              ),
+            ]
+          : null,
+      child: isLoadingLive
+          ? _buildLoadingState(theme)
+          : liveTransactionsAsync.hasError && !isSavingsFiltered
+              ? _buildApiErrorState(
+                  theme,
+                  liveTransactionsAsync.error!,
+                  () => ref.invalidate(transactionsProvider),
+                )
+              : transactions.isEmpty
+                  ? _buildEmptyState(theme)
+                  : LayoutBuilder(
               builder: (context, constraints) {
                 final isTablet = constraints.maxWidth >= 900;
 
@@ -727,6 +681,41 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     );
   }
 
+  /// Convert raw API transaction maps into [AppTransaction] objects.
+  List<AppTransaction> _normalizeApiTransactions(
+    List<Map<String, dynamic>> raw,
+  ) {
+    return raw.asMap().entries.map((entry) {
+      final i = entry.key;
+      final txn = entry.value;
+      final typeStr = (txn['type'] as String? ?? 'debit').toLowerCase();
+      final type = switch (typeStr) {
+        'credit' => TransactionType.deposit,
+        'repayment' => TransactionType.repayment,
+        _ => TransactionType.withdrawal,
+      };
+      final amount = (txn['amount'] as num?)?.toDouble() ??
+          double.tryParse(txn['amount']?.toString() ?? '') ??
+          0.0;
+      final description =
+          txn['description'] as String? ?? txn['narration'] as String? ?? '';
+      final dateStr = txn['date'] as String? ?? '';
+      DateTime date = DateTime.now();
+      try {
+        date = DateTime.parse(dateStr);
+      } catch (_) {}
+      return AppTransaction(
+        id: txn['transaction_id'] as String? ?? '$i',
+        title: description.isEmpty ? 'Transaction' : description,
+        description: description,
+        amount: amount,
+        type: type,
+        date: date,
+        category: typeStr == 'credit' ? 'Income' : 'Expense',
+      );
+    }).toList();
+  }
+
   List<AppTransaction> _buildSavingsTransactions(
     String savingsId,
     String? savingsTitle,
@@ -785,6 +774,53 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     } catch (_) {
       return null;
     }
+  }
+
+  Widget _buildLoadingState(ThemeData theme) {
+    return const Center(child: CircularProgressIndicator());
+  }
+
+  Widget _buildApiErrorState(
+    ThemeData theme,
+    Object error,
+    VoidCallback onRetry,
+  ) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.cloud_off_rounded,
+              size: 48,
+              color: theme.colorScheme.error,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Could not load transactions',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error.toString().replaceFirst(RegExp(r'^.*Exception: '), ''),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+              ),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Try Again'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildEmptyState(ThemeData theme) {

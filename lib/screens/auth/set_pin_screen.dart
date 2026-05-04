@@ -1,26 +1,117 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/color_ext.dart';
+import '../../core/exceptions/app_exceptions.dart';
+import '../../core/providers/app_providers.dart';
+import '../../core/services/secure_auth_storage.dart';
 
-class SetPinScreen extends StatefulWidget {
-  const SetPinScreen({super.key});
+class SetPinScreen extends ConsumerStatefulWidget {
+  const SetPinScreen({
+    super.key,
+    this.phoneNumber = '',
+    this.accountNumber = '',
+    this.mode = 'manage',
+  });
+
+  final String phoneNumber;
+  final String accountNumber;
+  final String mode;
 
   @override
-  State<SetPinScreen> createState() => _SetPinScreenState();
+  ConsumerState<SetPinScreen> createState() => _SetPinScreenState();
 }
 
-class _SetPinScreenState extends State<SetPinScreen> {
+class _SetPinScreenState extends ConsumerState<SetPinScreen> {
   final TextEditingController _pinController = TextEditingController();
   final TextEditingController _confirmController = TextEditingController();
   bool _showPin = false;
+  bool _isSubmitting = false;
 
   bool get _canSubmit =>
       _pinController.text.trim().length == 4 &&
       _pinController.text == _confirmController.text;
 
   bool get _pinMatch => _pinController.text == _confirmController.text;
+
+  Future<void> _handleSubmit() async {
+    if (_isSubmitting || !_canSubmit) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      final pin = _pinController.text.trim();
+      final router = GoRouter.of(context);
+
+      if (widget.mode == 'register') {
+        if (widget.accountNumber.isEmpty) {
+          throw ValidationException(
+            message: 'Missing account details. Please restart registration.',
+          );
+        }
+        final message = await ref.read(authProvider.notifier).submitRegistration(
+              accountNumber: widget.accountNumber,
+              pin: pin,
+            );
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Registration Submitted'),
+            content: Text(
+              '$message\n\nYour account is pending approval. '
+              'Once approved you can log in with your phone number.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  router.go('/login');
+                },
+                child: const Text('Go to Login'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      final authState = ref.read(authProvider);
+      if (authState.isAuthenticated && authState.userId != null) {
+        await ref
+            .read(authProvider.notifier)
+            .setPin(userId: authState.userId!, pin: pin);
+      }
+
+      await SecureAuthStorage.instance.storePin(pin);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('transaction_pin', pin);
+
+      ref.invalidate(userProfileProvider);
+      ref.invalidate(transactionsProvider);
+      ref.invalidate(loansProvider);
+      ref.invalidate(savingsProvider);
+
+      if (!mounted) return;
+      router.go('/home');
+    } on AppException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to set PIN right now.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -83,7 +174,9 @@ class _SetPinScreenState extends State<SetPinScreen> {
                     children: [
                       const SizedBox(height: 40),
                       Text(
-                        'Create PIN',
+                        widget.mode == 'register'
+                            ? 'Create PIN'
+                            : 'Update PIN',
                         style: theme.textTheme.displaySmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -91,7 +184,9 @@ class _SetPinScreenState extends State<SetPinScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Create a 4-digit PIN to secure your account',
+                        widget.mode == 'register'
+                            ? 'Create a 4-digit PIN to secure your account'
+                            : 'Set a new 4-digit PIN for your account',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.white70,
@@ -266,32 +361,37 @@ class _SetPinScreenState extends State<SetPinScreen> {
                               width: double.infinity,
                               height: 52,
                               child: ElevatedButton(
-                                onPressed: _canSubmit
-                                    ? () async {
-                                        final router = GoRouter.of(context);
-                                        final prefs =
-                                            await SharedPreferences.getInstance();
-                                        await prefs.setString(
-                                          'transaction_pin',
-                                          _pinController.text.trim(),
-                                        );
-                                        if (!mounted) return;
-                                        router.go('/home');
-                                      }
+                                onPressed: _canSubmit && !_isSubmitting
+                                    ? _handleSubmit
                                     : null,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: _canSubmit
+                                  backgroundColor: _canSubmit && !_isSubmitting
                                       ? Colors.white
                                       : Colors.white.withOpacitySafe(0.3),
                                 ),
-                                child: Text(
-                                  'Create PIN & Continue',
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    color: _canSubmit
-                                        ? primary
-                                        : Colors.white60,
-                                  ),
-                                ),
+                                child: _isSubmitting
+                                    ? SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                            primary,
+                                          ),
+                                        ),
+                                      )
+                                    : Text(
+                                        widget.mode == 'register'
+                                            ? 'Register'
+                                            : 'Save PIN',
+                                        style:
+                                            theme.textTheme.labelLarge?.copyWith(
+                                          color: _canSubmit
+                                              ? primary
+                                              : Colors.white60,
+                                        ),
+                                      ),
                               ),
                             ),
                           ],

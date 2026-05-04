@@ -18,6 +18,16 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   bool _isLoading = true;
+  _NotificationFilter _activeFilter = _NotificationFilter.all;
+  static const List<_NotificationFilter> _filterOrder = [
+    _NotificationFilter.all,
+    _NotificationFilter.unread,
+    _NotificationFilter.security,
+    _NotificationFilter.transactions,
+    _NotificationFilter.loans,
+    _NotificationFilter.savings,
+    _NotificationFilter.offers,
+  ];
   NotificationPreferences _preferences = const NotificationPreferences(
     enabled: true,
     transactionAlerts: true,
@@ -71,6 +81,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final unreadCount = _notifications.where((item) => !item.read).length;
+    final filteredNotifications = _applyFilter(_notifications);
+    final groupedNotifications = _groupNotifications(filteredNotifications);
 
     return AppScaffold(
       title: 'Notifications',
@@ -287,32 +299,69 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  if (_notifications.isEmpty)
+                  SizedBox(
+                    height: 38,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _filterOrder.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        final filter = _filterOrder[index];
+                        return ChoiceChip(
+                          label: Text(filter.label),
+                          selected: _activeFilter == filter,
+                          onSelected: (_) =>
+                              setState(() => _activeFilter = filter),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (filteredNotifications.isEmpty)
                     AppCard(
                       margin: EdgeInsets.zero,
                       child: Padding(
                         padding: const EdgeInsets.all(20),
                         child: Text(
-                          'No notifications yet. New account activity will show up here.',
+                          'No notifications match this filter yet.',
                           style: theme.textTheme.bodyMedium,
                         ),
                       ),
                     )
                   else
-                    ..._notifications.map(
-                      (notification) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _NotificationTile(
-                          notification: notification,
-                          icon: _notificationService.iconForType(
-                            notification.type,
+                    ...groupedNotifications.map(
+                      (group) => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4, bottom: 8),
+                            child: Text(
+                              group.title,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: theme.colorScheme.onSurface
+                                    .withOpacitySafe(0.62),
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
                           ),
-                          accentColor: _notificationService.colorForType(
-                            theme,
-                            notification.type,
+                          ...group.items.map(
+                            (notification) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _NotificationTile(
+                                notification: notification,
+                                icon: _notificationService.iconForType(
+                                  notification.type,
+                                ),
+                                accentColor: _notificationService.colorForType(
+                                  theme,
+                                  notification.type,
+                                ),
+                                onTap: () => _markAsRead(notification),
+                              ),
+                            ),
                           ),
-                          onTap: () => _markAsRead(notification),
-                        ),
+                        ],
                       ),
                     ),
                 ],
@@ -320,6 +369,110 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             ),
     );
   }
+
+  List<AppNotification> _applyFilter(List<AppNotification> source) {
+    switch (_activeFilter) {
+      case _NotificationFilter.all:
+        return source;
+      case _NotificationFilter.unread:
+        return source.where((item) => !item.read).toList();
+      case _NotificationFilter.transactions:
+        return source
+            .where((item) => item.type == AppNotificationType.transaction)
+            .toList();
+      case _NotificationFilter.loans:
+        return source
+            .where((item) => item.type == AppNotificationType.loan)
+            .toList();
+      case _NotificationFilter.savings:
+        return source
+            .where((item) => item.type == AppNotificationType.savings)
+            .toList();
+      case _NotificationFilter.security:
+        return source
+            .where((item) => item.type == AppNotificationType.security)
+            .toList();
+      case _NotificationFilter.offers:
+        return source
+            .where((item) => item.type == AppNotificationType.promo)
+            .toList();
+    }
+  }
+
+  List<_NotificationGroup> _groupNotifications(List<AppNotification> source) {
+    if (source.isEmpty) return const [];
+
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final yesterdayStart = todayStart.subtract(const Duration(days: 1));
+
+    final today = <AppNotification>[];
+    final yesterday = <AppNotification>[];
+    final earlier = <AppNotification>[];
+
+    for (final notification in source) {
+      final stamp = notification.timestamp;
+      if (stamp.isAfter(todayStart) || stamp.isAtSameMomentAs(todayStart)) {
+        today.add(notification);
+      } else if (stamp.isAfter(yesterdayStart) ||
+          stamp.isAtSameMomentAs(yesterdayStart)) {
+        yesterday.add(notification);
+      } else {
+        earlier.add(notification);
+      }
+    }
+
+    final groups = <_NotificationGroup>[];
+    if (today.isNotEmpty) {
+      groups.add(_NotificationGroup(title: 'Today', items: today));
+    }
+    if (yesterday.isNotEmpty) {
+      groups.add(_NotificationGroup(title: 'Yesterday', items: yesterday));
+    }
+    if (earlier.isNotEmpty) {
+      groups.add(_NotificationGroup(title: 'Earlier', items: earlier));
+    }
+
+    return groups;
+  }
+}
+
+enum _NotificationFilter {
+  all,
+  unread,
+  transactions,
+  loans,
+  savings,
+  security,
+  offers,
+}
+
+extension _NotificationFilterLabel on _NotificationFilter {
+  String get label {
+    switch (this) {
+      case _NotificationFilter.all:
+        return 'All';
+      case _NotificationFilter.unread:
+        return 'Unread';
+      case _NotificationFilter.transactions:
+        return 'Transactions';
+      case _NotificationFilter.loans:
+        return 'Loans';
+      case _NotificationFilter.savings:
+        return 'Savings';
+      case _NotificationFilter.security:
+        return 'Security';
+      case _NotificationFilter.offers:
+        return 'Offers';
+    }
+  }
+}
+
+class _NotificationGroup {
+  const _NotificationGroup({required this.title, required this.items});
+
+  final String title;
+  final List<AppNotification> items;
 }
 
 class _PreferenceSwitchTile extends StatelessWidget {
@@ -478,9 +631,9 @@ class _NotificationTile extends StatelessWidget {
                       ],
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

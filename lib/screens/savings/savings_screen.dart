@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:math';
 
@@ -7,14 +8,15 @@ import '../../core/app_card.dart';
 import '../../core/balance_card_shell.dart';
 import '../../core/color_ext.dart';
 import '../../core/layout/responsive.dart';
+import '../../core/providers/app_providers.dart';
 import 'savings_model.dart';
 import 'savings_storage.dart';
 
-class SavingsScreen extends StatefulWidget {
+class SavingsScreen extends ConsumerStatefulWidget {
   const SavingsScreen({super.key});
 
   @override
-  State<SavingsScreen> createState() => _SavingsScreenState();
+  ConsumerState<SavingsScreen> createState() => _SavingsScreenState();
 }
 
 class SavingsTip {
@@ -39,7 +41,7 @@ class SavingsTip {
 
 enum GoalsSortOption { closestToGoal, highestBalance, newest }
 
-class _SavingsScreenState extends State<SavingsScreen>
+class _SavingsScreenState extends ConsumerState<SavingsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   GoalsSortOption _goalsSort = GoalsSortOption.closestToGoal;
@@ -384,6 +386,47 @@ class _SavingsScreenState extends State<SavingsScreen>
     });
   }
 
+    Savings _mapToSavings(Map<String, dynamic> map) {
+      final typeStr =
+          ((map['type'] as String?) ?? 'member').toLowerCase().replaceAll(' ', '_');
+      final type = switch (typeStr) {
+        'current' || 'current_saving' || 'current_savings' => SavingsType.currentSaving,
+        'kiddy' || 'kiddy_saving' || 'kiddy_savings' => SavingsType.kiddySaving,
+        'fixed' || 'fixed_deposit' || 'fixed_saving' => SavingsType.fixedDeposit,
+        _ => SavingsType.memberSaving,
+      };
+      final id = (map['savings_id'] as String? ??
+              map['id'] as String? ??
+              map['product_id'] as String? ??
+              '')
+          .replaceAll(' ', '-')
+          .toLowerCase();
+      final name = map['name'] as String? ??
+          map['product_name'] as String? ??
+          map['account_name'] as String? ??
+          'Savings';
+      final balance = _toDouble(
+        map['balance'] ?? map['current_balance'] ?? map['amount'] ?? 0,
+      );
+      final target = _toDouble(
+        map['target'] ?? map['target_amount'] ?? map['goal_amount'] ?? 0,
+      );
+      return Savings(
+        id: id.isEmpty ? 'api-${name.toLowerCase().replaceAll(' ', '-')}' : id,
+        title: name,
+        balance: balance,
+        target: target > 0 ? target : (balance > 0 ? balance * 2 : 1000),
+        type: type,
+        interestRate: _toDouble(map['interest_rate'] ?? map['rate'] ?? 0),
+      );
+    }
+
+    static double _toDouble(dynamic v) {
+      if (v == null) return 0;
+      if (v is num) return v.toDouble();
+      return double.tryParse(v.toString().replaceAll(',', '')) ?? 0;
+    }
+
   Future<void> _addGoalIfMissing(Savings incoming) async {
     final alreadyExists = _userCreatedGoals.any(
       (goal) => goal.id == incoming.id,
@@ -577,58 +620,28 @@ class _SavingsScreenState extends State<SavingsScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Mock list with multiple savings types
-    final allSavings = [
-      ..._userCreatedGoals, // Add user-created goals first
-      Savings(
-        id: 'emergency-fund',
-        title: 'Emergency Fund',
-        balance: 1200,
-        target: 2000,
-        type: SavingsType.memberSaving,
-      ),
-      Savings(
-        id: 'current-savings',
-        title: 'Daily Expenses',
-        balance: 450,
-        target: 1000,
-        type: SavingsType.currentSaving,
-      ),
-      Savings(
-        id: 'education-savings',
-        title: 'Children Education',
-        balance: 5000,
-        target: 10000,
-        type: SavingsType.kiddySaving,
-      ),
-      Savings(
-        id: 'fixed-savings',
-        title: '12-Month Fixed Deposit',
-        balance: 2000,
-        target: 2000,
-        type: SavingsType.fixedDeposit,
-        interestRate: 5.5,
-        maturityDate: DateTime.now().add(const Duration(days: 365)),
-      ),
-      Savings(
-        id: 'vacation-savings',
-        title: 'Vacation Fund',
-        balance: 300,
-        target: 1500,
-        type: SavingsType.currentSaving,
-      ),
-      Savings(
-        id: 'member-savings',
-        title: 'Group Savings',
-        balance: 3200,
-        target: 5000,
-        type: SavingsType.memberSaving,
-      ),
-    ];
+    // Watch the live savings API
+    final apiSavingsAsync = ref.watch(savingsProvider);
+    // Convert API maps to Savings objects
+    final apiSavings = (apiSavingsAsync.valueOrNull ?? []).map(_mapToSavings).toList();
+
+    // Merge: user-created goals first, then API savings (de-duplicate by id)
+    final apiIds = apiSavings.map((s) => s.id).toSet();
+    final mergedLocalGoals = _userCreatedGoals
+        .where((g) => !apiIds.contains(g.id))
+        .toList();
+    final allSavings = [...mergedLocalGoals, ...apiSavings];
 
     final totalBalance = allSavings.fold<double>(
       0,
       (sum, s) => sum + s.balance,
+    );
+    final summaryText = apiSavingsAsync.when(
+      data: (data) =>
+          '${data.length} accounts • GH₵${totalBalance.toStringAsFixed(0)} saved so far',
+      loading: () => 'Loading savings from server...',
+      error: (error, stackTrace) =>
+          '${allSavings.length} goals • GH₵${totalBalance.toStringAsFixed(0)} saved so far',
     );
 
     return Scaffold(
@@ -723,7 +736,7 @@ class _SavingsScreenState extends State<SavingsScreen>
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              '${allSavings.length} goals • GH₵${totalBalance.toStringAsFixed(0)} saved so far',
+                              summaryText,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.labelMedium?.copyWith(

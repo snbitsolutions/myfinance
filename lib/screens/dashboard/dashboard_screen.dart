@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/providers/app_providers.dart';
 import '../../core/services/notification_service.dart';
@@ -24,8 +25,10 @@ class DashboardScreen extends ConsumerWidget {
 
     return userProfileAsync.when(
       loading: () => const _DashboardLoadingSkeleton(),
-      error: (error, stack) =>
-          const _DashboardContent(profile: _fallbackProfile),
+      error: (error, stack) => _DashboardErrorView(
+        error: error,
+        onRetry: () => ref.invalidate(userProfileProvider),
+      ),
       data: (profile) => _DashboardContent(profile: profile),
     );
   }
@@ -49,15 +52,31 @@ class _DashboardUi {
   static const topBackgroundHeight = 250.0;
 }
 
-class _DashboardContent extends StatelessWidget {
+class _DashboardContent extends ConsumerStatefulWidget {
   final Map<String, dynamic> profile;
 
   const _DashboardContent({required this.profile});
 
   @override
+  ConsumerState<_DashboardContent> createState() => _DashboardContentState();
+}
+
+class _DashboardContentState extends ConsumerState<_DashboardContent> {
+  Future<void> _onRefresh() async {
+    ref.invalidate(userProfileProvider);
+    ref.invalidate(transactionsProvider);
+    try {
+      await Future.wait([
+        ref.read(userProfileProvider.future),
+        ref.read(transactionsProvider.future),
+      ]);
+    } catch (_) {}
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final viewData = _DashboardProfileViewData.fromProfile(profile);
+    final viewData = _DashboardProfileViewData.fromProfile(widget.profile);
     final firstName = viewData.accountName.trim().split(RegExp(r'\s+')).first;
 
     final quickActionsPanel = Column(
@@ -98,38 +117,36 @@ class _DashboardContent extends StatelessWidget {
             ],
           ),
         ),
-        Expanded(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: 1),
-            duration: const Duration(milliseconds: 650),
-            curve: Curves.easeOutCubic,
-            builder: (context, value, child) {
-              return Opacity(
-                opacity: value,
-                child: Transform.translate(
-                  offset: Offset(0, 24 * (1 - value)),
-                  child: child,
-                ),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.22),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: 1),
+          duration: const Duration(milliseconds: 650),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, child) {
+            return Opacity(
+              opacity: value,
+              child: Transform.translate(
+                offset: Offset(0, 24 * (1 - value)),
+                child: child,
               ),
-              child: const _QuickActions(),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.22),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
+            child: const _QuickActions(),
           ),
         ),
       ],
@@ -158,21 +175,23 @@ class _DashboardContent extends StatelessWidget {
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  _DashboardUi.contentHorizontalPadding,
-                  12,
-                  _DashboardUi.contentHorizontalPadding,
-                  16,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _TopHeader(firstName: firstName),
-                    const SizedBox(height: 16),
-                    if (isTablet)
-                      Expanded(
-                        child: Row(
+              RefreshIndicator(
+                onRefresh: _onRefresh,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(
+                    _DashboardUi.contentHorizontalPadding,
+                    12,
+                    _DashboardUi.contentHorizontalPadding,
+                    24,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _TopHeader(firstName: firstName),
+                      const SizedBox(height: 16),
+                      if (isTablet)
+                        Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
@@ -196,28 +215,30 @@ class _DashboardContent extends StatelessWidget {
                             const SizedBox(width: 16),
                             Expanded(flex: 5, child: quickActionsPanel),
                           ],
+                        )
+                      else ...[
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0, end: 1),
+                          duration: const Duration(milliseconds: 450),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, value, child) {
+                            return Opacity(
+                              opacity: value,
+                              child: Transform.translate(
+                                offset: Offset(0, 16 * (1 - value)),
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: _AccountInfoCard(viewData: viewData),
                         ),
-                      )
-                    else ...[
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0, end: 1),
-                        duration: const Duration(milliseconds: 450),
-                        curve: Curves.easeOutCubic,
-                        builder: (context, value, child) {
-                          return Opacity(
-                            opacity: value,
-                            child: Transform.translate(
-                              offset: Offset(0, 16 * (1 - value)),
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: _AccountInfoCard(viewData: viewData),
-                      ),
-                      const SizedBox(height: 16),
-                      Expanded(child: quickActionsPanel),
+                        const SizedBox(height: 16),
+                        quickActionsPanel,
+                      ],
+                      const SizedBox(height: 20),
+                      const _RecentTransactions(),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -522,6 +543,62 @@ class _AccountInfoCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Live balance
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.22),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Available Balance',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: _DashboardUi.cardTextColor.withValues(
+                                  alpha: 0.72,
+                                ),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'GH₵ ${viewData.availableBalance.toStringAsFixed(2)}',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                color: _DashboardUi.cardTextColor,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.account_balance_wallet_outlined,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Align(
@@ -1087,6 +1164,322 @@ class _QuickAction extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Recent Transactions ──────────────────────────────────────────────────────
+
+class _RecentTransactions extends ConsumerWidget {
+  const _RecentTransactions();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final transactionsAsync = ref.watch(transactionsProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Recent Transactions',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.1,
+              ),
+            ),
+            const Spacer(),
+            TextButton(
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+              ),
+              onPressed: () => context.go('/transactions'),
+              child: const Text('See all'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        transactionsAsync.when(
+          loading: () => const _TransactionsSkeleton(),
+          error: (e, _) => _TransactionsErrorRow(
+            onRetry: () => ref.invalidate(transactionsProvider),
+          ),
+          data: (txns) {
+            if (txns.isEmpty) {
+              return _TransactionsEmptyRow(theme: theme);
+            }
+            final recent = txns.take(5).toList();
+            return Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: theme.colorScheme.outline.withValues(alpha: 0.22),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ListView.separated(
+                physics: const NeverScrollableScrollPhysics(),
+                shrinkWrap: true,
+                itemCount: recent.length,
+                separatorBuilder: (_, __) => Divider(
+                  height: 1,
+                  indent: 60,
+                  color: theme.colorScheme.outline.withValues(alpha: 0.20),
+                ),
+                itemBuilder: (_, i) => Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: _DashboardTransactionTile(txn: recent[i]),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _DashboardTransactionTile extends StatelessWidget {
+  final Map<String, dynamic> txn;
+  const _DashboardTransactionTile({required this.txn});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isCredit = (txn['type'] as String? ?? 'debit') == 'credit';
+    final amount = (txn['amount'] as num?)?.toDouble() ?? 0.0;
+    final description = txn['description'] as String? ?? '';
+    final dateStr = txn['date'] as String? ?? '';
+
+    DateTime? date;
+    try {
+      date = DateTime.parse(dateStr);
+    } catch (_) {}
+
+    final accentColor =
+        isCredit ? theme.colorScheme.primary : theme.colorScheme.error;
+
+    return Row(
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: accentColor.withValues(alpha: 0.10),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            isCredit ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+            size: 17,
+            color: accentColor,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                description.isEmpty ? 'Transaction' : description,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (date != null)
+                Text(
+                  DateFormat('MMM d, y').format(date),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        Text(
+          '${isCredit ? '+' : '-'} ₵${amount.toStringAsFixed(2)}',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: accentColor,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TransactionsSkeleton extends StatelessWidget {
+  const _TransactionsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      children: List.generate(
+        3,
+        (_) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              _SkeletonBox(
+                height: 38,
+                width: 38,
+                color: theme.colorScheme.outline.withValues(alpha: 0.18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _SkeletonBox(
+                      height: 13,
+                      width: double.infinity,
+                      color: theme.colorScheme.outline.withValues(alpha: 0.18),
+                    ),
+                    const SizedBox(height: 6),
+                    _SkeletonBox(
+                      height: 10,
+                      width: 90,
+                      color: theme.colorScheme.outline.withValues(alpha: 0.12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              _SkeletonBox(
+                height: 13,
+                width: 70,
+                color: theme.colorScheme.outline.withValues(alpha: 0.18),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TransactionsErrorRow extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _TransactionsErrorRow({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(
+          Icons.cloud_off_rounded,
+          size: 18,
+          color: theme.colorScheme.error,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'Could not load transactions',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+            ),
+          ),
+        ),
+        TextButton(
+          style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+          onPressed: onRetry,
+          child: const Text('Retry'),
+        ),
+      ],
+    );
+  }
+}
+
+class _TransactionsEmptyRow extends StatelessWidget {
+  final ThemeData theme;
+  const _TransactionsEmptyRow({required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Center(
+        child: Text(
+          'No transactions yet',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.50),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Error / Loading views ────────────────────────────────────────────────────
+
+class _DashboardErrorView extends StatelessWidget {
+  const _DashboardErrorView({required this.error, required this.onRetry});
+
+  final Object error;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.error.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.cloud_off_rounded,
+                size: 32,
+                color: theme.colorScheme.error,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Unable to load account',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error.toString().replaceFirst(RegExp(r'^.*Exception: '), ''),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+              ),
+            ),
+            const SizedBox(height: 28),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Try Again'),
+            ),
+          ],
         ),
       ),
     );

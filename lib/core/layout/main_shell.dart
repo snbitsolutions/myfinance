@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../providers/app_providers.dart';
 import 'responsive.dart';
 
-class MainShell extends StatefulWidget {
+class MainShell extends ConsumerStatefulWidget {
   final Widget child;
 
   const MainShell({super.key, required this.child});
 
   @override
-  State<MainShell> createState() => _MainShellState();
+  ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends ConsumerState<MainShell> {
+  // Track previous online state to only show the "back online" flash once.
   static const _savingsHintSeenKey = 'hint_long_press_savings_seen';
 
   @override
@@ -48,9 +51,39 @@ class _MainShellState extends State<MainShell> {
     final theme = Theme.of(context);
     final isExpanded = Responsive.isExpanded(context);
 
+    // Connectivity banner
+    final connectivityAsync = ref.watch(connectivityProvider);
+    final isOnline = connectivityAsync.valueOrNull ?? true;
+
+    // When connectivity is restored, show a brief snackbar.
+    ref.listen<AsyncValue<bool>>(connectivityProvider, (prev, next) {
+      final wasOnline = prev?.valueOrNull;
+      final nowOnline = next.valueOrNull;
+      if (wasOnline == false && nowOnline == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.wifi_rounded, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text('Back online'),
+              ],
+            ),
+            backgroundColor: theme.colorScheme.primary,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
+
     if (isExpanded) {
       return Scaffold(
-        body: Row(
+        body: Column(
+          children: [
+            _OfflineBanner(isOnline: isOnline),
+            Expanded(
+              child: Row(
           children: [
             NavigationRail(
               selectedIndex: currentIndex,
@@ -107,11 +140,19 @@ class _MainShellState extends State<MainShell> {
             Expanded(child: widget.child),
           ],
         ),
+            ),
+          ],
+        ),
       );
     }
 
     return Scaffold(
-      body: widget.child,
+      body: Column(
+        children: [
+          _OfflineBanner(isOnline: isOnline),
+          Expanded(child: widget.child),
+        ],
+      ),
       bottomNavigationBar: SafeArea(
         top: false,
         child: Container(
@@ -227,6 +268,52 @@ class _ShellNavItem extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _OfflineBanner extends StatelessWidget {
+  final bool isOnline;
+  const _OfflineBanner({required this.isOnline});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
+      child: isOnline
+          ? const SizedBox.shrink()
+          : Material(
+              color: const Color(0xFFC62828),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 7,
+                    horizontal: 16,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.wifi_off_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'No internet connection',
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
     );
   }
 }

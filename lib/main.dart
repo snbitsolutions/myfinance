@@ -52,7 +52,7 @@ class AdepaTeachersApp extends StatelessWidget {
         final maxContentWidth = Responsive.maxContentWidth(context);
         final horizontalPadding = Responsive.horizontalGutter(context);
 
-        return MediaQuery(
+        final constrainedChild = MediaQuery(
           data: media.copyWith(
             textScaler: media.textScaler.clamp(
               minScaleFactor: 0.9,
@@ -72,6 +72,31 @@ class AdepaTeachersApp extends StatelessWidget {
               ),
             ),
           ),
+        );
+
+        return ValueListenableBuilder<bool>(
+          valueListenable: AppRouter.redirectLoading,
+          builder: (_, isLoading, inner) {
+            return Stack(
+              children: [
+                inner!,
+                if (isLoading)
+                  Positioned.fill(
+                    child: ColoredBox(
+                      color: appColorScheme.surface.withValues(alpha: 0.70),
+                      child: const Center(
+                        child: SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(strokeWidth: 3),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+          child: constrainedChild,
         );
       },
       theme: ThemeData(

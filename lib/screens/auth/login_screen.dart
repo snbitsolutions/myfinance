@@ -1,21 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'auth_flow_error_utils.dart';
 import '../../core/color_ext.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/exceptions/app_exceptions.dart';
+import '../../core/providers/app_providers.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
   bool _showSnbReveal = false;
+  bool _isSubmitting = false;
 
   bool get _isValid => _phoneController.text.trim().length >= 9;
+
+  String get _normalizedPhoneNumber {
+    final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('233')) return digits;
+    if (digits.startsWith('0')) return '233${digits.substring(1)}';
+    return digits;
+  }
 
   Future<void> _showSnbSheet() async {
     await showModalBottomSheet(
@@ -33,6 +45,40 @@ class _LoginScreenState extends State<LoginScreen> {
     await _showSnbSheet();
     if (!mounted) return;
     setState(() => _showSnbReveal = false);
+  }
+
+  Future<void> _handleContinue() async {
+    if (_isSubmitting) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      await ref
+          .read(authProvider.notifier)
+          .confirmPhoneNumber(phoneNumber: _normalizedPhoneNumber);
+      if (!mounted) return;
+      context.go(
+        '/account-number',
+        extra: {'phoneNumber': _normalizedPhoneNumber},
+      );
+    } on AppException catch (e) {
+      if (!mounted) return;
+      if (shouldRedirectToSignup(e.message)) {
+        context.go('/signup?reason=not_registered');
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to confirm phone number.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   @override
@@ -190,20 +236,35 @@ class _LoginScreenState extends State<LoginScreen> {
                               width: double.infinity,
                               height: 52,
                               child: ElevatedButton(
-                                onPressed: _isValid
-                                    ? () => context.go('/otp')
+                                onPressed: _isValid && !_isSubmitting
+                                    ? _handleContinue
                                     : null,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: _isValid
+                                  backgroundColor: _isValid && !_isSubmitting
                                       ? Colors.white
                                       : Colors.white.withOpacitySafe(0.3),
                                 ),
-                                child: Text(
-                                  'Continue',
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    color: _isValid ? primary : Colors.white60,
-                                  ),
-                                ),
+                                child: _isSubmitting
+                                    ? SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                primary,
+                                              ),
+                                        ),
+                                      )
+                                    : Text(
+                                        'Continue',
+                                        style: theme.textTheme.labelLarge
+                                            ?.copyWith(
+                                              color: _isValid
+                                                  ? primary
+                                                  : Colors.white60,
+                                            ),
+                                      ),
                               ),
                             ),
                             const SizedBox(height: 20),
@@ -217,7 +278,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                                 TextButton(
-                                  onPressed: () => context.go('/onboarding'),
+                                  onPressed: () => context.go('/signup'),
                                   child: Text(
                                     'Sign up',
                                     style: theme.textTheme.bodySmall?.copyWith(

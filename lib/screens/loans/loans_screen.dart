@@ -8,6 +8,7 @@ import '../../core/app_scaffold.dart';
 import '../../core/balance_card_shell.dart';
 import '../../core/color_ext.dart';
 import '../../core/layout/responsive.dart';
+import '../../core/providers/app_providers.dart';
 import 'loan_application_provider.dart';
 
 String _loanDateLabel(DateTime date) {
@@ -35,17 +36,32 @@ class LoansScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final loan = ref.watch(loanApplicationProvider);
+    final apiLoansAsync = ref.watch(loansProvider);
 
     return AppScaffold(
       title: 'Loans',
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh_rounded),
+          tooltip: 'Refresh',
+          onPressed: () => ref.invalidate(loansProvider),
+        ),
+      ],
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isTablet = constraints.maxWidth >= Responsive.medium;
           final content = SingleChildScrollView(
             padding: const EdgeInsets.all(16),
-            child: loan == null
-                ? _EmptyLoansView(theme: theme)
-                : _ActiveLoanView(theme: theme, loan: loan),
+            child: Column(
+              children: [
+                // Live API loans summary banner
+                _ApiLoansSummary(apiLoansAsync: apiLoansAsync, theme: theme),
+                if (loan == null)
+                  _EmptyLoansView(theme: theme)
+                else
+                  _ActiveLoanView(theme: theme, loan: loan),
+              ],
+            ),
           );
 
           if (!isTablet) return content;
@@ -57,6 +73,112 @@ class LoansScreen extends ConsumerWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _ApiLoansSummary extends StatelessWidget {
+  final AsyncValue<List<Map<String, dynamic>>> apiLoansAsync;
+  final ThemeData theme;
+
+  const _ApiLoansSummary({required this.apiLoansAsync, required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    if (apiLoansAsync.isLoading) {
+      return const Padding(
+        padding: EdgeInsets.only(bottom: 16),
+        child: Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2.5),
+          ),
+        ),
+      );
+    }
+
+    if (apiLoansAsync.hasError) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.errorContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.cloud_off_rounded,
+                size: 16,
+                color: theme.colorScheme.onErrorContainer,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Could not load loans from server',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onErrorContainer,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final loans = apiLoansAsync.value ?? const [];
+    if (loans.isEmpty) return const SizedBox.shrink();
+
+    final totalOutstanding = loans.fold<double>(0.0, (sum, l) {
+      final v = l['outstanding_balance'] ?? l['balance'] ?? l['amount'] ?? 0;
+      return sum + (v is num ? v.toDouble() : 0.0);
+    });
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: AppCard(
+        margin: EdgeInsets.zero,
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFB86A14).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.account_balance_rounded,
+                color: Color(0xFFB86A14),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${loans.length} active loan${loans.length == 1 ? '' : 's'} on file',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Total outstanding: GH₵${totalOutstanding.toStringAsFixed(2)}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

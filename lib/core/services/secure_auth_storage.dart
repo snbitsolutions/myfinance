@@ -82,6 +82,24 @@ class SecureAuthStorage {
     );
   }
 
+  Future<void> storePin(String pin) async {
+    await initialize();
+    await _storage.write(
+      key: AppConstants.secureStorageKeyUserPin,
+      value: pin,
+    );
+  }
+
+  Future<String?> readPin() async {
+    await initialize();
+    return _storage.read(key: AppConstants.secureStorageKeyUserPin);
+  }
+
+  Future<void> clearPin() async {
+    await initialize();
+    await _storage.delete(key: AppConstants.secureStorageKeyUserPin);
+  }
+
   Future<bool> hasSessionBoundToFingerprint(String currentFingerprint) async {
     await initialize();
     final token = await readAuthToken();
@@ -105,6 +123,7 @@ class SecureAuthStorage {
     await _storage.delete(
       key: AppConstants.secureStorageKeySessionDeviceFingerprint,
     );
+    await _storage.delete(key: AppConstants.secureStorageKeyUserPin);
   }
 
   Future<void> _migrateLegacyTokens() async {

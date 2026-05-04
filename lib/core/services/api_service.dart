@@ -1,5 +1,6 @@
 import '../constants/app_constants.dart';
 import '../exceptions/app_exceptions.dart';
+import 'http_client.dart';
 import '../utils/logger.dart';
 
 /// Abstract service for all API calls with error handling
@@ -28,18 +29,140 @@ abstract class BaseService {
     }
   }
 
-  /// Simulate network delay (for mock data)
-  Future<void> _simulateNetworkDelay({
-    Duration delay = const Duration(milliseconds: 500),
-  }) {
-    return Future.delayed(delay);
-  }
 }
 
 /// User authentication service
 class AuthService extends BaseService {
+  final HttpClient _httpClient = HttpClient.instance;
+
+  Future<void> confirmPhoneNumber({required String phoneNumber}) async {
+    return handleApiCall(() async {
+      AppLogger.logApiRequest('POST', ApiEndpoints.confirmPhoneNumber, {
+        'phone_number': phoneNumber,
+      });
+
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.confirmPhoneNumber,
+        data: {'phone_number': phoneNumber},
+      );
+
+      AppLogger.logApiResponse(
+        'POST',
+        ApiEndpoints.confirmPhoneNumber,
+        response.data,
+      );
+    });
+  }
+
+  Future<void> confirmAccountNumber({
+    required String phoneNumber,
+    required String accountNumber,
+  }) async {
+    return handleApiCall(() async {
+      final request = {
+        'phone_number': phoneNumber,
+        'account_number': accountNumber,
+      };
+
+      AppLogger.logApiRequest(
+        'POST',
+        ApiEndpoints.confirmAccountNumber,
+        request,
+      );
+
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.confirmAccountNumber,
+        data: request,
+      );
+
+      final raw = response.data;
+      final data = raw is Map<String, dynamic>
+          ? raw
+          : <String, dynamic>{};
+
+      AppLogger.logApiResponse('POST', ApiEndpoints.confirmAccountNumber, data);
+
+      // Empty body on HTTP 200 means the backend accepted the request (OTP triggered).
+      // Only reject on an explicit failure status in the response body.
+      if (data.isNotEmpty) {
+        final status = data['status'];
+        final isExplicitFailure = status != null &&
+            status != 1 &&
+            status != '1' &&
+            !(status is String && status.toLowerCase() == 'success');
+
+        if (isExplicitFailure) {
+          throw AuthException(
+            message:
+                data['message'] as String? ?? 'Account verification failed.',
+          );
+        }
+      }
+    });
+  }
+
+  Future<Map<String, dynamic>> confirmPin({
+    required String phoneNumber,
+    required String accountNumber,
+    required String pin,
+  }) async {
+    return handleApiCall(() async {
+      final request = {
+        'phone_number': phoneNumber,
+        'account_number': accountNumber,
+        'pin': pin,
+      };
+
+      AppLogger.logApiRequest('POST', ApiEndpoints.confirmPin, request);
+
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.confirmPin,
+        data: request,
+      );
+
+      final data = response.data;
+      final result = data is Map<String, dynamic>
+          ? data
+          : <String, dynamic>{};
+
+      AppLogger.logApiResponse('POST', ApiEndpoints.confirmPin, result);
+      return result;
+    });
+  }
+
+  /// Register a new member via /register
+  Future<Map<String, dynamic>> register({
+    String? phoneNumber,
+    required String accountNumber,
+    required String pin,
+  }) async {
+    return handleApiCall(() async {
+      final request = <String, dynamic>{
+        if (phoneNumber != null && phoneNumber.isNotEmpty)
+          'phone_number': phoneNumber,
+        'account_number': accountNumber,
+        'pin': pin,
+      };
+      AppLogger.logApiRequest('POST', ApiEndpoints.register, request);
+
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.register,
+        data: request,
+      );
+
+      final raw = response.data;
+      final data = raw is Map<String, dynamic>
+          ? raw
+          : <String, dynamic>{};
+
+      AppLogger.logApiResponse('POST', ApiEndpoints.register, data);
+      return data;
+    });
+  }
+
   /// Login with email and password
   Future<Map<String, dynamic>> login({
+
     required String email,
     required String password,
     Map<String, dynamic>? deviceContext,
@@ -49,33 +172,10 @@ class AuthService extends BaseService {
         'email': email,
         'device_context': ?deviceContext,
       });
-      await _simulateNetworkDelay();
-
-      // Mock validation
-      if (email.isEmpty || password.isEmpty) {
-        throw ValidationException(message: AppConstants.validationErrorMessage);
-      }
-
-      if (!email.contains('@')) {
-        throw ValidationException(message: 'Invalid email format');
-      }
-
-      // Mock response - simulate successful login
-      final response = {
-        'status': 'success',
-        'data': {
-          'user_id': 'USR_12345',
-          'email': email,
-          'auth_token':
-              'mock_jwt_token_${DateTime.now().millisecondsSinceEpoch}',
-          'refresh_token':
-              'mock_refresh_token_${DateTime.now().millisecondsSinceEpoch}',
-          'token_expires_in': 3600, // 1 hour
-        },
-      };
-
-      AppLogger.logApiResponse('POST', ApiEndpoints.login, response);
-      return response;
+      throw ValidationException(
+        message:
+            'Email/password login is not supported by the STCCU API. Use phone/account/PIN sign in.',
+      );
     });
   }
 
@@ -89,21 +189,10 @@ class AuthService extends BaseService {
         'email': email,
         'device_context': ?deviceContext,
       });
-      await _simulateNetworkDelay();
-
-      if (email.isEmpty) {
-        throw ValidationException(message: AppConstants.validationErrorMessage);
-      }
-
-      final response = {
-        'status': 'success',
-        'message': 'OTP sent to your email',
-        'otp_id': 'OTP_${DateTime.now().millisecondsSinceEpoch}',
-        'expires_in': 300, // 5 minutes
-      };
-
-      AppLogger.logApiResponse('POST', ApiEndpoints.sendOtp, response);
-      return response;
+      throw ValidationException(
+        message:
+            'Legacy send OTP endpoint is not supported by the STCCU API. Use phone/account verification flow.',
+      );
     });
   }
 
@@ -118,21 +207,10 @@ class AuthService extends BaseService {
         'otp_id': otpId,
         'device_context': ?deviceContext,
       });
-      await _simulateNetworkDelay();
-
-      if (otp.isEmpty || otp.length != AppConstants.otpLength) {
-        throw ValidationException(message: AppConstants.invalidOtpMessage);
-      }
-
-      // Mock: any 4-digit code is valid
-      final response = {
-        'status': 'success',
-        'message': 'OTP verified successfully',
-        'verification_token': 'VER_${DateTime.now().millisecondsSinceEpoch}',
-      };
-
-      AppLogger.logApiResponse('POST', ApiEndpoints.verifyOtp, response);
-      return response;
+      throw ValidationException(
+        message:
+            'Legacy verify OTP endpoint is not supported by the STCCU API. Use phone/account/PIN sign in.',
+      );
     });
   }
 
@@ -143,22 +221,42 @@ class AuthService extends BaseService {
     Map<String, dynamic>? deviceContext,
   }) async {
     return handleApiCall(() async {
-      AppLogger.logApiRequest('POST', ApiEndpoints.setPin, {
-        'user_id': userId,
-        'device_context': ?deviceContext,
-      });
-      await _simulateNetworkDelay();
-
       if (pin.isEmpty || pin.length != AppConstants.pinLength) {
         throw ValidationException(
           message: 'PIN must be ${AppConstants.pinLength} digits',
         );
       }
 
-      final response = {'status': 'success', 'message': 'PIN set successfully'};
+      final request = {
+        'account_number': userId,
+        'pin': pin,
+        'device_context': ?deviceContext,
+      };
+      AppLogger.logApiRequest('POST', ApiEndpoints.changePin, request);
 
-      AppLogger.logApiResponse('POST', ApiEndpoints.setPin, response);
-      return response;
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.changePin,
+        data: request,
+      );
+
+      final raw = response.data;
+      final data = raw is Map<String, dynamic>
+          ? raw
+          : <String, dynamic>{};
+
+      AppLogger.logApiResponse('POST', ApiEndpoints.changePin, data);
+
+      final status = (data['status'] as num?)?.toInt() ?? 0;
+      if (status != 1) {
+        throw ValidationException(
+          message: data['message'] as String? ?? 'Unable to change PIN.',
+        );
+      }
+
+      return {
+        'status': 'success',
+        'message': data['message'] as String? ?? 'PIN updated successfully',
+      };
     });
   }
 
@@ -166,13 +264,8 @@ class AuthService extends BaseService {
   Future<Map<String, dynamic>> logout({required String userId}) async {
     return handleApiCall(() async {
       AppLogger.logApiRequest('POST', ApiEndpoints.logout, {'user_id': userId});
-      await _simulateNetworkDelay();
-
-      final response = {
-        'status': 'success',
-        'message': 'Logged out successfully',
-      };
-
+      // STCCU API has no server-side logout endpoint; session is cleared locally.
+      final response = {'status': 'success', 'message': 'Logged out locally'};
       AppLogger.logApiResponse('POST', ApiEndpoints.logout, response);
       return response;
     });
@@ -181,35 +274,74 @@ class AuthService extends BaseService {
 
 /// User profile service
 class UserService extends BaseService {
-  /// Get user profile
-  Future<Map<String, dynamic>> getUserProfile({required String userId}) async {
-    return handleApiCall(() async {
-      AppLogger.logApiRequest(
-        'GET',
-        '${ApiEndpoints.getUserProfile}/$userId',
-        null,
-      );
-      await _simulateNetworkDelay();
+  final HttpClient _httpClient = HttpClient.instance;
 
-      final response = {
-        'status': 'success',
+  static double _toDouble(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString().replaceAll(',', '')) ?? 0;
+  }
+
+  /// Get user profile via live /getAccountBalance endpoint
+  Future<Map<String, dynamic>> getUserProfile({
+    required String phoneNumber,
+    required String accountNumber,
+    required String pin,
+  }) async {
+    return handleApiCall(() async {
+      final request = {
+        'phone_number': phoneNumber,
+        'account_number': accountNumber,
+        'pin': pin,
+      };
+      AppLogger.logApiRequest('POST', ApiEndpoints.getAccountBalance, request);
+
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.getAccountBalance,
+        data: request,
+      );
+
+      final raw = response.data;
+      final data = raw is Map<String, dynamic>
+          ? raw
+          : <String, dynamic>{};
+
+      AppLogger.logApiResponse('POST', ApiEndpoints.getAccountBalance, data);
+
+      final status = (data['status'] as num?)?.toInt() ?? 0;
+      if (status != 1) {
+        throw AuthException(
+          message: data['message'] as String? ??
+              'Failed to load account details',
+        );
+      }
+
+      // Normalise multiple possible field name patterns from STCCU API
+      final name = data['account_name'] as String? ??
+          data['name'] as String? ??
+          data['full_name'] as String? ??
+          'Account Holder';
+      final balance = _toDouble(
+        data['available_balance'] ??
+            data['balance'] ??
+            data['account_balance'] ??
+            0,
+      );
+      final branch = data['branch'] as String? ??
+          data['branch_name'] as String? ??
+          '';
+
+      return {
         'data': {
-          'user_id': userId,
-          'name': 'Steven Boadu',
-          'branch': 'Accra Main',
-          'account_number': '0123456789',
-          'email': 'steven@email.com',
-          'phone': '0241234567',
-          'balance': 4500.50,
-          'kyc_status': 'not_started',
-          'created_at': DateTime.now()
-              .subtract(const Duration(days: 30))
-              .toIso8601String(),
+          'user_id': accountNumber,
+          'name': name,
+          'account_number': accountNumber,
+          'balance': balance,
+          'branch': branch,
+          'phone': phoneNumber,
+          'status': 'Active',
         },
       };
-
-      AppLogger.logApiResponse('GET', ApiEndpoints.getUserProfile, response);
-      return response;
     });
   }
 
@@ -224,16 +356,9 @@ class UserService extends BaseService {
         '${ApiEndpoints.updateUserProfile}/$userId',
         data,
       );
-      await _simulateNetworkDelay();
-
-      final response = {
-        'status': 'success',
-        'message': 'Profile updated successfully',
-        'data': data,
-      };
-
-      AppLogger.logApiResponse('PUT', ApiEndpoints.updateUserProfile, response);
-      return response;
+      throw ValidationException(
+        message: 'Profile update endpoint is not available in STCCU API.',
+      );
     });
   }
 
@@ -248,89 +373,88 @@ class UserService extends BaseService {
         '${ApiEndpoints.submitKyc}/$userId',
         kycData,
       );
-      await _simulateNetworkDelay();
-
-      final response = {
-        'status': 'success',
-        'message': 'KYC submitted for review',
-        'kyc_id': 'KYC_${DateTime.now().millisecondsSinceEpoch}',
-        'kyc_status': 'pending', // renamed to avoid duplicate map key
-      };
-
-      AppLogger.logApiResponse('POST', ApiEndpoints.submitKyc, response);
-      return response;
+      throw ValidationException(
+        message: 'KYC submission endpoint is not available in STCCU API.',
+      );
     });
   }
 }
 
 /// Loan service
 class LoanService extends BaseService {
-  /// Get list of loans for user
-  Future<Map<String, dynamic>> getLoansList({required String userId}) async {
+  final HttpClient _httpClient = HttpClient.instance;
+
+  static double _toDouble(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString().replaceAll(',', '')) ?? 0;
+  }
+
+  /// Get list of loans for user via live /getLoans endpoint
+  Future<Map<String, dynamic>> getLoansList({
+    required String phoneNumber,
+    required String accountNumber,
+    required String pin,
+  }) async {
     return handleApiCall(() async {
-      AppLogger.logApiRequest('GET', ApiEndpoints.getLoansList, {
-        'user_id': userId,
-      });
-      await _simulateNetworkDelay();
-
-      final response = {
-        'status': 'success',
-        'data': [
-          {
-            'loan_id': 'LOAN_001',
-            'amount': 1000.0,
-            'outstanding': 800.0,
-            'status': 'active',
-            'interest_rate': 5.0,
-            'due_date': DateTime.now()
-                .add(const Duration(days: 30))
-                .toIso8601String(),
-            'created_at': DateTime.now()
-                .subtract(const Duration(days: 60))
-                .toIso8601String(),
-          },
-        ],
+      final request = {
+        'phone_number': phoneNumber,
+        'account_number': accountNumber,
+        'pin': pin,
       };
+      AppLogger.logApiRequest('POST', ApiEndpoints.getLoans, request);
 
-      AppLogger.logApiResponse('GET', ApiEndpoints.getLoansList, response);
-      return response;
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.getLoans,
+        data: request,
+      );
+
+      final raw = response.data;
+      final data = raw is Map<String, dynamic>
+          ? raw
+          : <String, dynamic>{};
+
+      AppLogger.logApiResponse('POST', ApiEndpoints.getLoans, data);
+
+      final status = (data['status'] as num?)?.toInt() ?? 0;
+      if (status != 1) {
+        return {
+          'status': 'success',
+          'data': [],
+        };
+      }
+
+      // Normalise STCCU loans response
+      final loansRaw = data['loans'] as List? ?? [];
+      final normalizedLoans = loansRaw
+          .whereType<Map<String, dynamic>>()
+          .map((loan) => {
+            'loan_id': loan['id'] as String? ?? loan['loan_id'] as String? ?? '',
+            'amount': _toDouble(loan['original_amount'] ?? loan['amount'] ?? 0),
+            'outstanding':
+                _toDouble(loan['outstanding_balance'] ?? loan['balance'] ?? 0),
+            'status': (loan['status'] as String? ?? 'active').toLowerCase(),
+            'interest_rate': _toDouble(loan['interest_rate'] ?? 0),
+            'due_date': loan['due_date'] as String? ?? '',
+            'created_at': loan['created_date'] as String? ?? '',
+          })
+          .toList();
+
+      return {
+        'status': 'success',
+        'data': normalizedLoans,
+      };
     });
   }
 
   /// Get loan detail
   Future<Map<String, dynamic>> getLoanDetail({required String loanId}) async {
     return handleApiCall(() async {
-      AppLogger.logApiRequest(
-        'GET',
-        '${ApiEndpoints.getLoanDetail}/$loanId',
-        null,
+      AppLogger.logApiRequest('GET', ApiEndpoints.getLoanDetail, {'loan_id': loanId});
+      throw ValidationException(
+        message:
+            'Loan detail endpoint is not available in STCCU API. Use getLoans list response.',
       );
-      await _simulateNetworkDelay();
-
-      final response = {
-        'status': 'success',
-        'data': {
-          'loan_id': loanId,
-          'amount': 1000.0,
-          'outstanding': 800.0,
-          'status': 'active',
-          'interest_rate': 5.0,
-          'repayment_plan': 'monthly',
-          'due_date': DateTime.now()
-              .add(const Duration(days: 30))
-              .toIso8601String(),
-          'monthly_payment': 200.0,
-          'next_payment_date': DateTime.now()
-              .add(const Duration(days: 7))
-              .toIso8601String(),
-          'created_at': DateTime.now()
-              .subtract(const Duration(days: 60))
-              .toIso8601String(),
-        },
-      };
-
-      AppLogger.logApiResponse('GET', ApiEndpoints.getLoanDetail, response);
-      return response;
     });
   }
 
@@ -348,8 +472,6 @@ class LoanService extends BaseService {
         'purpose': purpose,
         'repayment_plan': repaymentPlan,
       });
-      await _simulateNetworkDelay();
-
       if (amount < AppConstants.loanMinAmount ||
           amount > AppConstants.loanMaxAmount) {
         throw ValidationException(
@@ -357,17 +479,9 @@ class LoanService extends BaseService {
               'Loan amount must be between ${AppConstants.loanMinAmount} and ${AppConstants.loanMaxAmount}',
         );
       }
-
-      final response = {
-        'status': 'success',
-        'message': 'Loan application submitted',
-        'loan_id': 'LOAN_${DateTime.now().millisecondsSinceEpoch}',
-        'application_status': 'pending_review',
-        'estimated_approval_time': '1-2 business days',
-      };
-
-      AppLogger.logApiResponse('POST', ApiEndpoints.applyLoan, response);
-      return response;
+      throw ValidationException(
+        message: 'Loan application endpoint is not available in STCCU API.',
+      );
     });
   }
 
@@ -376,24 +490,47 @@ class LoanService extends BaseService {
     required String loanId,
     required double amount,
     required double currentOutstanding,
+    required String accountNumber,
+    required String pin,
     String paymentMethod = 'Mobile Money',
-    String? phoneNumber,
+    String? momoPhoneNumber,
   }) async {
     return handleApiCall(() async {
-      AppLogger.logApiRequest('POST', '${ApiEndpoints.repayLoan}/$loanId', {
-        'amount': amount,
-        'payment_method': paymentMethod,
-        'phone_number': phoneNumber,
-      });
-      await _simulateNetworkDelay();
-
       if (amount <= 0) {
         throw ValidationException(message: 'Amount must be greater than zero');
       }
-
       if (amount > currentOutstanding) {
         throw ValidationException(
           message: 'Amount cannot exceed the outstanding balance.',
+        );
+      }
+
+      final request = {
+        'account_number': accountNumber,
+        'pin': pin,
+        'loan_id': loanId,
+        'amount': amount,
+        if (momoPhoneNumber != null && momoPhoneNumber.isNotEmpty)
+          'momo_number': momoPhoneNumber,
+      };
+      AppLogger.logApiRequest('POST', ApiEndpoints.repayLoanStccu, request);
+
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.repayLoanStccu,
+        data: request,
+      );
+
+      final raw = response.data;
+      final data = raw is Map<String, dynamic>
+          ? raw
+          : <String, dynamic>{};
+
+      AppLogger.logApiResponse('POST', ApiEndpoints.repayLoanStccu, data);
+
+      final status = (data['status'] as num?)?.toInt() ?? 0;
+      if (status != 1) {
+        throw GenericException(
+          message: data['message'] as String? ?? 'Loan repayment failed.',
         );
       }
 
@@ -403,56 +540,108 @@ class LoanService extends BaseService {
         currentOutstanding,
       );
 
-      final response = {
+      return {
         'status': 'success',
-        'message': 'Loan repayment successful',
+        'message': data['message'] as String? ?? 'Loan repayment successful',
         'data': {
           'loan_id': loanId,
-          'transaction_id': 'TXN_${now.millisecondsSinceEpoch}',
+          'transaction_id': data['transaction_id'] as String? ??
+              'TXN_${now.millisecondsSinceEpoch}',
           'amount': amount,
           'previous_outstanding': currentOutstanding,
           'new_outstanding': newOutstanding,
           'processed_at': now.toIso8601String(),
-          'payment_method': 'momo',
-          'payment_method_label': paymentMethod,
-          'phone_number': phoneNumber,
+          'payment_method': paymentMethod,
+          'phone_number': momoPhoneNumber,
         },
       };
-
-      AppLogger.logApiResponse('POST', ApiEndpoints.repayLoan, response);
-      return response;
     });
   }
 }
 
 /// Savings service
 class SavingsService extends BaseService {
-  /// Get list of savings goals
-  Future<Map<String, dynamic>> getSavingsList({required String userId}) async {
+  final HttpClient _httpClient = HttpClient.instance;
+
+  static double _toDouble(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString().replaceAll(',', '')) ?? 0;
+  }
+
+  /// Get list of savings products/accounts via live /getSavingsProducts endpoint
+  Future<Map<String, dynamic>> getSavingsList({
+    required String phoneNumber,
+    required String accountNumber,
+    required String pin,
+  }) async {
     return handleApiCall(() async {
-      AppLogger.logApiRequest('GET', ApiEndpoints.getSavingsList, {
-        'user_id': userId,
-      });
-      await _simulateNetworkDelay();
-
-      final response = {
-        'status': 'success',
-        'data': [
-          {
-            'savings_id': 'SAV_001',
-            'name': 'Emergency Fund',
-            'target': 2000.0,
-            'current': 1200.0,
-            'interest_earned': 45.50,
-            'created_at': DateTime.now()
-                .subtract(const Duration(days: 30))
-                .toIso8601String(),
-          },
-        ],
+      final request = {
+        'phone_number': phoneNumber,
+        'account_number': accountNumber,
+        'pin': pin,
       };
+      AppLogger.logApiRequest(
+        'POST',
+        ApiEndpoints.getSavingsProductsList,
+        request,
+      );
 
-      AppLogger.logApiResponse('GET', ApiEndpoints.getSavingsList, response);
-      return response;
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.getSavingsProductsList,
+        data: request,
+      );
+
+      final raw = response.data;
+      final data = raw is Map<String, dynamic>
+          ? raw
+          : <String, dynamic>{};
+
+      AppLogger.logApiResponse(
+        'POST',
+        ApiEndpoints.getSavingsProductsList,
+        data,
+      );
+
+      final status = (data['status'] as num?)?.toInt() ?? 0;
+      if (status != 1) {
+        return {'status': 'success', 'data': []};
+      }
+
+      final savingsRaw = data['savings'] as List? ??
+          data['data'] as List? ??
+          data['products'] as List? ??
+          [];
+
+      final normalizedSavings = savingsRaw
+          .whereType<Map<String, dynamic>>()
+          .map((s) => {
+                'savings_id': s['id'] as String? ??
+                    s['savings_id'] as String? ??
+                    s['product_id'] as String? ??
+                    '',
+                'name': s['name'] as String? ??
+                    s['product_name'] as String? ??
+                    s['account_name'] as String? ??
+                    'Savings',
+                'balance': _toDouble(
+                  s['balance'] ?? s['current_balance'] ?? s['amount'] ?? 0,
+                ),
+                'target': _toDouble(
+                  s['target'] ??
+                      s['target_amount'] ??
+                      s['goal_amount'] ??
+                      0,
+                ),
+                'interest_rate': _toDouble(s['interest_rate'] ?? s['rate'] ?? 0),
+                'type': s['type'] as String? ??
+                    s['product_type'] as String? ??
+                    s['savings_type'] as String? ??
+                    'member',
+              })
+          .toList();
+
+      return {'status': 'success', 'data': normalizedSavings};
     });
   }
 
@@ -470,132 +659,208 @@ class SavingsService extends BaseService {
         'target_amount': targetAmount,
         'auto_save': autoSave,
       });
-      await _simulateNetworkDelay();
-
       if (name.isEmpty || targetAmount <= 0) {
         throw ValidationException(message: AppConstants.validationErrorMessage);
       }
-
-      final response = {
-        'status': 'success',
-        'message': 'Savings goal created successfully',
-        'savings_id': 'SAV_${DateTime.now().millisecondsSinceEpoch}',
-        'created_at': DateTime.now().toIso8601String(),
-      };
-
-      AppLogger.logApiResponse('POST', ApiEndpoints.createSavings, response);
-      return response;
+      throw ValidationException(
+        message:
+            'Savings goal creation endpoint is not available in STCCU API.',
+      );
     });
   }
 
   /// Deposit to savings
   Future<Map<String, dynamic>> depositSavings({
-    required String savingsId,
+    required String phoneNumber,
+    required String accountNumber,
+    required String pin,
     required double amount,
+    String? savingsId,
   }) async {
     return handleApiCall(() async {
-      AppLogger.logApiRequest(
-        'POST',
-        '${ApiEndpoints.depositSavings}/$savingsId',
-        {'amount': amount},
-      );
-      await _simulateNetworkDelay();
-
       if (amount <= 0) {
         throw ValidationException(message: 'Amount must be greater than zero');
       }
 
-      final response = {
-        'status': 'success',
-        'message': 'Deposit successful',
-        'transaction_id': 'TXN_${DateTime.now().millisecondsSinceEpoch}',
-        'new_balance': 1200.0 + amount,
+      final request = <String, dynamic>{
+        'phone_number': phoneNumber,
+        'account_number': accountNumber,
+        'pin': pin,
+        'amount': amount,
+        'savings_id': savingsId,
       };
+      request.removeWhere((key, value) => value == null);
+      AppLogger.logApiRequest('POST', ApiEndpoints.depositFunds, request);
 
-      AppLogger.logApiResponse('POST', ApiEndpoints.depositSavings, response);
-      return response;
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.depositFunds,
+        data: request,
+      );
+
+      final raw = response.data;
+      final data = raw is Map<String, dynamic>
+          ? raw
+          : <String, dynamic>{};
+
+      AppLogger.logApiResponse('POST', ApiEndpoints.depositFunds, data);
+
+      final status = (data['status'] as num?)?.toInt() ?? 0;
+      if (status != 1) {
+        throw GenericException(
+          message: data['message'] as String? ?? 'Deposit failed.',
+        );
+      }
+
+      return {
+        'status': 'success',
+        'message': data['message'] as String? ?? 'Deposit successful',
+        'transaction_id': data['transaction_id'] as String? ??
+            'TXN_${DateTime.now().millisecondsSinceEpoch}',
+        'new_balance': _toDouble(data['new_balance'] ?? data['balance'] ?? 0),
+      };
     });
   }
 
   /// Withdraw from savings
   Future<Map<String, dynamic>> withdrawSavings({
-    required String savingsId,
+    required String phoneNumber,
+    required String accountNumber,
+    required String pin,
     required double amount,
+    String? savingsId,
   }) async {
     return handleApiCall(() async {
-      AppLogger.logApiRequest(
-        'POST',
-        '${ApiEndpoints.withdrawSavings}/$savingsId',
-        {'amount': amount},
-      );
-      await _simulateNetworkDelay();
-
       if (amount <= 0) {
         throw ValidationException(message: 'Amount must be greater than zero');
       }
 
-      final response = {
-        'status': 'success',
-        'message': 'Withdrawal successful',
-        'transaction_id': 'TXN_${DateTime.now().millisecondsSinceEpoch}',
-        'new_balance': 1200.0 - amount,
+      final request = <String, dynamic>{
+        'phone_number': phoneNumber,
+        'account_number': accountNumber,
+        'pin': pin,
+        'amount': amount,
+        'savings_id': savingsId,
       };
+      request.removeWhere((key, value) => value == null);
+      AppLogger.logApiRequest('POST', ApiEndpoints.withdrawFunds, request);
 
-      AppLogger.logApiResponse('POST', ApiEndpoints.withdrawSavings, response);
-      return response;
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.withdrawFunds,
+        data: request,
+      );
+
+      final raw = response.data;
+      final data = raw is Map<String, dynamic>
+          ? raw
+          : <String, dynamic>{};
+
+      AppLogger.logApiResponse('POST', ApiEndpoints.withdrawFunds, data);
+
+      final status = (data['status'] as num?)?.toInt() ?? 0;
+      if (status != 1) {
+        throw GenericException(
+          message: data['message'] as String? ?? 'Withdrawal failed.',
+        );
+      }
+
+      return {
+        'status': 'success',
+        'message': data['message'] as String? ?? 'Withdrawal successful',
+        'transaction_id': data['transaction_id'] as String? ??
+            'TXN_${DateTime.now().millisecondsSinceEpoch}',
+        'new_balance': _toDouble(data['new_balance'] ?? data['balance'] ?? 0),
+      };
     });
   }
 }
 
 /// Transaction service
 class TransactionService extends BaseService {
-  /// Get transactions for user
+  final HttpClient _httpClient = HttpClient.instance;
+
+  static double _toDouble(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString().replaceAll(',', '')) ?? 0;
+  }
+
+  /// Get transactions for user via live /miniStatement endpoint
   Future<Map<String, dynamic>> getTransactions({
-    required String userId,
+    required String phoneNumber,
+    required String accountNumber,
+    required String pin,
     int page = 1,
     int limit = 20,
   }) async {
     return handleApiCall(() async {
-      AppLogger.logApiRequest('GET', ApiEndpoints.getTransactions, {
-        'user_id': userId,
+      final request = {
+        'phone_number': phoneNumber,
+        'account_number': accountNumber,
+        'pin': pin,
         'page': page,
         'limit': limit,
-      });
-      await _simulateNetworkDelay();
+      };
+      AppLogger.logApiRequest('POST', ApiEndpoints.miniStatement, request);
 
-      final response = {
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.miniStatement,
+        data: request,
+      );
+
+      final raw = response.data;
+      final data = raw is Map<String, dynamic>
+          ? raw
+          : <String, dynamic>{};
+
+      AppLogger.logApiResponse('POST', ApiEndpoints.miniStatement, data);
+
+      final status = (data['status'] as num?)?.toInt() ?? 0;
+      if (status != 1) {
+        return {
+          'status': 'success',
+          'data': [],
+          'pagination': {
+            'current_page': page,
+            'total_pages': 1,
+            'total_items': 0,
+          },
+        };
+      }
+
+      // Normalise STCCU statement response
+      final statementsRaw = data['statement'] as List? ?? data['transactions'] as List? ?? [];
+      final normalizedTransactions = statementsRaw
+          .whereType<Map<String, dynamic>>()
+          .map((txn) => {
+            'transaction_id': txn['id'] as String? ??
+                txn['transaction_id'] as String? ??
+                '',
+            'type': (txn['type'] as String? ?? 'debit').toLowerCase(),
+            'amount': _toDouble(
+              txn['debit'] ??
+                  txn['credit'] ??
+                  txn['amount'] ??
+                  0,
+            ),
+            'description': txn['narration'] as String? ??
+                txn['description'] as String? ??
+                '',
+            'date': txn['date'] as String? ?? DateTime.now().toIso8601String(),
+            'status': 'success',
+            'balance': _toDouble(txn['balance'] ?? 0),
+          })
+          .toList();
+
+      return {
         'status': 'success',
-        'data': [
-          {
-            'transaction_id': 'TXN_001',
-            'type': 'deposit',
-            'amount': 500.0,
-            'description': 'Savings Deposit',
-            'date': DateTime.now()
-                .subtract(const Duration(hours: 2))
-                .toIso8601String(),
-            'status': 'success',
-          },
-          {
-            'transaction_id': 'TXN_002',
-            'type': 'repayment',
-            'amount': 200.0,
-            'description': 'Loan Repayment',
-            'date': DateTime.now()
-                .subtract(const Duration(days: 1))
-                .toIso8601String(),
-            'status': 'success',
-          },
-        ],
+        'data': normalizedTransactions,
         'pagination': {
           'current_page': page,
-          'total_pages': 5,
-          'total_items': 100,
+          'total_pages': data['total_pages'] as int? ?? 1,
+          'total_items': data['total_items'] as int? ?? normalizedTransactions.length,
         },
       };
-
-      AppLogger.logApiResponse('GET', ApiEndpoints.getTransactions, response);
-      return response;
     });
   }
 }
+
