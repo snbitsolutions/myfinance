@@ -1,22 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_scaffold.dart';
 import '../../core/app_card.dart';
 import '../../core/color_ext.dart';
+import '../../core/exceptions/app_exceptions.dart';
 import '../../core/layout/responsive.dart';
 import '../../core/modern_input.dart';
+import '../../core/models/notification_models.dart';
+import '../../core/providers/app_providers.dart';
+import '../../core/services/notification_service.dart';
 
-class PaymentScreen extends StatefulWidget {
+class PaymentScreen extends ConsumerStatefulWidget {
   final String? sourceLabel;
 
   const PaymentScreen({super.key, this.sourceLabel});
 
   @override
-  State<PaymentScreen> createState() => _PaymentScreenState();
+  ConsumerState<PaymentScreen> createState() => _PaymentScreenState();
 }
 
-class _PaymentScreenState extends State<PaymentScreen> {
+class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   static const _paymentMethods = ['Account', 'MoMo'];
   static const _momoProviders = [
     'MTN MoMo',
@@ -33,6 +38,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _momoPhoneController = TextEditingController();
   String _method = _paymentMethods.first;
+  bool _isSubmitting = false;
   String _selectedShareAccount = _shareSourceAccounts.first;
   String _selectedInternalAccount = _shareSourceAccounts.first;
   String _selectedMomoProvider = _momoProviders.first;
@@ -40,6 +46,109 @@ class _PaymentScreenState extends State<PaymentScreen> {
   bool _isValidMomoNumber(String value) {
     final phone = value.trim();
     return RegExp(r'^0\d{9}$').hasMatch(phone);
+  }
+
+  Future<void> _handleProceed() async {
+    if (_isSubmitting) return;
+
+    final amount = double.tryParse(_amountController.text.trim()) ?? 0;
+    final useExistingAccount = widget.sourceLabel == 'Existing account';
+    final isMomo = !useExistingAccount && _method == 'MoMo';
+    final momoPhone = _momoPhoneController.text.trim();
+    final canProceed = amount > 0 && (!isMomo || _isValidMomoNumber(momoPhone));
+
+    if (!canProceed) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      final authState = ref.read(authProvider);
+      final accountNumber = authState.userId ?? '';
+      final phoneNumber = authState.userEmail ?? '';
+
+      final response = await ref
+          .read(paymentServiceProvider)
+          .chargePayment(
+            accountNumber: accountNumber,
+            phoneNumber: phoneNumber,
+            amount: amount,
+            paymentMethod: _method,
+            momoPhoneNumber: isMomo ? momoPhone : null,
+          );
+
+      if (!mounted) return;
+      final statusValue = response['status'];
+      final isSuccess =
+          statusValue == 'success' ||
+          statusValue == 1 ||
+          statusValue == '1' ||
+          (statusValue is String && statusValue.toLowerCase() == 'success') ||
+          (response['data'] is Map &&
+              (response['data'] as Map)['status'] == 'success');
+
+      if (isSuccess) {
+        await NotificationService.instance.addNotification(
+          AppNotification(
+            id: 'payment_success_${DateTime.now().millisecondsSinceEpoch}',
+            title: 'Payment completed',
+            message:
+                'Your payment of GH₵${amount.toStringAsFixed(2)} was processed successfully.',
+            timestamp: DateTime.now(),
+            type: AppNotificationType.transaction,
+            read: false,
+          ),
+        );
+        if (!mounted) return;
+        context.go(
+          '/payment-success',
+          extra: {
+            'amount': amount,
+            'processedAt': DateTime.now().toIso8601String(),
+            'reference':
+                response['transaction_id'] ??
+                response['reference'] ??
+                response['transactionId'] ??
+                'PAY#${DateTime.now().millisecondsSinceEpoch}',
+            'title': 'Payment Successful',
+            'message':
+                response['message'] ??
+                'Your transaction was completed successfully.',
+          },
+        );
+      } else {
+        await NotificationService.instance.addNotification(
+          AppNotification(
+            id: 'payment_failed_${DateTime.now().millisecondsSinceEpoch}',
+            title: 'Payment needs attention',
+            message:
+                'Your payment of GH₵${amount.toStringAsFixed(2)} could not be completed.',
+            timestamp: DateTime.now(),
+            type: AppNotificationType.security,
+            read: false,
+          ),
+        );
+        if (!mounted) return;
+        context.go(
+          '/payment-failed',
+          extra: {
+            'amount': amount,
+            'message':
+                response['message'] ?? 'Your payment could not be completed.',
+          },
+        );
+      }
+    } on AppException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to process payment right now.')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -413,25 +522,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   width: double.infinity,
                   height: 52,
                   child: FilledButton.icon(
-                    onPressed: canProceed
-                        ? () {
-                            final now = DateTime.now();
-                            if (amt >= 1) {
-                              context.go(
-                                '/payment-success',
-                                extra: {
-                                  'amount': amt,
-                                  'processedAt': now.toIso8601String(),
-                                  'reference': 'PAY#${now.millisecondsSinceEpoch}',
-                                },
-                              );
-                            } else {
-                              context.go('/payment-failed');
-                            }
-                          }
+                    onPressed: canProceed && !_isSubmitting
+                        ? _handleProceed
                         : null,
-                    icon: const Icon(Icons.lock_outline_rounded),
-                    label: const Text('Proceed to Payment'),
+                    icon: _isSubmitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.lock_outline_rounded),
+                    label: Text(
+                      _isSubmitting ? 'Processing...' : 'Proceed to Payment',
+                    ),
                     style: FilledButton.styleFrom(
                       elevation: 0,
                       shape: RoundedRectangleBorder(

@@ -62,6 +62,7 @@ class AppConstants {
   static const String invalidOtpMessage =
       'Invalid verification code. Please try again.';
   static const String pinMismatchMessage = 'PINs do not match.';
+  static const String defaultMobileApiSKey = 'ArTM3c8yq0Lhlh';
   static const String pinTooSimpleMessage =
       'PIN is too simple. Please choose a different PIN.';
 
@@ -93,6 +94,7 @@ class AppConstants {
   static const String sharedPrefKeySavingsReminders = 'savingsReminders';
   static const String sharedPrefKeyMarketingUpdates = 'marketingUpdates';
   static const String sharedPrefKeyReadNotificationIds = 'readNotificationIds';
+  static const String sharedPrefKeyCustomNotifications = 'customNotifications';
 
   // Secure storage keys
   static const String secureStorageKeyUserToken = 'secure.userToken';
@@ -121,14 +123,16 @@ class AppConstants {
 }
 
 class ApiEndpoints {
-    static const String baseUrl = 'https://adepaye.com/stccu-api';
+  static const String baseUrl = 'https://adepaye.com';
 
-  // STCCU auth endpoints
-  static const String confirmPhoneNumber = '/confirmPhoneNumber';
-  static const String confirmAccountNumber = '/confirmAccountNumber';
-  static const String confirmPin = '/confirmPin';
-  static const String register = '/register';
-  static const String changePin = '/changePin';
+  // Documented ATCCU mobile app auth endpoints
+  static const String confirmPhoneNumber = '/mobileapp-api/confirmPhoneNumber';
+  static const String confirmAccountNumber =
+      '/mobileapp-api/confirmAccountNumber';
+  static const String confirmPin = '/mobileapp-api/verifyPin';
+  static const String register = '/mobileapp-api/register';
+  static const String changePin = '/mobileapp-api/changePin';
+  static const String setPin = '/mobileapp-api/setPin';
 
   // STCCU account / data endpoints
   static const String getAccountBalance = '/getAccountBalance';
@@ -149,7 +153,7 @@ class ApiEndpoints {
   static const String logout = '/auth/logout';
   static const String sendOtp = '/auth/send-otp';
   static const String verifyOtp = '/auth/verify-otp';
-  static const String setPin = '/auth/set-pin';
+  static const String legacySetPin = '/auth/set-pin';
   static const String refreshToken = '/auth/refresh-token';
 
   // User
@@ -176,8 +180,10 @@ class ApiEndpoints {
   static const String getTransactionDetail = '/transactions/:id';
 
   // Payments
-  static const String initiatePayment = '/payments/initiate';
-  static const String verifyPayment = '/payments/verify';
+  static const String paymentServiceBaseUrl =
+      'https://adepaye.com/api/payment-services';
+  static const String initiatePayment = '/api/payment-services/initiate';
+  static const String verifyPayment = '/api/payment-services/verify';
 
   // Settings
   static const String getSettings = '/settings';

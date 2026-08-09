@@ -7,6 +7,8 @@ import '../../core/color_ext.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/layout/responsive.dart';
 import '../../core/modern_input.dart';
+import '../../core/models/notification_models.dart';
+import '../../core/services/notification_service.dart';
 import 'savings_model.dart';
 import 'savings_storage.dart';
 
@@ -671,6 +673,17 @@ class _CreateSavingsScreenState extends State<CreateSavingsScreen> {
                             );
 
                             await SavingsStorage.addGoal(newSavings);
+                            await NotificationService.instance.addNotification(
+                              AppNotification(
+                                id: 'savings_created_${DateTime.now().millisecondsSinceEpoch}',
+                                title: 'Savings goal created',
+                                message:
+                                    'Your savings goal “${newSavings.title}” is now ready to grow.',
+                                timestamp: DateTime.now(),
+                                type: AppNotificationType.savings,
+                                read: false,
+                              ),
+                            );
                             if (!context.mounted) return;
 
                             // Navigate to success screen

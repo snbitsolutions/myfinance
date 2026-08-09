@@ -9,6 +9,8 @@ abstract class NotificationRepository {
 
   Future<List<AppNotification>> getNotifications();
 
+  Future<void> addNotification(AppNotification notification);
+
   Future<NotificationListResponse> getNotificationListResponse();
 
   Future<int> getUnreadCount();

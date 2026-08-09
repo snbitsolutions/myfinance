@@ -7,6 +7,8 @@ import '../../core/app_scaffold.dart';
 import '../../core/color_ext.dart';
 import '../../core/layout/responsive.dart';
 import '../../core/modern_input.dart';
+import '../../core/models/notification_models.dart';
+import '../../core/services/notification_service.dart';
 import 'loan_application_provider.dart';
 
 class ApplyLoanScreen extends ConsumerStatefulWidget {
@@ -181,7 +183,7 @@ class _ApplyLoanScreenState extends ConsumerState<ApplyLoanScreen> {
             ),
             child: ElevatedButton(
               onPressed: _canSubmit
-                  ? () {
+                  ? () async {
                       ref
                           .read(loanApplicationProvider.notifier)
                           .submit(
@@ -189,6 +191,18 @@ class _ApplyLoanScreenState extends ConsumerState<ApplyLoanScreen> {
                             purpose: _purposeController.text.trim(),
                             repaymentPlan: _repaymentPlan,
                           );
+                      await NotificationService.instance.addNotification(
+                        AppNotification(
+                          id: 'loan_applied_${DateTime.now().millisecondsSinceEpoch}',
+                          title: 'Loan application received',
+                          message:
+                              'Your loan request for GH₵${_loanAmount.toStringAsFixed(0)} is now being reviewed.',
+                          timestamp: DateTime.now(),
+                          type: AppNotificationType.loan,
+                          read: false,
+                        ),
+                      );
+                      if (!context.mounted) return;
                       context.go('/loan-status');
                     }
                   : null,

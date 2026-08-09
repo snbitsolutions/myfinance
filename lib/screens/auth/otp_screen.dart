@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/color_ext.dart';
 import '../../core/exceptions/app_exceptions.dart';
+import '../../core/models/notification_models.dart';
 import '../../core/providers/app_providers.dart';
+import '../../core/services/notification_service.dart';
 
 class OtpScreen extends ConsumerStatefulWidget {
   const OtpScreen({
@@ -26,15 +28,30 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
   bool get _isValid => _otpController.text.trim().length == 4;
 
+  String get _normalizedOtp => _otpController.text.trim();
+
   Future<void> _handleVerify() async {
     if (_isSubmitting || !_isValid) return;
     setState(() => _isSubmitting = true);
     try {
-      await ref.read(authProvider.notifier).loginWithOtp(
+      await ref
+          .read(authProvider.notifier)
+          .loginWithOtp(
             phoneNumber: widget.phoneNumber,
             accountNumber: widget.accountNumber,
-            otp: _otpController.text.trim(),
+            otp: _normalizedOtp,
           );
+      await NotificationService.instance.addNotification(
+        AppNotification(
+          id: 'otp_verified_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Verification complete',
+          message:
+              'Your OTP was verified successfully for ${widget.phoneNumber}.',
+          timestamp: DateTime.now(),
+          type: AppNotificationType.security,
+          read: false,
+        ),
+      );
       ref.invalidate(userProfileProvider);
       ref.invalidate(transactionsProvider);
       ref.invalidate(loansProvider);
@@ -42,11 +59,31 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       if (!mounted) return;
       context.go('/home');
     } on AppException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
+      await NotificationService.instance.addNotification(
+        AppNotification(
+          id: 'otp_failed_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Verification issue',
+          message: 'We could not verify the OTP for ${widget.phoneNumber}.',
+          timestamp: DateTime.now(),
+          type: AppNotificationType.security,
+          read: false,
+        ),
       );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (_) {
+      await NotificationService.instance.addNotification(
+        AppNotification(
+          id: 'otp_failed_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Verification issue',
+          message: 'We could not verify the OTP for ${widget.phoneNumber}.',
+          timestamp: DateTime.now(),
+          type: AppNotificationType.security,
+          read: false,
+        ),
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Verification failed. Please try again.')),
@@ -119,13 +156,16 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                         alignment: Alignment.centerLeft,
                         child: IconButton(
                           onPressed: () {
-                              if (context.canPop()) {
-                                context.pop();
-                              } else {
-                                context.go('/login');
-                              }
+                            if (context.canPop()) {
+                              context.pop();
+                            } else {
+                              context.go('/login');
+                            }
                           },
-                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -217,7 +257,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                                     ),
                                   ),
                                   onChanged: (_) => setState(() {}),
-                                                                  onSubmitted: (_) => _handleVerify(),
+                                  onSubmitted: (_) => _handleVerify(),
                                 ),
                               ],
                             ),
@@ -240,14 +280,20 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                                         height: 20,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2.2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(primary),
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                primary,
+                                              ),
                                         ),
                                       )
                                     : Text(
                                         'Verify & Sign In',
-                                        style: theme.textTheme.labelLarge?.copyWith(
-                                          color: _isValid ? primary : Colors.white60,
-                                        ),
+                                        style: theme.textTheme.labelLarge
+                                            ?.copyWith(
+                                              color: _isValid
+                                                  ? primary
+                                                  : Colors.white60,
+                                            ),
                                       ),
                               ),
                             ),

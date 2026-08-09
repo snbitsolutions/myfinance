@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -63,14 +65,61 @@ class NotificationService implements NotificationRepository {
   }
 
   @override
+  Future<void> addNotification(AppNotification notification) async {
+    final prefs = await SharedPreferences.getInstance();
+    final existing = await _getStoredNotifications();
+    final updated = [...existing, notification];
+    await prefs.setString(
+      AppConstants.sharedPrefKeyCustomNotifications,
+      jsonEncode(updated.map((item) => item.toJson()).toList()),
+    );
+  }
+
+  Future<List<AppNotification>> _getStoredNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = prefs.getString(
+      AppConstants.sharedPrefKeyCustomNotifications,
+    );
+    if (encoded == null || encoded.isEmpty) return const [];
+
+    final decoded = jsonDecode(encoded);
+    if (decoded is! List) return const [];
+
+    return decoded
+        .whereType<Map>()
+        .map(
+          (item) => AppNotification.fromJson(Map<String, dynamic>.from(item)),
+        )
+        .toList();
+  }
+
+  @override
   Future<NotificationListResponse> getNotificationListResponse() async {
     final prefs = await SharedPreferences.getInstance();
     final readIds =
         prefs.getStringList(AppConstants.sharedPrefKeyReadNotificationIds) ??
         const <String>[];
+    final preferences = await getPreferences();
+
+    final storedNotifications = await _getStoredNotifications();
 
     final notifications =
-        _seedNotifications
+        [..._seedNotifications, ...storedNotifications]
+            .where((notification) {
+              if (!preferences.enabled) return false;
+              switch (notification.type) {
+                case AppNotificationType.transaction:
+                  return preferences.transactionAlerts;
+                case AppNotificationType.loan:
+                  return preferences.loanUpdates;
+                case AppNotificationType.savings:
+                  return preferences.savingsReminders;
+                case AppNotificationType.security:
+                  return preferences.enabled;
+                case AppNotificationType.promo:
+                  return preferences.marketingUpdates;
+              }
+            })
             .map(
               (notification) => notification.copyWith(
                 read: readIds.contains(notification.id),
@@ -129,9 +178,11 @@ class NotificationService implements NotificationRepository {
     MarkAllNotificationsReadRequest request,
   ) async {
     final prefs = await SharedPreferences.getInstance();
-    final allIds = _seedNotifications
-        .map((notification) => notification.id)
-        .toList();
+    final storedNotifications = await _getStoredNotifications();
+    final allIds = [
+      ..._seedNotifications,
+      ...storedNotifications,
+    ].map((notification) => notification.id).toList();
     await prefs.setStringList(
       AppConstants.sharedPrefKeyReadNotificationIds,
       allIds,
