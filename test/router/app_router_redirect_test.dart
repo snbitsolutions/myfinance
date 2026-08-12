@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:adepa_teachers/core/constants/app_constants.dart';
 import 'package:adepa_teachers/core/services/device_identity_service.dart';
+import 'package:adepa_teachers/main.dart';
 import 'package:adepa_teachers/router/app_router.dart';
 import 'package:adepa_teachers/core/services/secure_auth_storage.dart';
 import 'package:adepa_teachers/screens/auth/account_number_screen.dart';
@@ -82,16 +83,15 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 50));
   }
 
-  testWidgets(
-    'starts unauthenticated users on onboarding from root',
-    (tester) async {
-      await pumpAt(tester, '/');
+  testWidgets('starts unauthenticated users on onboarding from root', (
+    tester,
+  ) async {
+    await pumpAt(tester, '/');
 
-      expect(find.byType(OnboardingScreen), findsOneWidget);
-      expect(find.byType(LoginScreen), findsNothing);
-      expect(find.byType(DashboardScreen), findsNothing);
-    },
-  );
+    expect(find.byType(OnboardingScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+    expect(find.byType(DashboardScreen), findsNothing);
+  });
 
   testWidgets(
     'redirects protected routes to onboarding when onboarding not seen',
@@ -127,8 +127,8 @@ void main() {
         AppConstants.sharedPrefKeyDeviceInstallId,
         'test-install-id',
       );
-      final fingerprint =
-          await DeviceIdentityService().getInstallationFingerprint();
+      final fingerprint = await DeviceIdentityService()
+          .getInstallationFingerprint();
 
       secureStore[AppConstants.secureStorageKeyUserToken] = 'test-token';
       secureStore[AppConstants.secureStorageKeySessionDeviceFingerprint] =
@@ -143,6 +143,53 @@ void main() {
       expect(find.byType(LoginScreen), findsNothing);
     },
   );
+
+  test('treats environment-based debug auth bypass as enabled', () {
+    expect(
+      AppRouter.isDebugAuthBypassEnabled(
+        queryValue: null,
+        savedPreferenceValue: false,
+        environmentValue: true,
+      ),
+      isTrue,
+    );
+  });
+
+  testWidgets(
+    'redirects the root route to home when debug auth bypass is enabled',
+    (tester) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(AppConstants.sharedPrefKeyOnboarding, true);
+      await prefs.setString(
+        AppConstants.sharedPrefKeyUserId,
+        '001060000004075',
+      );
+      await prefs.setString(
+        AppConstants.sharedPrefKeyUserEmail,
+        '233501234567',
+      );
+
+      await pumpAt(tester, '/?debugAuth=true');
+
+      expect(find.byType(DashboardScreen), findsOneWidget);
+      expect(find.byType(LoginScreen), findsNothing);
+    },
+  );
+
+  testWidgets('allows protected routes when debug auth bypass is enabled', (
+    tester,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(AppConstants.sharedPrefKeyOnboarding, true);
+    await prefs.setBool(AppConstants.sharedPrefKeyDebugBypassAuth, true);
+    await prefs.setString(AppConstants.sharedPrefKeyUserId, '001060000004075');
+    await prefs.setString(AppConstants.sharedPrefKeyUserEmail, '233501234567');
+
+    await pumpAt(tester, '/home?debugAuth=true');
+
+    expect(find.byType(DashboardScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
 
   testWidgets(
     'shows SignupScreen at /signup when onboarding seen and no session',
@@ -179,30 +226,24 @@ void main() {
     },
   );
 
-  testWidgets(
-    'shows OtpScreen at /otp when onboarding seen and no session',
-    (tester) async {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(AppConstants.sharedPrefKeyOnboarding, true);
+  testWidgets('shows OtpScreen at /otp when onboarding seen and no session', (
+    tester,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(AppConstants.sharedPrefKeyOnboarding, true);
 
-      AppRouter.router.go(
-        '/otp',
-        extra: {
-          'phoneNumber': '233501234567',
-          'accountNumber': '12345678',
-        },
-      );
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp.router(routerConfig: AppRouter.router),
-        ),
-      );
-      await tester.pumpAndSettle(const Duration(milliseconds: 50));
+    AppRouter.router.go(
+      '/otp',
+      extra: {'phoneNumber': '233501234567', 'accountNumber': '12345678'},
+    );
+    await tester.pumpWidget(
+      ProviderScope(child: MaterialApp.router(routerConfig: AppRouter.router)),
+    );
+    await tester.pumpAndSettle(const Duration(milliseconds: 50));
 
-      expect(find.byType(OtpScreen), findsOneWidget);
-      expect(find.byType(LoginScreen), findsNothing);
-    },
-  );
+    expect(find.byType(OtpScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
 
   testWidgets(
     'clears session and redirects to login when device fingerprint mismatches',
@@ -226,4 +267,32 @@ void main() {
       expect(tokenAfter, isNull);
     },
   );
+
+  testWidgets('loading overlay does not swallow taps', (tester) async {
+    var tapped = false;
+    AppRouter.redirectLoading.value = true;
+    addTearDown(() => AppRouter.redirectLoading.value = false);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: RedirectLoadingOverlay(
+            isLoading: true,
+            child: SizedBox.expand(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => tapped = true,
+                child: const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pump();
+
+    expect(tapped, isTrue);
+  });
 }

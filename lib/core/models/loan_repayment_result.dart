@@ -22,10 +22,15 @@ class LoanRepaymentResult {
   double get amountApplied => previousOutstanding - newOutstanding;
 
   factory LoanRepaymentResult.fromApiResponse(Map<String, dynamic> response) {
-    final data = response['data'] as Map<String, dynamic>? ?? response;
+    final rawData = response['data'];
+    final data = rawData is Map
+        ? Map<String, dynamic>.from(rawData)
+        : <String, dynamic>{};
+
     return LoanRepaymentResult(
-      loanId: (data['loan_id'] ?? '').toString(),
-      transactionId: (data['transaction_id'] ?? '').toString(),
+      loanId: (data['loan_id'] ?? data['loanId'] ?? '').toString(),
+      transactionId: (data['transaction_id'] ?? data['transactionId'] ?? '')
+          .toString(),
       amount: (data['amount'] as num?)?.toDouble() ?? 0,
       previousOutstanding:
           (data['previous_outstanding'] as num?)?.toDouble() ?? 0,
@@ -34,8 +39,11 @@ class LoanRepaymentResult {
           DateTime.tryParse((data['processed_at'] ?? '').toString()) ??
           DateTime.now(),
       message: (response['message'] ?? data['message'] ?? '').toString(),
-      paymentMethod: (data['payment_method_label'] ?? 'Mobile Money')
-          .toString(),
+      paymentMethod:
+          (data['payment_method'] ??
+                  data['payment_method_label'] ??
+                  'Mobile Money')
+              .toString(),
     );
   }
 }

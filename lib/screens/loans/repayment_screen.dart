@@ -73,7 +73,7 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
     LoanApplicationState loan,
     double amount,
   ) async {
-      final momoPhone = _phoneController.text.trim();
+    final momoPhone = _phoneController.text.trim();
     final navigator = GoRouter.of(context);
     final messenger = ScaffoldMessenger.of(context);
     if (_isSubmitting) return;
@@ -82,20 +82,27 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
 
     try {
       final loanService = ref.read(loanServiceProvider);
-        final auth = ref.read(authProvider);
-        final pin = await SecureAuthStorage.instance.readPin() ?? '';
-        final account = auth.userId ?? '';
+      final auth = ref.read(authProvider);
+      final pin = await SecureAuthStorage.instance.readPin() ?? '';
+      final account = auth.userId ?? '';
 
       final response = await loanService.repayLoan(
         loanId: loan.referenceNumber,
         amount: amount,
         currentOutstanding: loan.outstandingBalance,
-          accountNumber: account,
-          pin: pin,
+        accountNumber: account,
+        pin: pin,
         paymentMethod: _momoProvider,
-          momoPhoneNumber: momoPhone,
+        momoPhoneNumber: momoPhone,
       );
       final result = LoanRepaymentResult.fromApiResponse(response);
+      final safeAmount = result.amount > 0 ? result.amount : amount;
+      final safeNewOutstanding = result.newOutstanding > 0
+          ? result.newOutstanding
+          : (loan.outstandingBalance - amount).clamp(
+              0,
+              loan.outstandingBalance,
+            );
 
       ref
           .read(loanApplicationProvider.notifier)
@@ -105,12 +112,12 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
       navigator.go(
         '/payment-success',
         extra: {
-          'amount': result.amount,
+          'amount': safeAmount,
           'processedAt': result.processedAt.toIso8601String(),
           'reference': result.transactionId,
           'title': 'Loan Repayment Successful',
           'message':
-              'Your repayment of GH₵${result.amount.toStringAsFixed(2)} via ${result.paymentMethod} from $momoPhone was received. Remaining balance: GH₵${result.newOutstanding.toStringAsFixed(2)}.',
+              'Your repayment of GH₵${safeAmount.toStringAsFixed(2)} via ${result.paymentMethod} from $momoPhone was received. Remaining balance: GH₵${safeNewOutstanding.toStringAsFixed(2)}.',
           'primaryActionLabel': 'View Loan Details',
           'primaryActionRoute': '/loan-detail',
           'secondaryActionLabel': 'Back to Loans',

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/color_ext.dart';
 import '../../core/exceptions/app_exceptions.dart';
@@ -30,11 +29,15 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
   bool _showPin = false;
   bool _isSubmitting = false;
 
+  bool get _isRegisterMode => widget.mode == 'register';
+  bool get _isSignInMode => widget.mode == 'signin';
+
   bool get _canSubmit =>
       _pinController.text.trim().length == 4 &&
-      _pinController.text == _confirmController.text;
+      (_isSignInMode || _pinController.text == _confirmController.text);
 
-  bool get _pinMatch => _pinController.text == _confirmController.text;
+  bool get _pinMatch =>
+      _isSignInMode || _pinController.text == _confirmController.text;
 
   Future<void> _handleSubmit() async {
     if (_isSubmitting || !_canSubmit) return;
@@ -44,14 +47,17 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
       final pin = _pinController.text.trim();
       final router = GoRouter.of(context);
 
-      if (widget.mode == 'register') {
+      if (_isRegisterMode) {
         if (widget.accountNumber.isEmpty) {
           throw ValidationException(
             message: 'Missing account details. Please restart registration.',
           );
         }
-        final message = await ref.read(authProvider.notifier).submitRegistration(
+        final message = await ref
+            .read(authProvider.notifier)
+            .submitRegistration(
               accountNumber: widget.accountNumber,
+              phoneNumber: widget.phoneNumber,
               pin: pin,
             );
         if (!mounted) return;
@@ -78,6 +84,31 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
         return;
       }
 
+      if (_isSignInMode) {
+        if (widget.phoneNumber.isEmpty || widget.accountNumber.isEmpty) {
+          throw ValidationException(
+            message: 'Missing sign-in details. Please restart login.',
+          );
+        }
+
+        await ref
+            .read(authProvider.notifier)
+            .signInWithPin(
+              phoneNumber: widget.phoneNumber,
+              accountNumber: widget.accountNumber,
+              pin: pin,
+            );
+
+        ref.invalidate(userProfileProvider);
+        ref.invalidate(transactionsProvider);
+        ref.invalidate(loansProvider);
+        ref.invalidate(savingsProvider);
+
+        if (!mounted) return;
+        router.go('/home');
+        return;
+      }
+
       final authState = ref.read(authProvider);
       if (authState.isAuthenticated && authState.userId != null) {
         await ref
@@ -86,8 +117,6 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
       }
 
       await SecureAuthStorage.instance.storePin(pin);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('transaction_pin', pin);
 
       ref.invalidate(userProfileProvider);
       ref.invalidate(transactionsProvider);
@@ -98,9 +127,9 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
       router.go('/home');
     } on AppException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -174,9 +203,9 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                     children: [
                       const SizedBox(height: 40),
                       Text(
-                        widget.mode == 'register'
+                        _isRegisterMode
                             ? 'Create PIN'
-                            : 'Update PIN',
+                            : (_isSignInMode ? 'Enter PIN' : 'Update PIN'),
                         style: theme.textTheme.displaySmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -184,9 +213,11 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        widget.mode == 'register'
+                        _isRegisterMode
                             ? 'Create a 4-digit PIN to secure your account'
-                            : 'Set a new 4-digit PIN for your account',
+                            : (_isSignInMode
+                                  ? 'Enter your 4-digit PIN to sign in'
+                                  : 'Set a new 4-digit PIN for your account'),
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.white70,
@@ -279,83 +310,93 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 20),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Confirm PIN',
-                                  style: theme.textTheme.bodyLarge?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                TextField(
-                                  controller: _confirmController,
-                                  keyboardType: TextInputType.number,
-                                  maxLength: 4,
-                                  obscureText: !_showPin,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.headlineMedium
-                                      ?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 8,
-                                      ),
-                                  decoration: InputDecoration(
-                                    counterText: '',
-                                    hintText: '••••',
-                                    hintStyle: theme.textTheme.bodyMedium
-                                        ?.copyWith(color: Colors.white54),
-                                    filled: true,
-                                    fillColor: Colors.white.withOpacitySafe(
-                                      0.15,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(
-                                        color:
-                                            _pinMatch ||
-                                                _confirmController.text.isEmpty
-                                            ? Colors.white.withOpacitySafe(0.2)
-                                            : Colors.red.withOpacitySafe(0.5),
-                                      ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(
-                                        color:
-                                            _pinMatch ||
-                                                _confirmController.text.isEmpty
-                                            ? Colors.white.withOpacitySafe(0.2)
-                                            : Colors.red.withOpacitySafe(0.5),
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(
-                                        color: _pinMatch
-                                            ? Colors.white
-                                            : Colors.red,
-                                        width: 2,
-                                      ),
+                            if (!_isSignInMode) ...[
+                              const SizedBox(height: 20),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Confirm PIN',
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w500,
                                     ),
                                   ),
-                                  onChanged: (_) => setState(() {}),
-                                ),
-                                if (_confirmController.text.isNotEmpty &&
-                                    !_pinMatch)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 8),
-                                    child: Text(
-                                      'PINs do not match',
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(color: Colors.red[300]),
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                    controller: _confirmController,
+                                    keyboardType: TextInputType.number,
+                                    maxLength: 4,
+                                    obscureText: !_showPin,
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.headlineMedium
+                                        ?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 8,
+                                        ),
+                                    decoration: InputDecoration(
+                                      counterText: '',
+                                      hintText: '••••',
+                                      hintStyle: theme.textTheme.bodyMedium
+                                          ?.copyWith(color: Colors.white54),
+                                      filled: true,
+                                      fillColor: Colors.white.withOpacitySafe(
+                                        0.15,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color:
+                                              _pinMatch ||
+                                                  _confirmController
+                                                      .text
+                                                      .isEmpty
+                                              ? Colors.white.withOpacitySafe(
+                                                  0.2,
+                                                )
+                                              : Colors.red.withOpacitySafe(0.5),
+                                        ),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color:
+                                              _pinMatch ||
+                                                  _confirmController
+                                                      .text
+                                                      .isEmpty
+                                              ? Colors.white.withOpacitySafe(
+                                                  0.2,
+                                                )
+                                              : Colors.red.withOpacitySafe(0.5),
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: _pinMatch
+                                              ? Colors.white
+                                              : Colors.red,
+                                          width: 2,
+                                        ),
+                                      ),
                                     ),
+                                    onChanged: (_) => setState(() {}),
                                   ),
-                              ],
-                            ),
+                                  if (_confirmController.text.isNotEmpty &&
+                                      !_pinMatch)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: Text(
+                                        'PINs do not match',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(color: Colors.red[300]),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
                             const SizedBox(height: 28),
                             SizedBox(
                               width: double.infinity,
@@ -377,20 +418,22 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                                           strokeWidth: 2.2,
                                           valueColor:
                                               AlwaysStoppedAnimation<Color>(
-                                            primary,
-                                          ),
+                                                primary,
+                                              ),
                                         ),
                                       )
                                     : Text(
-                                        widget.mode == 'register'
+                                        _isRegisterMode
                                             ? 'Register'
-                                            : 'Save PIN',
-                                        style:
-                                            theme.textTheme.labelLarge?.copyWith(
-                                          color: _canSubmit
-                                              ? primary
-                                              : Colors.white60,
-                                        ),
+                                            : (_isSignInMode
+                                                  ? 'Sign In'
+                                                  : 'Save PIN'),
+                                        style: theme.textTheme.labelLarge
+                                            ?.copyWith(
+                                              color: _canSubmit
+                                                  ? primary
+                                                  : Colors.white60,
+                                            ),
                                       ),
                               ),
                             ),

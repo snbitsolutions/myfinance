@@ -1,12 +1,135 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:adepa_teachers/core/providers/app_providers.dart';
+import 'package:adepa_teachers/core/services/api_service.dart';
+import 'package:adepa_teachers/core/services/device_identity_service.dart';
 import 'package:adepa_teachers/screens/transactions/transactions_screen.dart';
 
+class ThrowingUserService extends UserService {
+  @override
+  Future<Map<String, dynamic>> getUserProfile({
+    required String phoneNumber,
+    required String accountNumber,
+    required String pin,
+  }) async {
+    throw Exception('remote service should not be called');
+  }
+}
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  const sharedPreferencesChannel = MethodChannel(
+    'plugins.flutter.io/shared_preferences',
+  );
+  const secureStorageChannel = MethodChannel(
+    'plugins.it_nomads.com/flutter_secure_storage',
+  );
+
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(sharedPreferencesChannel, (call) async {
+        if (call.method == 'getAll') {
+          return <String, Object>{};
+        }
+        if (call.method == 'setBool') {
+          return true;
+        }
+        if (call.method == 'setString') {
+          return true;
+        }
+        if (call.method == 'remove') {
+          return true;
+        }
+        return null;
+      });
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(secureStorageChannel, (call) async {
+        if (call.method == 'read') {
+          return null;
+        }
+        if (call.method == 'containsKey') {
+          return false;
+        }
+        if (call.method == 'readAll') {
+          return <String, String>{};
+        }
+        return null;
+      });
+
+  test(
+    'transactions provider uses fallback sample data when unauthenticated',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          authProvider.overrideWith(
+            (ref) => AuthNotifier(
+              authService: AuthService(),
+              userService: UserService(),
+              deviceIdentityService: DeviceIdentityService(),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final transactions = await container.read(transactionsProvider.future);
+
+      expect(transactions, isNotEmpty);
+      expect(transactions.first['description'], 'Salary deposit');
+    },
+  );
+
+  test(
+    'user profile provider uses fallback data when unauthenticated',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          authProvider.overrideWith(
+            (ref) => AuthNotifier(
+              authService: AuthService(),
+              userService: UserService(),
+              deviceIdentityService: DeviceIdentityService(),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final profile = await container.read(userProfileProvider.future);
+
+      expect(profile['name'], 'Demo User');
+      expect(profile['balance'], greaterThan(0));
+    },
+  );
+
+  test(
+    'user profile provider uses fallback data for debug-auth sessions',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          authProvider.overrideWith(
+            (ref) => AuthNotifier(
+              authService: AuthService(),
+              userService: ThrowingUserService(),
+              deviceIdentityService: DeviceIdentityService(),
+            ),
+          ),
+          userServiceProvider.overrideWithValue(ThrowingUserService()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final profile = await container.read(userProfileProvider.future);
+
+      expect(profile['name'], 'Demo User');
+      expect(profile['balance'], 5240.75);
+    },
+  );
+
   testWidgets('transactions screen is overflow-safe on small screens', (
     tester,
   ) async {

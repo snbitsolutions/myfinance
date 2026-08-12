@@ -58,6 +58,15 @@ class DeviceIdentityService {
       'is_physical_device': true,
     };
 
+    final resolvedDeviceIdentifier = await _resolveDeviceIdentifier();
+    if (resolvedDeviceIdentifier != null &&
+        resolvedDeviceIdentifier.isNotEmpty) {
+      base['device_identifier'] = resolvedDeviceIdentifier;
+      base['device_identifier_masked'] = maskIdentifier(
+        resolvedDeviceIdentifier,
+      );
+    }
+
     try {
       if (kIsWeb) {
         final webInfo = await _deviceInfoPlugin.webBrowserInfo;
@@ -80,6 +89,7 @@ class DeviceIdentityService {
             'manufacturer': info.manufacturer,
             'device_sdk_int': info.version.sdkInt,
             'is_physical_device': info.isPhysicalDevice,
+            'android_id': info.id,
           };
         case TargetPlatform.iOS:
           final info = await _deviceInfoPlugin.iosInfo;
@@ -137,6 +147,59 @@ class DeviceIdentityService {
         'manufacturer': 'unknown',
       };
     }
+  }
+
+  Future<String?> _resolveDeviceIdentifier() async {
+    try {
+      if (kIsWeb) {
+        return null;
+      }
+
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        final info = await _deviceInfoPlugin.androidInfo;
+        return resolveDeviceIdentifier({
+          'imei_number': info.id,
+          'android_id': info.id,
+          'installation_id': await _getOrCreateInstallationId(),
+        });
+      }
+
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        final info = await _deviceInfoPlugin.iosInfo;
+        return resolveDeviceIdentifier({
+          'device_identifier': info.identifierForVendor,
+          'installation_id': await _getOrCreateInstallationId(),
+        });
+      }
+    } catch (e, st) {
+      AppLogger.warning('Unable to resolve device identifier', e, st);
+    }
+
+    return null;
+  }
+
+  @visibleForTesting
+  static String? resolveDeviceIdentifier(Map<String, dynamic> values) {
+    for (final key in [
+      'imei_number',
+      'imei',
+      'android_id',
+      'device_identifier',
+    ]) {
+      final value = values[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+
+    for (final key in ['installation_id', 'installationId']) {
+      final value = values[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+
+    return null;
   }
 
   Future<String> _getOrCreateInstallationId() async {

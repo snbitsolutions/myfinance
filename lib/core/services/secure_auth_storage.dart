@@ -84,20 +84,47 @@ class SecureAuthStorage {
 
   Future<void> storePin(String pin) async {
     await initialize();
-    await _storage.write(
-      key: AppConstants.secureStorageKeyUserPin,
-      value: pin,
-    );
+    try {
+      await _storage.write(
+        key: AppConstants.secureStorageKeyUserPin,
+        value: pin,
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(AppConstants.sharedPrefKeyUserPin);
+    } catch (_) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.sharedPrefKeyUserPin, pin);
+    }
   }
 
   Future<String?> readPin() async {
     await initialize();
-    return _storage.read(key: AppConstants.secureStorageKeyUserPin);
+    try {
+      final securePin = await _storage.read(
+        key: AppConstants.secureStorageKeyUserPin,
+      );
+      if (securePin != null && securePin.isNotEmpty) {
+        return securePin;
+      }
+    } catch (_) {}
+
+    final prefs = await SharedPreferences.getInstance();
+    final fallbackPin = prefs.getString(AppConstants.sharedPrefKeyUserPin);
+    if (fallbackPin != null && fallbackPin.isNotEmpty) {
+      return fallbackPin;
+    }
+
+    return null;
   }
 
   Future<void> clearPin() async {
     await initialize();
-    await _storage.delete(key: AppConstants.secureStorageKeyUserPin);
+    try {
+      await _storage.delete(key: AppConstants.secureStorageKeyUserPin);
+    } catch (_) {}
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(AppConstants.sharedPrefKeyUserPin);
   }
 
   Future<bool> hasSessionBoundToFingerprint(String currentFingerprint) async {
@@ -123,7 +150,12 @@ class SecureAuthStorage {
     await _storage.delete(
       key: AppConstants.secureStorageKeySessionDeviceFingerprint,
     );
-    await _storage.delete(key: AppConstants.secureStorageKeyUserPin);
+    try {
+      await _storage.delete(key: AppConstants.secureStorageKeyUserPin);
+    } catch (_) {}
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(AppConstants.sharedPrefKeyUserPin);
   }
 
   Future<void> _migrateLegacyTokens() async {

@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/app_constants.dart';
 import '../exceptions/app_exceptions.dart';
+import '../models/auth_session.dart';
 import '../models/auth_state.dart';
 import '../repositories/notification_repository.dart';
 import '../services/api_service.dart';
@@ -12,6 +14,7 @@ import '../services/network_service.dart';
 import '../services/notification_service.dart';
 import '../services/secure_auth_storage.dart';
 import '../utils/logger.dart';
+import '../../router/app_router.dart';
 
 // Core infrastructure providers
 final httpClientProvider = Provider<HttpClient>((ref) {
@@ -53,6 +56,10 @@ final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
   return NotificationService.instance;
 });
 
+final paymentServiceProvider = Provider<PaymentService>((ref) {
+  return PaymentService();
+});
+
 final deviceIdentityServiceProvider = Provider<DeviceIdentityService>((ref) {
   return DeviceIdentityService();
 });
@@ -92,6 +99,43 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _restoreStoredAuth() async {
     final prefs = await _getPrefs();
+    final debugBypassAuth = AppRouter.isDebugAuthBypassEnabled(
+      savedPreferenceValue: prefs.getBool(
+        AppConstants.sharedPrefKeyDebugBypassAuth,
+      ),
+    );
+
+    if (debugBypassAuth) {
+      final savedUserId =
+          prefs.getString(AppConstants.sharedPrefKeyUserId)?.trim() ??
+          AppConstants.debugApiAccountNumber.trim();
+      final savedUserEmail =
+          prefs.getString(AppConstants.sharedPrefKeyUserEmail)?.trim() ??
+          AppConstants.debugApiPhoneNumber.trim();
+
+      if (savedUserId.isEmpty || savedUserEmail.isEmpty) {
+        if (!mounted) {
+          return;
+        }
+        state = AuthState.unauthenticated();
+        AppLogger.info(
+          'Debug bypass enabled, but no test account identity found.',
+        );
+        return;
+      }
+
+      if (!mounted) {
+        return;
+      }
+      state = AuthState.authenticated(
+        userId: savedUserId,
+        userEmail: savedUserEmail,
+        authToken: 'debug-token',
+      );
+      AppLogger.info('Loaded debug authentication bypass');
+      return;
+    }
+
     final token = await SecureAuthStorage.instance.readAuthToken();
     final userId = prefs.getString(AppConstants.sharedPrefKeyUserId);
     final email = prefs.getString(AppConstants.sharedPrefKeyUserEmail);
@@ -141,10 +185,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
         deviceContext: deviceContext,
       );
 
-      final data = response['data'] as Map<String, dynamic>;
-      final token = data['auth_token'] as String;
-      final refreshToken = data['refresh_token'] as String?;
-      final userId = data['user_id'] as String;
+      final session = AuthSession.fromResponse(response);
+      if (session == null) {
+        throw AuthException(
+          message:
+              'Sign-in succeeded, but no session token was returned by the server.',
+        );
+      }
+
+      final data = response['data'] is Map
+          ? Map<String, dynamic>.from(response['data'] as Map)
+          : <String, dynamic>{};
+      final token = session.accessToken;
+      final refreshToken = session.refreshToken;
+      final userId =
+          (data['user_id'] as String?) ??
+          (data['account_number'] as String?) ??
+          'unknown-user';
       final prefs = await _getPrefs();
       final currentFingerprint = await deviceIdentityService
           .getInstallationFingerprint();
@@ -211,22 +268,34 @@ class AuthNotifier extends StateNotifier<AuthState> {
         accountNumber: accountNumber,
         pin: pin,
       );
-      final status = (response['status'] as num?)?.toInt() ?? 0;
+      final status = response['status'];
       final message = response['message'] as String?;
+      final isSuccess =
+          AuthSession.isSuccessStatus(status) ||
+          AuthSession.isSuccessStatus(response['success']) ||
+          AuthSession.isSuccessStatus(response['is_success']);
 
-      if (status != 1) {
+      if (!isSuccess) {
         throw AuthException(
           message: message ?? AppConstants.invalidCredentialsMessage,
+        );
+      }
+
+      final session = AuthSession.fromResponse(response);
+      if (session == null) {
+        throw AuthException(
+          message:
+              'Sign-in succeeded, but the server did not issue a session token. Please contact support.',
         );
       }
 
       final prefs = await _getPrefs();
       final currentFingerprint = await deviceIdentityService
           .getInstallationFingerprint();
-      final sessionToken = 'stccu-session:$accountNumber';
 
       await SecureAuthStorage.instance.storeSession(
-        authToken: sessionToken,
+        authToken: session.accessToken,
+        refreshToken: session.refreshToken,
         deviceFingerprint: currentFingerprint,
       );
       await SecureAuthStorage.instance.storePin(pin);
@@ -236,7 +305,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthState.authenticated(
         userId: accountNumber,
         userEmail: phoneNumber,
-        authToken: sessionToken,
+        authToken: session.accessToken,
       );
 
       AppLogger.info('User signed in successfully: $accountNumber');
@@ -318,32 +387,43 @@ class AuthNotifier extends StateNotifier<AuthState> {
         accountNumber: accountNumber,
         pin: otp,
       );
-      final status = (response['status'] as num?)?.toInt() ?? 0;
+      final status = response['status'];
       final message = response['message'] as String?;
+      final isSuccess =
+          AuthSession.isSuccessStatus(status) ||
+          AuthSession.isSuccessStatus(response['success']) ||
+          AuthSession.isSuccessStatus(response['is_success']);
 
-      if (status != 1) {
+      if (!isSuccess) {
         throw AuthException(
           message: message ?? 'Invalid OTP. Please try again.',
         );
       }
 
+      final session = AuthSession.fromResponse(response);
+      if (session == null) {
+        throw AuthException(
+          message:
+              'Verification succeeded, but the server did not issue a session token. Please contact support.',
+        );
+      }
+
       final prefs = await _getPrefs();
-      final currentFingerprint =
-          await deviceIdentityService.getInstallationFingerprint();
-      final sessionToken = 'stccu-session:$accountNumber';
+      final currentFingerprint = await deviceIdentityService
+          .getInstallationFingerprint();
 
       await SecureAuthStorage.instance.storeSession(
-        authToken: sessionToken,
+        authToken: session.accessToken,
+        refreshToken: session.refreshToken,
         deviceFingerprint: currentFingerprint,
       );
-      await SecureAuthStorage.instance.storePin(otp);
       await prefs.setString(AppConstants.sharedPrefKeyUserId, accountNumber);
       await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
 
       state = AuthState.authenticated(
         userId: accountNumber,
         userEmail: phoneNumber,
-        authToken: sessionToken,
+        authToken: session.accessToken,
       );
 
       AppLogger.info('User logged in via OTP: $accountNumber');
@@ -359,16 +439,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<String> submitRegistration({
     required String accountNumber,
     required String pin,
+    String? phoneNumber,
   }) async {
     try {
       final response = await authService.register(
         accountNumber: accountNumber,
+        phoneNumber: phoneNumber,
         pin: pin,
       );
 
       final status = response['status'];
       final message = response['message'] as String? ?? '';
-      final isSuccess = status == 1 ||
+      final isSuccess =
+          status == 1 ||
           status == '1' ||
           (status is String && status.toLowerCase() == 'success');
 
@@ -435,25 +518,52 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   );
 });
 
+Map<String, dynamic> _buildFallbackProfile() {
+  return {
+    'user_id': 'demo-user',
+    'name': 'Demo User',
+    'account_number': '1000000001',
+    'balance': 5240.75,
+    'branch': 'Demo Branch',
+    'phone': '233200000000',
+    'status': 'Active',
+  };
+}
+
+bool _shouldUseLocalDemoData(AuthState auth) {
+  // Temporary local/dev fallback for testing. Flip this off once the real
+  // authentication/API flow is ready to be restored.
+  const useLocalDemoData = bool.fromEnvironment(
+    'USE_LOCAL_DEMO_DATA',
+    defaultValue: false,
+  );
+  return useLocalDemoData;
+}
+
 // User profile provider
 final userProfileProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final auth = ref.watch(authProvider);
   final userService = ref.watch(userServiceProvider);
 
-  if (!auth.isAuthenticated || auth.userId == null) {
-    throw AuthException(message: 'User not authenticated');
+  if (_shouldUseLocalDemoData(auth)) {
+    return _buildFallbackProfile();
   }
 
-  final pin = await SecureAuthStorage.instance.readPin() ?? '';
   final phone = auth.userEmail ?? '';
   final account = auth.userId!;
+  final pin = await SecureAuthStorage.instance.readPin() ?? '';
 
   final response = await userService.getUserProfile(
     phoneNumber: phone,
     accountNumber: account,
     pin: pin,
   );
-  return response['data'] as Map<String, dynamic>;
+  final data = response['data'];
+  if (data is Map) {
+    return Map<String, dynamic>.from(data);
+  }
+
+  throw ServerException(message: 'Profile endpoint returned an empty payload.');
 });
 
 // Loans list provider
@@ -461,8 +571,15 @@ final loansProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final auth = ref.watch(authProvider);
   final loanService = ref.watch(loanServiceProvider);
 
-  if (!auth.isAuthenticated || auth.userId == null) {
-    throw AuthException(message: 'User not authenticated');
+  if (_shouldUseLocalDemoData(auth)) {
+    return [
+      {
+        'loan_id': 'demo-loan-1',
+        'amount': 1500.0,
+        'status': 'Approved',
+        'purpose': 'Emergency fund',
+      },
+    ];
   }
 
   final pin = await SecureAuthStorage.instance.readPin() ?? '';
@@ -474,7 +591,12 @@ final loansProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
     accountNumber: account,
     pin: pin,
   );
-  return List<Map<String, dynamic>>.from(response['data'] as List);
+  final data = response['data'];
+  if (data is List) {
+    return data.whereType<Map<String, dynamic>>().toList();
+  }
+
+  return [];
 });
 
 // Savings list provider
@@ -482,8 +604,15 @@ final savingsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final auth = ref.watch(authProvider);
   final savingsService = ref.watch(savingsServiceProvider);
 
-  if (!auth.isAuthenticated || auth.userId == null) {
-    throw AuthException(message: 'User not authenticated');
+  if (_shouldUseLocalDemoData(auth)) {
+    return [
+      {
+        'savings_id': 'demo-savings-1',
+        'name': 'Emergency Fund',
+        'target_amount': 5000.0,
+        'current_amount': 2350.0,
+      },
+    ];
   }
 
   final pin = await SecureAuthStorage.instance.readPin() ?? '';
@@ -495,16 +624,49 @@ final savingsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
     accountNumber: account,
     pin: pin,
   );
-  return List<Map<String, dynamic>>.from(response['data'] as List);
+  final data = response['data'];
+  if (data is List) {
+    return data.whereType<Map<String, dynamic>>().toList();
+  }
+
+  return [];
 });
 
+List<Map<String, dynamic>> _buildFallbackTransactions() {
+  return [
+    {
+      'transaction_id': 'demo-1',
+      'type': 'credit',
+      'amount': 1250.0,
+      'description': 'Salary deposit',
+      'date': '2026-08-09',
+    },
+    {
+      'transaction_id': 'demo-2',
+      'type': 'debit',
+      'amount': 320.5,
+      'description': 'Groceries',
+      'date': '2026-08-08',
+    },
+    {
+      'transaction_id': 'demo-3',
+      'type': 'repayment',
+      'amount': 150.0,
+      'description': 'Loan repayment',
+      'date': '2026-08-07',
+    },
+  ];
+}
+
 // Transactions provider
-final transactionsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final transactionsProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
   final auth = ref.watch(authProvider);
   final transactionService = ref.watch(transactionServiceProvider);
 
-  if (!auth.isAuthenticated || auth.userId == null) {
-    throw AuthException(message: 'User not authenticated');
+  if (_shouldUseLocalDemoData(auth)) {
+    return _buildFallbackTransactions();
   }
 
   final pin = await SecureAuthStorage.instance.readPin() ?? '';
@@ -516,5 +678,158 @@ final transactionsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) as
     accountNumber: account,
     pin: pin,
   );
-  return List<Map<String, dynamic>>.from(response['data'] as List);
+  final data = response['data'];
+  if (data is List) {
+    final normalized = data.whereType<Map<String, dynamic>>().toList();
+    return normalized;
+  }
+
+  return [];
+});
+
+Future<Map<String, String>> _runBackendProbe({
+  required Future<void> Function() action,
+}) async {
+  try {
+    await action();
+    return {'status': 'ok', 'message': 'OK'};
+  } on AppException catch (e) {
+    return {'status': 'error', 'message': e.message};
+  } catch (e) {
+    return {'status': 'error', 'message': e.toString()};
+  }
+}
+
+final backendDiagnosticsProvider =
+    FutureProvider<Map<String, Map<String, String>>>((ref) async {
+      final auth = ref.watch(authProvider);
+      if (!kDebugMode) {
+        return {
+          'profile': {'status': 'info', 'message': 'Diagnostics disabled'},
+          'loans': {'status': 'info', 'message': 'Diagnostics disabled'},
+          'savings': {'status': 'info', 'message': 'Diagnostics disabled'},
+          'transactions': {'status': 'info', 'message': 'Diagnostics disabled'},
+        };
+      }
+
+      if (!auth.isAuthenticated ||
+          auth.userId == null ||
+          auth.userEmail == null) {
+        return {
+          'profile': {'status': 'error', 'message': 'Not authenticated'},
+          'loans': {'status': 'error', 'message': 'Not authenticated'},
+          'savings': {'status': 'error', 'message': 'Not authenticated'},
+          'transactions': {'status': 'error', 'message': 'Not authenticated'},
+        };
+      }
+
+      final phone = auth.userEmail!;
+      final account = auth.userId!;
+      final pin = await SecureAuthStorage.instance.readPin() ?? '';
+
+      final userService = ref.watch(userServiceProvider);
+      final loanService = ref.watch(loanServiceProvider);
+      final savingsService = ref.watch(savingsServiceProvider);
+      final transactionService = ref.watch(transactionServiceProvider);
+
+      final profileResult = await _runBackendProbe(
+        action: () async {
+          await userService.getUserProfile(
+            phoneNumber: phone,
+            accountNumber: account,
+            pin: pin,
+          );
+        },
+      );
+
+      final loansResult = await _runBackendProbe(
+        action: () async {
+          await loanService.getLoansList(
+            phoneNumber: phone,
+            accountNumber: account,
+            pin: pin,
+          );
+        },
+      );
+
+      final savingsResult = await _runBackendProbe(
+        action: () async {
+          await savingsService.getSavingsList(
+            phoneNumber: phone,
+            accountNumber: account,
+            pin: pin,
+          );
+        },
+      );
+
+      final transactionsResult = await _runBackendProbe(
+        action: () async {
+          await transactionService.getTransactions(
+            phoneNumber: phone,
+            accountNumber: account,
+            pin: pin,
+          );
+        },
+      );
+
+      return {
+        'profile': profileResult,
+        'loans': loansResult,
+        'savings': savingsResult,
+        'transactions': transactionsResult,
+      };
+    });
+
+final debugRegistrationProbeProvider = FutureProvider<Map<String, String>>((
+  ref,
+) async {
+  final auth = ref.watch(authProvider);
+
+  if (!kDebugMode) {
+    return {
+      'status': 'info',
+      'message': 'Registration probe is available in debug builds only.',
+    };
+  }
+
+  if (!auth.isAuthenticated || auth.userId == null || auth.userEmail == null) {
+    return {'status': 'error', 'message': 'Not authenticated'};
+  }
+
+  final pin = await SecureAuthStorage.instance.readPin() ?? '';
+  if (pin.isEmpty) {
+    return {
+      'status': 'error',
+      'message': 'No PIN saved. Set PIN first to run registration probe.',
+    };
+  }
+
+  try {
+    final authService = ref.watch(authServiceProvider);
+    final response = await authService.register(
+      accountNumber: auth.userId!,
+      phoneNumber: auth.userEmail!,
+      pin: pin,
+    );
+
+    final status = response['status'];
+    final message = (response['message'] as String?)?.trim();
+    final ok =
+        status == 1 ||
+        status == '1' ||
+        (status is String && status.toLowerCase() == 'success');
+
+    return {
+      'status': ok ? 'ok' : 'error',
+      'message': message?.isNotEmpty == true
+          ? message!
+          : (ok
+                ? 'Registration endpoint responded successfully.'
+                : 'Registration endpoint returned an unexpected response.'),
+    };
+  } on AppException catch (e) {
+    return {'status': 'error', 'message': e.message};
+  } catch (e) {
+    return {'status': 'error', 'message': e.toString()};
+  }
 });

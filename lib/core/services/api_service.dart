@@ -1,10 +1,40 @@
+import 'package:dio/dio.dart';
+
 import '../constants/app_constants.dart';
 import '../exceptions/app_exceptions.dart';
+import '../models/auth_session.dart';
 import 'http_client.dart';
 import '../utils/logger.dart';
 
 /// Abstract service for all API calls with error handling
 abstract class BaseService {
+  static final Options stccuFormOptions = Options(
+    contentType: Headers.formUrlEncodedContentType,
+  );
+
+  Map<String, dynamic> normalizeResponsePayload(dynamic raw) {
+    if (raw is! Map) {
+      return <String, dynamic>{};
+    }
+
+    final response = Map<String, dynamic>.from(raw);
+    final payload = AuthSession.extractPayload(response);
+    return <String, dynamic>{
+      ...payload,
+      if (response.containsKey('status')) 'status': response['status'],
+      if (response.containsKey('message')) 'message': response['message'],
+    };
+  }
+
+  bool isBackendEmptyPayload(dynamic raw) {
+    if (raw == null) return true;
+    if (raw is String) {
+      final trimmed = raw.trim();
+      return trimmed.isEmpty || trimmed == '""' || trimmed == 'null';
+    }
+    return false;
+  }
+
   Future<T> handleApiCall<T>(Future<T> Function() apiCall) async {
     try {
       AppLogger.debug('Executing API call');
@@ -28,7 +58,6 @@ abstract class BaseService {
       );
     }
   }
-
 }
 
 /// User authentication service
@@ -37,20 +66,38 @@ class AuthService extends BaseService {
 
   Future<void> confirmPhoneNumber({required String phoneNumber}) async {
     return handleApiCall(() async {
-      AppLogger.logApiRequest('POST', ApiEndpoints.confirmPhoneNumber, {
+      final request = {
         'phone_number': phoneNumber,
-      });
+        's_key': AppConstants.defaultMobileApiSKey,
+      };
+
+      AppLogger.logApiRequest('POST', ApiEndpoints.confirmPhoneNumber, request);
 
       final response = await _httpClient.post<dynamic>(
         ApiEndpoints.confirmPhoneNumber,
-        data: {'phone_number': phoneNumber},
+        data: request,
+        options: BaseService.stccuFormOptions,
       );
 
-      AppLogger.logApiResponse(
-        'POST',
-        ApiEndpoints.confirmPhoneNumber,
-        response.data,
-      );
+      final raw = response.data;
+      final data = normalizeResponsePayload(raw);
+
+      AppLogger.logApiResponse('POST', ApiEndpoints.confirmPhoneNumber, data);
+
+      if (data.isNotEmpty) {
+        final status = data['status'];
+        final isExplicitFailure =
+            status != null &&
+            status != 1 &&
+            status != '1' &&
+            !(status is String && status.toLowerCase() == 'success');
+
+        if (isExplicitFailure) {
+          throw AuthException(
+            message: data['message'] as String? ?? 'Phone verification failed.',
+          );
+        }
+      }
     });
   }
 
@@ -62,6 +109,7 @@ class AuthService extends BaseService {
       final request = {
         'phone_number': phoneNumber,
         'account_number': accountNumber,
+        's_key': AppConstants.defaultMobileApiSKey,
       };
 
       AppLogger.logApiRequest(
@@ -73,20 +121,18 @@ class AuthService extends BaseService {
       final response = await _httpClient.post<dynamic>(
         ApiEndpoints.confirmAccountNumber,
         data: request,
+        options: BaseService.stccuFormOptions,
       );
 
       final raw = response.data;
-      final data = raw is Map<String, dynamic>
-          ? raw
-          : <String, dynamic>{};
+      final data = normalizeResponsePayload(raw);
 
       AppLogger.logApiResponse('POST', ApiEndpoints.confirmAccountNumber, data);
 
-      // Empty body on HTTP 200 means the backend accepted the request (OTP triggered).
-      // Only reject on an explicit failure status in the response body.
       if (data.isNotEmpty) {
         final status = data['status'];
-        final isExplicitFailure = status != null &&
+        final isExplicitFailure =
+            status != null &&
             status != 1 &&
             status != '1' &&
             !(status is String && status.toLowerCase() == 'success');
@@ -107,10 +153,11 @@ class AuthService extends BaseService {
     required String pin,
   }) async {
     return handleApiCall(() async {
-      final request = {
-        'phone_number': phoneNumber,
-        'account_number': accountNumber,
-        'pin': pin,
+      final request = <String, dynamic>{
+        if (phoneNumber.trim().isNotEmpty) 'phone_number': phoneNumber,
+        'pin': int.tryParse(pin) ?? pin,
+        'account_number': int.tryParse(accountNumber) ?? accountNumber,
+        's_key': AppConstants.defaultMobileApiSKey,
       };
 
       AppLogger.logApiRequest('POST', ApiEndpoints.confirmPin, request);
@@ -118,12 +165,11 @@ class AuthService extends BaseService {
       final response = await _httpClient.post<dynamic>(
         ApiEndpoints.confirmPin,
         data: request,
+        options: BaseService.stccuFormOptions,
       );
 
       final data = response.data;
-      final result = data is Map<String, dynamic>
-          ? data
-          : <String, dynamic>{};
+      final result = normalizeResponsePayload(data);
 
       AppLogger.logApiResponse('POST', ApiEndpoints.confirmPin, result);
       return result;
@@ -138,22 +184,21 @@ class AuthService extends BaseService {
   }) async {
     return handleApiCall(() async {
       final request = <String, dynamic>{
-        if (phoneNumber != null && phoneNumber.isNotEmpty)
-          'phone_number': phoneNumber,
-        'account_number': accountNumber,
-        'pin': pin,
+        'acc_number': int.tryParse(accountNumber) ?? accountNumber,
+        'phone_number': int.tryParse(phoneNumber ?? '') ?? phoneNumber ?? '',
+        'pin': int.tryParse(pin) ?? pin,
+        's_key': AppConstants.defaultMobileApiSKey,
       };
       AppLogger.logApiRequest('POST', ApiEndpoints.register, request);
 
       final response = await _httpClient.post<dynamic>(
         ApiEndpoints.register,
         data: request,
+        options: BaseService.stccuFormOptions,
       );
 
       final raw = response.data;
-      final data = raw is Map<String, dynamic>
-          ? raw
-          : <String, dynamic>{};
+      final data = normalizeResponsePayload(raw);
 
       AppLogger.logApiResponse('POST', ApiEndpoints.register, data);
       return data;
@@ -162,7 +207,6 @@ class AuthService extends BaseService {
 
   /// Login with email and password
   Future<Map<String, dynamic>> login({
-
     required String email,
     required String password,
     Map<String, dynamic>? deviceContext,
@@ -170,7 +214,7 @@ class AuthService extends BaseService {
     return handleApiCall(() async {
       AppLogger.logApiRequest('POST', ApiEndpoints.login, {
         'email': email,
-        'device_context': ?deviceContext,
+        'device_context': deviceContext,
       });
       throw ValidationException(
         message:
@@ -187,7 +231,7 @@ class AuthService extends BaseService {
     return handleApiCall(() async {
       AppLogger.logApiRequest('POST', ApiEndpoints.sendOtp, {
         'email': email,
-        'device_context': ?deviceContext,
+        'device_context': deviceContext,
       });
       throw ValidationException(
         message:
@@ -205,7 +249,7 @@ class AuthService extends BaseService {
     return handleApiCall(() async {
       AppLogger.logApiRequest('POST', ApiEndpoints.verifyOtp, {
         'otp_id': otpId,
-        'device_context': ?deviceContext,
+        'device_context': deviceContext,
       });
       throw ValidationException(
         message:
@@ -228,35 +272,25 @@ class AuthService extends BaseService {
       }
 
       final request = {
-        'account_number': userId,
-        'pin': pin,
-        'device_context': ?deviceContext,
+        'pin': int.tryParse(pin) ?? pin,
+        'imei_number': 100200300,
+        'account_number': int.tryParse(userId) ?? userId,
+        's_key': AppConstants.defaultMobileApiSKey,
       };
-      AppLogger.logApiRequest('POST', ApiEndpoints.changePin, request);
+      AppLogger.logApiRequest('POST', ApiEndpoints.setPin, request);
 
       final response = await _httpClient.post<dynamic>(
-        ApiEndpoints.changePin,
+        ApiEndpoints.setPin,
         data: request,
+        options: BaseService.stccuFormOptions,
       );
 
       final raw = response.data;
-      final data = raw is Map<String, dynamic>
-          ? raw
-          : <String, dynamic>{};
+      final data = normalizeResponsePayload(raw);
 
-      AppLogger.logApiResponse('POST', ApiEndpoints.changePin, data);
+      AppLogger.logApiResponse('POST', ApiEndpoints.setPin, data);
 
-      final status = (data['status'] as num?)?.toInt() ?? 0;
-      if (status != 1) {
-        throw ValidationException(
-          message: data['message'] as String? ?? 'Unable to change PIN.',
-        );
-      }
-
-      return {
-        'status': 'success',
-        'message': data['message'] as String? ?? 'PIN updated successfully',
-      };
+      return data;
     });
   }
 
@@ -299,25 +333,31 @@ class UserService extends BaseService {
       final response = await _httpClient.post<dynamic>(
         ApiEndpoints.getAccountBalance,
         data: request,
+        options: BaseService.stccuFormOptions,
       );
 
       final raw = response.data;
-      final data = raw is Map<String, dynamic>
-          ? raw
-          : <String, dynamic>{};
+      if (raw is String && (raw.trim().isEmpty || raw.trim() == '""')) {
+        throw AuthException(
+          message:
+              'No account data returned. Please confirm your account number and PIN.',
+        );
+      }
+      final data = normalizeResponsePayload(raw);
 
       AppLogger.logApiResponse('POST', ApiEndpoints.getAccountBalance, data);
 
-      final status = (data['status'] as num?)?.toInt() ?? 0;
-      if (status != 1) {
+      final status = data['status'];
+      if (!AuthSession.isSuccessStatus(status)) {
         throw AuthException(
-          message: data['message'] as String? ??
-              'Failed to load account details',
+          message:
+              data['message'] as String? ?? 'Failed to load account details',
         );
       }
 
       // Normalise multiple possible field name patterns from STCCU API
-      final name = data['account_name'] as String? ??
+      final name =
+          data['account_name'] as String? ??
           data['name'] as String? ??
           data['full_name'] as String? ??
           'Account Holder';
@@ -327,9 +367,8 @@ class UserService extends BaseService {
             data['account_balance'] ??
             0,
       );
-      final branch = data['branch'] as String? ??
-          data['branch_name'] as String? ??
-          '';
+      final branch =
+          data['branch'] as String? ?? data['branch_name'] as String? ?? '';
 
       return {
         'data': {
@@ -407,50 +446,57 @@ class LoanService extends BaseService {
       final response = await _httpClient.post<dynamic>(
         ApiEndpoints.getLoans,
         data: request,
+        options: BaseService.stccuFormOptions,
       );
 
       final raw = response.data;
-      final data = raw is Map<String, dynamic>
-          ? raw
-          : <String, dynamic>{};
+      if (isBackendEmptyPayload(raw)) {
+        throw GenericException(
+          message:
+              'No loan data returned from server. Please verify your credentials and try again.',
+        );
+      }
+      final data = normalizeResponsePayload(raw);
 
       AppLogger.logApiResponse('POST', ApiEndpoints.getLoans, data);
 
-      final status = (data['status'] as num?)?.toInt() ?? 0;
-      if (status != 1) {
-        return {
-          'status': 'success',
-          'data': [],
-        };
+      final status = data['status'];
+      if (!AuthSession.isSuccessStatus(status)) {
+        return {'status': 'success', 'data': []};
       }
 
       // Normalise STCCU loans response
       final loansRaw = data['loans'] as List? ?? [];
       final normalizedLoans = loansRaw
           .whereType<Map<String, dynamic>>()
-          .map((loan) => {
-            'loan_id': loan['id'] as String? ?? loan['loan_id'] as String? ?? '',
-            'amount': _toDouble(loan['original_amount'] ?? loan['amount'] ?? 0),
-            'outstanding':
-                _toDouble(loan['outstanding_balance'] ?? loan['balance'] ?? 0),
-            'status': (loan['status'] as String? ?? 'active').toLowerCase(),
-            'interest_rate': _toDouble(loan['interest_rate'] ?? 0),
-            'due_date': loan['due_date'] as String? ?? '',
-            'created_at': loan['created_date'] as String? ?? '',
-          })
+          .map(
+            (loan) => {
+              'loan_id':
+                  loan['id'] as String? ?? loan['loan_id'] as String? ?? '',
+              'amount': _toDouble(
+                loan['original_amount'] ?? loan['amount'] ?? 0,
+              ),
+              'outstanding': _toDouble(
+                loan['outstanding_balance'] ?? loan['balance'] ?? 0,
+              ),
+              'status': (loan['status'] as String? ?? 'active').toLowerCase(),
+              'interest_rate': _toDouble(loan['interest_rate'] ?? 0),
+              'due_date': loan['due_date'] as String? ?? '',
+              'created_at': loan['created_date'] as String? ?? '',
+            },
+          )
           .toList();
 
-      return {
-        'status': 'success',
-        'data': normalizedLoans,
-      };
+      return {'status': 'success', 'data': normalizedLoans};
     });
   }
 
   /// Get loan detail
   Future<Map<String, dynamic>> getLoanDetail({required String loanId}) async {
     return handleApiCall(() async {
-      AppLogger.logApiRequest('GET', ApiEndpoints.getLoanDetail, {'loan_id': loanId});
+      AppLogger.logApiRequest('GET', ApiEndpoints.getLoanDetail, {
+        'loan_id': loanId,
+      });
       throw ValidationException(
         message:
             'Loan detail endpoint is not available in STCCU API. Use getLoans list response.',
@@ -518,17 +564,16 @@ class LoanService extends BaseService {
       final response = await _httpClient.post<dynamic>(
         ApiEndpoints.repayLoanStccu,
         data: request,
+        options: BaseService.stccuFormOptions,
       );
 
       final raw = response.data;
-      final data = raw is Map<String, dynamic>
-          ? raw
-          : <String, dynamic>{};
+      final data = normalizeResponsePayload(raw);
 
       AppLogger.logApiResponse('POST', ApiEndpoints.repayLoanStccu, data);
 
-      final status = (data['status'] as num?)?.toInt() ?? 0;
-      if (status != 1) {
+      final status = data['status'];
+      if (!AuthSession.isSuccessStatus(status)) {
         throw GenericException(
           message: data['message'] as String? ?? 'Loan repayment failed.',
         );
@@ -545,7 +590,8 @@ class LoanService extends BaseService {
         'message': data['message'] as String? ?? 'Loan repayment successful',
         'data': {
           'loan_id': loanId,
-          'transaction_id': data['transaction_id'] as String? ??
+          'transaction_id':
+              data['transaction_id'] as String? ??
               'TXN_${now.millisecondsSinceEpoch}',
           'amount': amount,
           'previous_outstanding': currentOutstanding,
@@ -590,12 +636,17 @@ class SavingsService extends BaseService {
       final response = await _httpClient.post<dynamic>(
         ApiEndpoints.getSavingsProductsList,
         data: request,
+        options: BaseService.stccuFormOptions,
       );
 
       final raw = response.data;
-      final data = raw is Map<String, dynamic>
-          ? raw
-          : <String, dynamic>{};
+      if (isBackendEmptyPayload(raw)) {
+        throw GenericException(
+          message:
+              'No savings data returned from server. Please verify your credentials and try again.',
+        );
+      }
+      final data = normalizeResponsePayload(raw);
 
       AppLogger.logApiResponse(
         'POST',
@@ -603,42 +654,45 @@ class SavingsService extends BaseService {
         data,
       );
 
-      final status = (data['status'] as num?)?.toInt() ?? 0;
-      if (status != 1) {
+      final status = data['status'];
+      if (!AuthSession.isSuccessStatus(status)) {
         return {'status': 'success', 'data': []};
       }
 
-      final savingsRaw = data['savings'] as List? ??
+      final savingsRaw =
+          data['savings'] as List? ??
           data['data'] as List? ??
           data['products'] as List? ??
           [];
 
       final normalizedSavings = savingsRaw
           .whereType<Map<String, dynamic>>()
-          .map((s) => {
-                'savings_id': s['id'] as String? ??
-                    s['savings_id'] as String? ??
-                    s['product_id'] as String? ??
-                    '',
-                'name': s['name'] as String? ??
-                    s['product_name'] as String? ??
-                    s['account_name'] as String? ??
-                    'Savings',
-                'balance': _toDouble(
-                  s['balance'] ?? s['current_balance'] ?? s['amount'] ?? 0,
-                ),
-                'target': _toDouble(
-                  s['target'] ??
-                      s['target_amount'] ??
-                      s['goal_amount'] ??
-                      0,
-                ),
-                'interest_rate': _toDouble(s['interest_rate'] ?? s['rate'] ?? 0),
-                'type': s['type'] as String? ??
-                    s['product_type'] as String? ??
-                    s['savings_type'] as String? ??
-                    'member',
-              })
+          .map(
+            (s) => {
+              'savings_id':
+                  s['id'] as String? ??
+                  s['savings_id'] as String? ??
+                  s['product_id'] as String? ??
+                  '',
+              'name':
+                  s['name'] as String? ??
+                  s['product_name'] as String? ??
+                  s['account_name'] as String? ??
+                  'Savings',
+              'balance': _toDouble(
+                s['balance'] ?? s['current_balance'] ?? s['amount'] ?? 0,
+              ),
+              'target': _toDouble(
+                s['target'] ?? s['target_amount'] ?? s['goal_amount'] ?? 0,
+              ),
+              'interest_rate': _toDouble(s['interest_rate'] ?? s['rate'] ?? 0),
+              'type':
+                  s['type'] as String? ??
+                  s['product_type'] as String? ??
+                  s['savings_type'] as String? ??
+                  'member',
+            },
+          )
           .toList();
 
       return {'status': 'success', 'data': normalizedSavings};
@@ -695,17 +749,16 @@ class SavingsService extends BaseService {
       final response = await _httpClient.post<dynamic>(
         ApiEndpoints.depositFunds,
         data: request,
+        options: BaseService.stccuFormOptions,
       );
 
       final raw = response.data;
-      final data = raw is Map<String, dynamic>
-          ? raw
-          : <String, dynamic>{};
+      final data = normalizeResponsePayload(raw);
 
       AppLogger.logApiResponse('POST', ApiEndpoints.depositFunds, data);
 
-      final status = (data['status'] as num?)?.toInt() ?? 0;
-      if (status != 1) {
+      final status = data['status'];
+      if (!AuthSession.isSuccessStatus(status)) {
         throw GenericException(
           message: data['message'] as String? ?? 'Deposit failed.',
         );
@@ -714,7 +767,8 @@ class SavingsService extends BaseService {
       return {
         'status': 'success',
         'message': data['message'] as String? ?? 'Deposit successful',
-        'transaction_id': data['transaction_id'] as String? ??
+        'transaction_id':
+            data['transaction_id'] as String? ??
             'TXN_${DateTime.now().millisecondsSinceEpoch}',
         'new_balance': _toDouble(data['new_balance'] ?? data['balance'] ?? 0),
       };
@@ -747,17 +801,16 @@ class SavingsService extends BaseService {
       final response = await _httpClient.post<dynamic>(
         ApiEndpoints.withdrawFunds,
         data: request,
+        options: BaseService.stccuFormOptions,
       );
 
       final raw = response.data;
-      final data = raw is Map<String, dynamic>
-          ? raw
-          : <String, dynamic>{};
+      final data = normalizeResponsePayload(raw);
 
       AppLogger.logApiResponse('POST', ApiEndpoints.withdrawFunds, data);
 
-      final status = (data['status'] as num?)?.toInt() ?? 0;
-      if (status != 1) {
+      final status = data['status'];
+      if (!AuthSession.isSuccessStatus(status)) {
         throw GenericException(
           message: data['message'] as String? ?? 'Withdrawal failed.',
         );
@@ -766,9 +819,67 @@ class SavingsService extends BaseService {
       return {
         'status': 'success',
         'message': data['message'] as String? ?? 'Withdrawal successful',
-        'transaction_id': data['transaction_id'] as String? ??
+        'transaction_id':
+            data['transaction_id'] as String? ??
             'TXN_${DateTime.now().millisecondsSinceEpoch}',
         'new_balance': _toDouble(data['new_balance'] ?? data['balance'] ?? 0),
+      };
+    });
+  }
+}
+
+/// Transaction service
+class PaymentService extends BaseService {
+  final HttpClient _httpClient = HttpClient.instance;
+
+  Future<Map<String, dynamic>> chargePayment({
+    required String accountNumber,
+    required String phoneNumber,
+    required double amount,
+    required String paymentMethod,
+    String? momoPhoneNumber,
+  }) async {
+    return handleApiCall(() async {
+      if (amount <= 0) {
+        throw ValidationException(message: 'Amount must be greater than zero');
+      }
+
+      final request = <String, dynamic>{
+        'phone_number': phoneNumber,
+        'account_number': accountNumber,
+        'amount': amount,
+        'payment_method': paymentMethod,
+        if (momoPhoneNumber != null && momoPhoneNumber.isNotEmpty)
+          'momo_number': momoPhoneNumber,
+      };
+      request.removeWhere((key, value) => value == null);
+
+      AppLogger.logApiRequest('POST', ApiEndpoints.initiatePayment, request);
+
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.initiatePayment,
+        data: request,
+      );
+
+      final raw = response.data;
+      final data = normalizeResponsePayload(raw);
+
+      AppLogger.logApiResponse('POST', ApiEndpoints.initiatePayment, data);
+
+      final status = data['status'];
+      if (!AuthSession.isSuccessStatus(status)) {
+        throw GenericException(
+          message: data['message'] as String? ?? 'Payment failed.',
+        );
+      }
+
+      return {
+        'status': 'success',
+        'message': data['message'] as String? ?? 'Payment successful',
+        'transaction_id':
+            data['transaction_id'] as String? ??
+            'TXN_${DateTime.now().millisecondsSinceEpoch}',
+        'new_balance': data['new_balance'] ?? data['balance'] ?? 0,
       };
     });
   }
@@ -805,17 +916,22 @@ class TransactionService extends BaseService {
       final response = await _httpClient.post<dynamic>(
         ApiEndpoints.miniStatement,
         data: request,
+        options: BaseService.stccuFormOptions,
       );
 
       final raw = response.data;
-      final data = raw is Map<String, dynamic>
-          ? raw
-          : <String, dynamic>{};
+      if (isBackendEmptyPayload(raw)) {
+        throw GenericException(
+          message:
+              'No transaction data returned from server. Please verify your credentials and try again.',
+        );
+      }
+      final data = normalizeResponsePayload(raw);
 
       AppLogger.logApiResponse('POST', ApiEndpoints.miniStatement, data);
 
-      final status = (data['status'] as num?)?.toInt() ?? 0;
-      if (status != 1) {
+      final status = data['status'];
+      if (!AuthSession.isSuccessStatus(status)) {
         return {
           'status': 'success',
           'data': [],
@@ -828,27 +944,30 @@ class TransactionService extends BaseService {
       }
 
       // Normalise STCCU statement response
-      final statementsRaw = data['statement'] as List? ?? data['transactions'] as List? ?? [];
+      final statementsRaw =
+          data['statement'] as List? ?? data['transactions'] as List? ?? [];
       final normalizedTransactions = statementsRaw
           .whereType<Map<String, dynamic>>()
-          .map((txn) => {
-            'transaction_id': txn['id'] as String? ??
-                txn['transaction_id'] as String? ??
-                '',
-            'type': (txn['type'] as String? ?? 'debit').toLowerCase(),
-            'amount': _toDouble(
-              txn['debit'] ??
-                  txn['credit'] ??
-                  txn['amount'] ??
-                  0,
-            ),
-            'description': txn['narration'] as String? ??
-                txn['description'] as String? ??
-                '',
-            'date': txn['date'] as String? ?? DateTime.now().toIso8601String(),
-            'status': 'success',
-            'balance': _toDouble(txn['balance'] ?? 0),
-          })
+          .map(
+            (txn) => {
+              'transaction_id':
+                  txn['id'] as String? ??
+                  txn['transaction_id'] as String? ??
+                  '',
+              'type': (txn['type'] as String? ?? 'debit').toLowerCase(),
+              'amount': _toDouble(
+                txn['debit'] ?? txn['credit'] ?? txn['amount'] ?? 0,
+              ),
+              'description':
+                  txn['narration'] as String? ??
+                  txn['description'] as String? ??
+                  '',
+              'date':
+                  txn['date'] as String? ?? DateTime.now().toIso8601String(),
+              'status': 'success',
+              'balance': _toDouble(txn['balance'] ?? 0),
+            },
+          )
           .toList();
 
       return {
@@ -857,10 +976,10 @@ class TransactionService extends BaseService {
         'pagination': {
           'current_page': page,
           'total_pages': data['total_pages'] as int? ?? 1,
-          'total_items': data['total_items'] as int? ?? normalizedTransactions.length,
+          'total_items':
+              data['total_items'] as int? ?? normalizedTransactions.length,
         },
       };
     });
   }
 }
-

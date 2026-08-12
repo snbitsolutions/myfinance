@@ -101,6 +101,20 @@ class AppRouter {
     return false;
   }
 
+  static bool isDebugAuthBypassEnabled({
+    String? queryValue,
+    bool? savedPreferenceValue,
+    bool? environmentValue,
+  }) {
+    final effectiveEnvironmentValue =
+        environmentValue ??
+        const bool.fromEnvironment('DEBUG_AUTH_BYPASS', defaultValue: false);
+
+    return (queryValue == 'true') ||
+        (savedPreferenceValue ?? false) ||
+        effectiveEnvironmentValue;
+  }
+
   static Future<bool> _hasBoundSession() async {
     final now = DateTime.now();
     final cachedHasSession = _cachedHasBoundSession;
@@ -193,14 +207,48 @@ class AppRouter {
   static Future<String?> _computeRedirect(GoRouterState state) async {
     final path = state.uri.path;
 
-    // Keep splash navigation behavior intact.
+    final prefs = await SharedPreferences.getInstance();
+    final storedUserId =
+        prefs.getString(AppConstants.sharedPrefKeyUserId)?.trim() ?? '';
+    final storedUserEmail =
+        prefs.getString(AppConstants.sharedPrefKeyUserEmail)?.trim() ?? '';
+    final seededUserId = AppConstants.debugApiAccountNumber.trim();
+    final seededUserEmail = AppConstants.debugApiPhoneNumber.trim();
+    final hasDebugIdentity =
+        (storedUserId.isNotEmpty && storedUserEmail.isNotEmpty) ||
+        (seededUserId.isNotEmpty && seededUserEmail.isNotEmpty);
+    final seenOnboarding =
+        prefs.getBool(AppConstants.sharedPrefKeyOnboarding) ?? false;
+    final debugBypassAuth = isDebugAuthBypassEnabled(
+      queryValue: state.uri.queryParameters['debugAuth'],
+      savedPreferenceValue: prefs.getBool(
+        AppConstants.sharedPrefKeyDebugBypassAuth,
+      ),
+    );
+
+    // Keep splash navigation behavior intact for normal runs, but let the
+    // debug bypass skip directly to the home screen.
     if (path == '/') {
+      if (debugBypassAuth) {
+        return hasDebugIdentity ? '/home' : '/login';
+      }
       return null;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final seenOnboarding =
-        prefs.getBool(AppConstants.sharedPrefKeyOnboarding) ?? false;
+    if (debugBypassAuth) {
+      // Allow auth flow when debug identity is not configured yet.
+      if (!hasDebugIdentity) {
+        if (!_isInRouteSet(path, _preAuthRoutes)) {
+          return '/login';
+        }
+        return null;
+      }
+
+      if (_isInRouteSet(path, _preAuthRoutes)) {
+        return '/home';
+      }
+      return null;
+    }
 
     if (!seenOnboarding) {
       return path == '/onboarding' ? null : '/onboarding';
@@ -229,7 +277,7 @@ class AppRouter {
 
   static GoRouter _createRouter() {
     final configuredRouter = GoRouter(
-      initialLocation: '/',
+      initialLocation: AppRouter.isDebugAuthBypassEnabled() ? '/home' : '/',
       redirect: (context, state) => _handleRedirect(state),
       errorBuilder: (context, state) {
         final errorMessage = state.error?.toString();
@@ -254,9 +302,8 @@ class AppRouter {
         ),
         GoRoute(
           path: '/signup',
-          builder: (context, state) => SignupScreen(
-            reason: state.uri.queryParameters['reason'],
-          ),
+          builder: (context, state) =>
+              SignupScreen(reason: state.uri.queryParameters['reason']),
         ),
         GoRoute(
           path: '/account-number',
@@ -271,9 +318,16 @@ class AppRouter {
           path: '/otp',
           builder: (context, state) {
             final extra = state.extra as Map<String, dynamic>?;
+            final query = state.uri.queryParameters;
             return OtpScreen(
-              phoneNumber: extra?['phoneNumber'] as String? ?? '',
-              accountNumber: extra?['accountNumber'] as String? ?? '',
+              phoneNumber:
+                  extra?['phoneNumber'] as String? ??
+                  query['phoneNumber'] ??
+                  '',
+              accountNumber:
+                  extra?['accountNumber'] as String? ??
+                  query['accountNumber'] ??
+                  '',
             );
           },
         ),
@@ -281,10 +335,19 @@ class AppRouter {
           path: '/set-pin',
           builder: (context, state) {
             final extra = state.extra as Map<String, dynamic>?;
+            final query = state.uri.queryParameters;
+            final resolvedPhone =
+                extra?['phoneNumber'] as String? ?? query['phoneNumber'] ?? '';
+            final resolvedAccount =
+                extra?['accountNumber'] as String? ??
+                query['accountNumber'] ??
+                '';
+            final resolvedMode =
+                extra?['mode'] as String? ?? query['mode'] ?? 'manage';
             return SetPinScreen(
-              phoneNumber: extra?['phoneNumber'] as String? ?? '',
-              accountNumber: extra?['accountNumber'] as String? ?? '',
-              mode: extra?['mode'] as String? ?? 'manage',
+              phoneNumber: resolvedPhone,
+              accountNumber: resolvedAccount,
+              mode: resolvedMode,
             );
           },
         ),

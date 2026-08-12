@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'auth_flow_error_utils.dart';
 import '../../core/color_ext.dart';
@@ -55,6 +56,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await ref
           .read(authProvider.notifier)
           .confirmPhoneNumber(phoneNumber: _normalizedPhoneNumber);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        AppConstants.sharedPrefKeyUserEmail,
+        _normalizedPhoneNumber,
+      );
       if (!mounted) return;
       context.go(
         '/account-number',
@@ -66,9 +72,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         context.go('/signup?reason=not_registered');
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

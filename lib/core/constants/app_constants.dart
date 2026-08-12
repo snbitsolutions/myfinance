@@ -17,6 +17,19 @@ class AppConstants {
   static const bool enableBiometric = false;
   static const bool enableNotifications = false;
   static const bool enableOfflineMode = false;
+  static const bool disableApiAuthInDebug = true;
+  static const String debugApiPhoneNumber = String.fromEnvironment(
+    'DEBUG_API_PHONE',
+    defaultValue: '',
+  );
+  static const String debugApiAccountNumber = String.fromEnvironment(
+    'DEBUG_API_ACCOUNT',
+    defaultValue: '',
+  );
+  static const String debugApiPin = String.fromEnvironment(
+    'DEBUG_API_PIN',
+    defaultValue: '',
+  );
 
   // Validation
   static const int minPasswordLength = 6;
@@ -78,6 +91,7 @@ class AppConstants {
 
   // Shared Preferences Keys
   static const String sharedPrefKeyOnboarding = 'seenOnboarding';
+  static const String sharedPrefKeyDebugBypassAuth = 'debugBypassAuth';
   static const String sharedPrefKeyUserToken = 'userToken';
   static const String sharedPrefKeyUserRefreshToken = 'userRefreshToken';
   static const String sharedPrefKeyUserId = 'userId';
@@ -103,6 +117,7 @@ class AppConstants {
   static const String secureStorageKeySessionDeviceFingerprint =
       'secure.sessionDeviceFingerprint';
   static const String secureStorageKeyUserPin = 'secure.userPin';
+  static const String sharedPrefKeyUserPin = 'userPin';
 
   // Loan Status
   static const String loanStatusPending = 'Pending';
@@ -123,14 +138,14 @@ class AppConstants {
 }
 
 class ApiEndpoints {
-  static const String baseUrl = 'https://adepaye.com';
+  static const String baseUrl = 'https://adepaye.com/stccu-api';
 
   // Documented ATCCU mobile app auth endpoints
   static const String confirmPhoneNumber = '/mobileapp-api/confirmPhoneNumber';
   static const String confirmAccountNumber =
       '/mobileapp-api/confirmAccountNumber';
   static const String confirmPin = '/mobileapp-api/verifyPin';
-  static const String register = '/mobileapp-api/register';
+  static const String register = '/register';
   static const String changePin = '/mobileapp-api/changePin';
   static const String setPin = '/mobileapp-api/setPin';
 

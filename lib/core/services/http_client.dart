@@ -47,17 +47,26 @@ class HttpClient {
     await SecureAuthStorage.instance.initialize();
   }
 
+  bool get _isDebugNoAuthMode {
+    return kDebugMode && AppConstants.disableApiAuthInDebug;
+  }
+
   /// Initialize interceptors
   void _initializeInterceptors() {
     _dio.interceptors.addAll([
       // Token injection interceptor
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // Inject auth token if available
-          await initializePreferences();
-          final token = await SecureAuthStorage.instance.readAuthToken();
-          if (token != null && token.isNotEmpty) {
-            options.headers['Authorization'] = 'Bearer $token';
+          // Keep API auth optional in debug mode for backend endpoints that
+          // rely on request payload credentials instead of bearer tokens.
+          if (_isDebugNoAuthMode) {
+            options.headers.remove('Authorization');
+          } else {
+            await initializePreferences();
+            final token = await SecureAuthStorage.instance.readAuthToken();
+            if (token != null && token.isNotEmpty) {
+              options.headers['Authorization'] = 'Bearer $token';
+            }
           }
 
           AppLogger.logApiRequest(
@@ -78,7 +87,7 @@ class HttpClient {
         },
         onError: (error, handler) async {
           // Handle token expiration (401)
-          if (error.response?.statusCode == 401) {
+          if (!_isDebugNoAuthMode && error.response?.statusCode == 401) {
             // Try to refresh token
             final refreshed = await _refreshToken();
             if (refreshed) {
@@ -111,7 +120,7 @@ class HttpClient {
       if (kDebugMode)
         PrettyDioLogger(
           requestHeader: false,
-          requestBody: true,
+          requestBody: false,
           responseHeader: false,
           responseBody: true,
           error: true,

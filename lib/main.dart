@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/constants/app_constants.dart';
@@ -7,6 +8,7 @@ import 'core/services/network_service.dart';
 import 'core/services/secure_auth_storage.dart';
 import 'core/layout/responsive.dart';
 import 'router/app_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +19,102 @@ void main() async {
   await NetworkService.instance.initialize();
   await DeviceIdentityService().primeInstallationId();
 
+  final prefs = await SharedPreferences.getInstance();
+  final savedDebugBypass = prefs.getBool(
+    AppConstants.sharedPrefKeyDebugBypassAuth,
+  );
+
+  if (kDebugMode) {
+    final hasSeededIdentity =
+        AppConstants.debugApiPhoneNumber.trim().isNotEmpty &&
+        AppConstants.debugApiAccountNumber.trim().isNotEmpty;
+
+    // Keep debug bypass opt-in: only auto-enable when test identity is
+    // provided, and auto-disable stale bypass when identity is absent.
+    if (hasSeededIdentity && savedDebugBypass == null) {
+      await prefs.setBool(AppConstants.sharedPrefKeyDebugBypassAuth, true);
+    } else if (!hasSeededIdentity && savedDebugBypass == true) {
+      await prefs.setBool(AppConstants.sharedPrefKeyDebugBypassAuth, false);
+    }
+  }
+
+  if (kDebugMode) {
+    await _seedDebugBypassIdentity(prefs);
+  }
+
   runApp(const ProviderScope(child: AdepaTeachersApp()));
+}
+
+Future<void> _seedDebugBypassIdentity(SharedPreferences prefs) async {
+  final debugPhone = AppConstants.debugApiPhoneNumber.trim();
+  final debugAccount = AppConstants.debugApiAccountNumber.trim();
+  final debugPin = AppConstants.debugApiPin.trim();
+
+  if (debugPhone.isNotEmpty) {
+    await prefs.setString(AppConstants.sharedPrefKeyUserEmail, debugPhone);
+  }
+
+  if (debugAccount.isNotEmpty) {
+    await prefs.setString(AppConstants.sharedPrefKeyUserId, debugAccount);
+  }
+
+  if (debugPin.isNotEmpty) {
+    await SecureAuthStorage.instance.storePin(debugPin);
+  }
+}
+
+class RedirectLoadingOverlay extends StatelessWidget {
+  final bool isLoading;
+  final Widget child;
+
+  const RedirectLoadingOverlay({
+    super.key,
+    required this.isLoading,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isLoading) {
+      return child;
+    }
+
+    return Stack(
+      children: [
+        child,
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 32,
+          child: IgnorePointer(
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.surface.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.10),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2.6),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class AdepaTeachersApp extends StatelessWidget {
@@ -77,24 +174,7 @@ class AdepaTeachersApp extends StatelessWidget {
         return ValueListenableBuilder<bool>(
           valueListenable: AppRouter.redirectLoading,
           builder: (_, isLoading, inner) {
-            return Stack(
-              children: [
-                inner!,
-                if (isLoading)
-                  Positioned.fill(
-                    child: ColoredBox(
-                      color: appColorScheme.surface.withValues(alpha: 0.70),
-                      child: const Center(
-                        child: SizedBox(
-                          width: 32,
-                          height: 32,
-                          child: CircularProgressIndicator(strokeWidth: 3),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            );
+            return RedirectLoadingOverlay(isLoading: isLoading, child: inner!);
           },
           child: constrainedChild,
         );

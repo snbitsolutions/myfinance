@@ -36,5 +36,24 @@ void main() {
 
       expect(shortened, '01234567...abcdef');
     });
+
+    test('resolveDeviceIdentifier prefers IMEI-like values first', () {
+      expect(
+        DeviceIdentityService.resolveDeviceIdentifier({
+          'imei_number': '355123456789012',
+          'android_id': 'android-123',
+          'installation_id': 'dev_abc',
+        }),
+        '355123456789012',
+      );
+
+      expect(
+        DeviceIdentityService.resolveDeviceIdentifier({
+          'android_id': 'android-123',
+          'installation_id': 'dev_abc',
+        }),
+        'android-123',
+      );
+    });
   });
 }

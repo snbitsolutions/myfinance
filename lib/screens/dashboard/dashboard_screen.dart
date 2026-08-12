@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/services/notification_service.dart';
 
@@ -18,7 +20,10 @@ class DashboardScreen extends ConsumerWidget {
     }
 
     if (!authState.isAuthenticated) {
-      return const _DashboardContent(profile: _fallbackProfile);
+      return _DashboardErrorView(
+        error: 'Please sign in to load your account data.',
+        onRetry: () {},
+      );
     }
 
     final userProfileAsync = ref.watch(userProfileProvider);
@@ -33,14 +38,6 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 }
-
-const Map<String, dynamic> _fallbackProfile = {
-  'name': 'Steven Boadu',
-  'branch': 'Accra Main',
-  'account_number': '0123456789',
-  'status': 'Active',
-  'balance': 4500.50,
-};
 
 class _DashboardUi {
   static const cardStart = Color(0xFF2E8B57);
@@ -235,6 +232,10 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
                         const SizedBox(height: 16),
                         quickActionsPanel,
                       ],
+                      if (kDebugMode && AppConstants.disableApiAuthInDebug) ...[
+                        const SizedBox(height: 16),
+                        const _BackendDiagnosticsCard(),
+                      ],
                       const SizedBox(height: 20),
                       const _RecentTransactions(),
                     ],
@@ -244,6 +245,181 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _BackendDiagnosticsCard extends ConsumerWidget {
+  const _BackendDiagnosticsCard();
+
+  Future<void> _runRegistrationProbe(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final probe = await ref.read(debugRegistrationProbeProvider.future);
+    if (!context.mounted) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    final status = probe['status'] ?? 'info';
+    final message = probe['message'] ?? 'No message returned';
+
+    final theme = Theme.of(context);
+    final isError = status == 'error';
+
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: isError
+            ? theme.colorScheme.errorContainer
+            : theme.colorScheme.surfaceContainerHighest,
+        content: Text(
+          'Registration check: $message',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: isError
+                ? theme.colorScheme.onErrorContainer
+                : theme.colorScheme.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _statusColor(ThemeData theme, String status) {
+    switch (status) {
+      case 'ok':
+        return theme.colorScheme.primary;
+      case 'error':
+        return theme.colorScheme.error;
+      default:
+        return theme.colorScheme.onSurface.withValues(alpha: 0.55);
+    }
+  }
+
+  IconData _statusIcon(String status) {
+    switch (status) {
+      case 'ok':
+        return Icons.check_circle_outline_rounded;
+      case 'error':
+        return Icons.error_outline_rounded;
+      default:
+        return Icons.info_outline_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final diagnosticsAsync = ref.watch(backendDiagnosticsProvider);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.22),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.bug_report_outlined,
+                size: 18,
+                color: theme.colorScheme.onSurface,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Backend Diagnostics',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () => _runRegistrationProbe(context, ref),
+                icon: const Icon(Icons.verified_user_outlined, size: 16),
+                label: const Text('Run Registration Check'),
+              ),
+              IconButton(
+                tooltip: 'Refresh checks',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => ref.invalidate(backendDiagnosticsProvider),
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+            ],
+          ),
+          diagnosticsAsync.when(
+            loading: () => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Running endpoint checks...',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            error: (error, _) => Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Diagnostics failed: $error',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ),
+            data: (result) {
+              const order = ['profile', 'loans', 'savings', 'transactions'];
+              return Column(
+                children: order.map((key) {
+                  final entry =
+                      result[key] ??
+                      const {'status': 'info', 'message': 'Unavailable'};
+                  final status = entry['status'] ?? 'info';
+                  final message = entry['message'] ?? 'Unavailable';
+                  final color = _statusColor(theme, status);
+
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(_statusIcon(status), size: 16, color: color),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${key[0].toUpperCase()}${key.substring(1)}: $message',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: color,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -302,64 +478,70 @@ class _TopHeader extends StatelessWidget {
             ),
           ],
         ),
-        InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: () => context.go('/notifications'),
-          child: FutureBuilder<int>(
-            future: notificationService.getUnreadCount(),
-            builder: (context, snapshot) {
-              final unreadCount = snapshot.data ?? 0;
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: () {
+              if (!context.mounted) return;
+              context.push('/notifications');
+            },
+            child: FutureBuilder<int>(
+              future: notificationService.getUnreadCount(),
+              builder: (context, snapshot) {
+                final unreadCount = snapshot.data ?? 0;
 
-              return Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.30),
-                  ),
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(
-                      unreadCount > 0
-                          ? Icons.notifications_active_outlined
-                          : Icons.notifications_none,
-                      color: theme.colorScheme.onSurface,
-                      size: 20,
+                return Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: theme.colorScheme.outline.withValues(alpha: 0.30),
                     ),
-                    if (unreadCount > 0)
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: Container(
-                          constraints: const BoxConstraints(
-                            minWidth: 16,
-                            minHeight: 16,
-                          ),
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primary,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Center(
-                            child: Text(
-                              unreadCount > 9 ? '9+' : '$unreadCount',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onPrimary,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 9,
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Icon(
+                        unreadCount > 0
+                            ? Icons.notifications_active_outlined
+                            : Icons.notifications_none,
+                        color: theme.colorScheme.onSurface,
+                        size: 20,
+                      ),
+                      if (unreadCount > 0)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Center(
+                              child: Text(
+                                unreadCount > 9 ? '9+' : '$unreadCount',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.onPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 9,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-              );
-            },
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ],
@@ -1233,7 +1415,7 @@ class _RecentTransactions extends ConsumerWidget {
                 physics: const NeverScrollableScrollPhysics(),
                 shrinkWrap: true,
                 itemCount: recent.length,
-                separatorBuilder: (_, __) => Divider(
+                separatorBuilder: (_, _) => Divider(
                   height: 1,
                   indent: 60,
                   color: theme.colorScheme.outline.withValues(alpha: 0.20),
@@ -1271,8 +1453,9 @@ class _DashboardTransactionTile extends StatelessWidget {
       date = DateTime.parse(dateStr);
     } catch (_) {}
 
-    final accentColor =
-        isCredit ? theme.colorScheme.primary : theme.colorScheme.error;
+    final accentColor = isCredit
+        ? theme.colorScheme.primary
+        : theme.colorScheme.error;
 
     return Row(
       children: [
@@ -1284,7 +1467,9 @@ class _DashboardTransactionTile extends StatelessWidget {
             shape: BoxShape.circle,
           ),
           child: Icon(
-            isCredit ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+            isCredit
+                ? Icons.arrow_downward_rounded
+                : Icons.arrow_upward_rounded,
             size: 17,
             color: accentColor,
           ),
@@ -1384,11 +1569,7 @@ class _TransactionsErrorRow extends StatelessWidget {
     final theme = Theme.of(context);
     return Row(
       children: [
-        Icon(
-          Icons.cloud_off_rounded,
-          size: 18,
-          color: theme.colorScheme.error,
-        ),
+        Icon(Icons.cloud_off_rounded, size: 18, color: theme.colorScheme.error),
         const SizedBox(width: 8),
         Expanded(
           child: Text(

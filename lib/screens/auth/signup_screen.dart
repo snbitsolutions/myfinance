@@ -14,23 +14,36 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _accountController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
 
-  bool get _isValid => _accountController.text.trim().length >= 8;
+  String get _normalizedPhone {
+    final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('233')) return digits;
+    if (digits.startsWith('0')) return '233${digits.substring(1)}';
+    return digits;
+  }
+
+  bool get _isValid =>
+      _accountController.text.trim().length >= 8 &&
+      _phoneController.text.trim().length >= 9;
 
   void _handleContinue() {
     if (!_isValid) return;
-    context.go(
-      '/set-pin',
-      extra: {
+    final destination = Uri(
+      path: '/set-pin',
+      queryParameters: {
         'accountNumber': _accountController.text.trim(),
+        'phoneNumber': _normalizedPhone,
         'mode': 'register',
       },
     );
+    context.go(destination.toString());
   }
 
   @override
   void dispose() {
     _accountController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -81,7 +94,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Enter your STCCU account number to get started.',
+                    'Enter your STCCU account number and phone number to get started.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: Colors.white70,
@@ -129,6 +142,52 @@ class _SignupScreenState extends State<SignupScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Text(
+                          'Phone Number',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _phoneController,
+                          keyboardType: TextInputType.phone,
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            prefixIcon: const Icon(
+                              Icons.phone_outlined,
+                              color: Colors.white70,
+                            ),
+                            hintText: 'Enter your phone number',
+                            hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                              color: Colors.white54,
+                            ),
+                            filled: true,
+                            fillColor: Colors.white.withOpacitySafe(0.15),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.white.withOpacitySafe(0.2),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.white.withOpacitySafe(0.2),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: Colors.white,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        const SizedBox(height: 16),
                         Text(
                           'Account Number',
                           style: theme.textTheme.bodyLarge?.copyWith(

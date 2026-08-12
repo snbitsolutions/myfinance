@@ -61,6 +61,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final repository = ref.read(notificationRepositoryProvider);
     await repository.savePreferences(preferences);
     if (!mounted) return;
+
+    if (!preferences.enabled) {
+      await repository.markAllAsRead();
+    }
+
+    await _loadData();
+    if (!mounted) return;
     setState(() => _preferences = preferences);
   }
 
@@ -80,8 +87,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final unreadCount = _notifications.where((item) => !item.read).length;
-    final filteredNotifications = _applyFilter(_notifications);
+    final effectiveNotifications = _preferences.enabled
+        ? _notifications
+        : const <AppNotification>[];
+    final unreadCount = effectiveNotifications
+        .where((item) => !item.read)
+        .length;
+    final filteredNotifications = _applyFilter(effectiveNotifications);
     final groupedNotifications = _groupNotifications(filteredNotifications);
 
     return AppScaffold(

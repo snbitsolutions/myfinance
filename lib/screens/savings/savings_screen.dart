@@ -386,46 +386,51 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
     });
   }
 
-    Savings _mapToSavings(Map<String, dynamic> map) {
-      final typeStr =
-          ((map['type'] as String?) ?? 'member').toLowerCase().replaceAll(' ', '_');
-      final type = switch (typeStr) {
-        'current' || 'current_saving' || 'current_savings' => SavingsType.currentSaving,
-        'kiddy' || 'kiddy_saving' || 'kiddy_savings' => SavingsType.kiddySaving,
-        'fixed' || 'fixed_deposit' || 'fixed_saving' => SavingsType.fixedDeposit,
-        _ => SavingsType.memberSaving,
-      };
-      final id = (map['savings_id'] as String? ??
-              map['id'] as String? ??
-              map['product_id'] as String? ??
-              '')
-          .replaceAll(' ', '-')
-          .toLowerCase();
-      final name = map['name'] as String? ??
-          map['product_name'] as String? ??
-          map['account_name'] as String? ??
-          'Savings';
-      final balance = _toDouble(
-        map['balance'] ?? map['current_balance'] ?? map['amount'] ?? 0,
-      );
-      final target = _toDouble(
-        map['target'] ?? map['target_amount'] ?? map['goal_amount'] ?? 0,
-      );
-      return Savings(
-        id: id.isEmpty ? 'api-${name.toLowerCase().replaceAll(' ', '-')}' : id,
-        title: name,
-        balance: balance,
-        target: target > 0 ? target : (balance > 0 ? balance * 2 : 1000),
-        type: type,
-        interestRate: _toDouble(map['interest_rate'] ?? map['rate'] ?? 0),
-      );
-    }
+  Savings _mapToSavings(Map<String, dynamic> map) {
+    final typeStr = ((map['type'] as String?) ?? 'member')
+        .toLowerCase()
+        .replaceAll(' ', '_');
+    final type = switch (typeStr) {
+      'current' ||
+      'current_saving' ||
+      'current_savings' => SavingsType.currentSaving,
+      'kiddy' || 'kiddy_saving' || 'kiddy_savings' => SavingsType.kiddySaving,
+      'fixed' || 'fixed_deposit' || 'fixed_saving' => SavingsType.fixedDeposit,
+      _ => SavingsType.memberSaving,
+    };
+    final id =
+        (map['savings_id'] as String? ??
+                map['id'] as String? ??
+                map['product_id'] as String? ??
+                '')
+            .replaceAll(' ', '-')
+            .toLowerCase();
+    final name =
+        map['name'] as String? ??
+        map['product_name'] as String? ??
+        map['account_name'] as String? ??
+        'Savings';
+    final balance = _toDouble(
+      map['balance'] ?? map['current_balance'] ?? map['amount'] ?? 0,
+    );
+    final target = _toDouble(
+      map['target'] ?? map['target_amount'] ?? map['goal_amount'] ?? 0,
+    );
+    return Savings(
+      id: id.isEmpty ? 'api-${name.toLowerCase().replaceAll(' ', '-')}' : id,
+      title: name,
+      balance: balance,
+      target: target > 0 ? target : (balance > 0 ? balance * 2 : 1000),
+      type: type,
+      interestRate: _toDouble(map['interest_rate'] ?? map['rate'] ?? 0),
+    );
+  }
 
-    static double _toDouble(dynamic v) {
-      if (v == null) return 0;
-      if (v is num) return v.toDouble();
-      return double.tryParse(v.toString().replaceAll(',', '')) ?? 0;
-    }
+  static double _toDouble(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString().replaceAll(',', '')) ?? 0;
+  }
 
   Future<void> _addGoalIfMissing(Savings incoming) async {
     final alreadyExists = _userCreatedGoals.any(
@@ -623,7 +628,10 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
     // Watch the live savings API
     final apiSavingsAsync = ref.watch(savingsProvider);
     // Convert API maps to Savings objects
-    final apiSavings = (apiSavingsAsync.valueOrNull ?? []).map(_mapToSavings).toList();
+    final apiSavings = (apiSavingsAsync.valueOrNull ?? [])
+        .map(_mapToSavings)
+        .where((s) => s.id.isNotEmpty || s.title.isNotEmpty)
+        .toList();
 
     // Merge: user-created goals first, then API savings (de-duplicate by id)
     final apiIds = apiSavings.map((s) => s.id).toSet();

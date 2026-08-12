@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'auth_flow_error_utils.dart';
 import '../../core/color_ext.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/exceptions/app_exceptions.dart';
 import '../../core/providers/app_providers.dart';
 
@@ -23,32 +25,59 @@ class _AccountNumberScreenState extends ConsumerState<AccountNumberScreen> {
 
   bool get _isValid => _accountController.text.trim().length >= 8;
 
+  String get _normalizedAccountNumber => _accountController.text.trim();
+
   Future<void> _handleContinue() async {
     if (_isSubmitting) return;
 
     setState(() => _isSubmitting = true);
     try {
-      await ref.read(authProvider.notifier).confirmAccountNumber(
+      final phoneDigits = widget.phoneNumber.replaceAll(RegExp(r'\D'), '');
+      final accountDigits = _normalizedAccountNumber.replaceAll(
+        RegExp(r'\D'),
+        '',
+      );
+      if (accountDigits.isNotEmpty && accountDigits == phoneDigits) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Enter your STCCU account number, not your phone number.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      await ref
+          .read(authProvider.notifier)
+          .confirmAccountNumber(
             phoneNumber: widget.phoneNumber,
-            accountNumber: _accountController.text.trim(),
+            accountNumber: _normalizedAccountNumber,
           );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        AppConstants.sharedPrefKeyUserId,
+        _normalizedAccountNumber,
+      );
       if (!mounted) return;
-      context.go(
-        '/otp',
-        extra: {
+      final destination = Uri(
+        path: '/otp',
+        queryParameters: {
           'phoneNumber': widget.phoneNumber,
-          'accountNumber': _accountController.text.trim(),
+          'accountNumber': _normalizedAccountNumber,
         },
       );
+      context.go(destination.toString());
     } on AppException catch (e) {
       if (!mounted) return;
       if (shouldRedirectToSignup(e.message)) {
         context.go('/signup?reason=not_registered');
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -200,14 +229,13 @@ class _AccountNumberScreenState extends ConsumerState<AccountNumberScreen> {
                                     height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2.2,
-                                      valueColor:
-                                          AlwaysStoppedAnimation<Color>(
+                                      valueColor: AlwaysStoppedAnimation<Color>(
                                         primary,
                                       ),
                                     ),
                                   )
                                 : Text(
-                                    'Send OTP',
+                                    'Continue',
                                     style: theme.textTheme.labelLarge?.copyWith(
                                       color: _isValid
                                           ? primary

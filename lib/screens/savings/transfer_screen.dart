@@ -1,10 +1,4 @@
-import 'dart:async';
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
@@ -81,27 +75,6 @@ class _TransferScreenState extends State<TransferScreen> {
   String? _fromAccountId;
   String? _toAccountId;
   final _amountController = TextEditingController();
-  bool _isSending = false;
-  String _savedTransactionPin = '1234';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadStoredPin();
-  }
-
-  Future<void> _loadStoredPin() async {
-    final prefs = await SharedPreferences.getInstance();
-    const possibleKeys = ['transaction_pin', 'user_pin', 'app_pin', 'pin'];
-    for (final key in possibleKeys) {
-      final value = prefs.getString(key)?.trim();
-      if (value != null && value.length == 4) {
-        if (!mounted) return;
-        setState(() => _savedTransactionPin = value);
-        return;
-      }
-    }
-  }
 
   @override
   void dispose() {
@@ -121,10 +94,6 @@ class _TransferScreenState extends State<TransferScreen> {
     return _findAccountById(_fromAccountId);
   }
 
-  _InternalAccount? get _toAccount {
-    return _findAccountById(_toAccountId);
-  }
-
   double get _amount => double.tryParse(_amountController.text) ?? 0;
 
   bool get _canSubmit {
@@ -141,251 +110,13 @@ class _TransferScreenState extends State<TransferScreen> {
   }
 
   Future<void> _onConfirmTransferPressed() async {
-    if (_isSending) return;
     FocusManager.instance.primaryFocus?.unfocus();
-    final confirmed = await _showTransferConfirmationSheet();
-    if (!mounted || !confirmed) return;
-    final navigator = GoRouter.of(context);
-    _submit(navigator);
-  }
-
-  Future<bool> _showTransferConfirmationSheet() async {
-    final fee = _amount * 0.005;
-    final total = _amount + fee;
-    final pinController = TextEditingController();
-    var attemptsLeft = 3;
-    var cooldownLeft = 0;
-    String? pinError;
-    var shakeTick = 0;
-    Timer? cooldownTimer;
-    var sheetActive = true;
-
-    final result = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Transfers are unavailable until secure backend transfer verification is connected.',
+        ),
       ),
-      builder: (sheetContext) {
-        final theme = Theme.of(sheetContext);
-        var pin = '';
-        var obscurePin = true;
-        return StatefulBuilder(
-          builder: (statefulContext, setSheetState) {
-            final isPinValid = pin.length == 4;
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                8,
-                16,
-                16 + MediaQuery.of(statefulContext).viewInsets.bottom,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Confirm Transfer',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Please review the details and enter your 4-digit PIN.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacitySafe(
-                          0.62,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    _ConfirmRow(
-                      label: 'From Account',
-                      value: _fromAccount?.name ?? '—',
-                    ),
-                    _ConfirmRow(
-                      label: 'To Account',
-                      value: _toAccount?.name ?? '—',
-                    ),
-                    const Divider(height: 24),
-                    _ConfirmRow(
-                      label: 'Amount',
-                      value: 'GH₵ ${_amount.toStringAsFixed(2)}',
-                    ),
-                    _ConfirmRow(
-                      label: 'Fee (0.5%)',
-                      value: 'GH₵ ${fee.toStringAsFixed(2)}',
-                    ),
-                    _ConfirmRow(
-                      label: 'Total Debit',
-                      value: 'GH₵ ${total.toStringAsFixed(2)}',
-                      emphasize: true,
-                    ),
-                    const SizedBox(height: 14),
-                    TweenAnimationBuilder<double>(
-                      key: ValueKey(shakeTick),
-                      tween: Tween(begin: 0, end: 1),
-                      duration: const Duration(milliseconds: 360),
-                      builder: (context, value, child) {
-                        final dx = math.sin(value * math.pi * 6) * 8;
-                        return Transform.translate(
-                          offset: Offset(dx, 0),
-                          child: child,
-                        );
-                      },
-                      child: TextField(
-                        controller: pinController,
-                        obscureText: obscurePin,
-                        enableInteractiveSelection: false,
-                        keyboardType: TextInputType.number,
-                        maxLength: 4,
-                        enabled: cooldownLeft == 0,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        onChanged: (value) => setSheetState(() {
-                          pin = value.trim();
-                          if (pinError != null) pinError = null;
-                        }),
-                        decoration: InputDecoration(
-                          labelText: 'Transaction PIN',
-                          hintText: 'Enter 4-digit PIN',
-                          counterText: '',
-                          prefixIcon: const Icon(Icons.lock_outline_rounded),
-                          suffixIcon: IconButton(
-                            onPressed: () =>
-                                setSheetState(() => obscurePin = !obscurePin),
-                            icon: Icon(
-                              obscurePin
-                                  ? Icons.visibility_rounded
-                                  : Icons.visibility_off_rounded,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (cooldownLeft > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          'Too many attempts. Try again in ${cooldownLeft}s.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.error,
-                          ),
-                        ),
-                      )
-                    else if (pinError != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          pinError!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.error,
-                          ),
-                        ),
-                      )
-                    else if (!isPinValid)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          'PIN must be exactly 4 digits.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.error,
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 16),
-                    FilledButton.icon(
-                      onPressed: isPinValid && cooldownLeft == 0
-                          ? () {
-                              FocusManager.instance.primaryFocus?.unfocus();
-                              if (pin == _savedTransactionPin) {
-                                Navigator.of(statefulContext).pop(true);
-                                return;
-                              }
-                              setSheetState(() {
-                                shakeTick++;
-                                attemptsLeft--;
-                                if (attemptsLeft > 0) {
-                                  pinError =
-                                      'Incorrect PIN. $attemptsLeft attempt${attemptsLeft == 1 ? '' : 's'} left.';
-                                } else {
-                                  pinError =
-                                      'PIN locked for 30s due to too many attempts.';
-                                  cooldownLeft = 30;
-                                  attemptsLeft = 3;
-                                  cooldownTimer?.cancel();
-                                  cooldownTimer = Timer.periodic(
-                                    const Duration(seconds: 1),
-                                    (timer) {
-                                      if (!sheetActive) {
-                                        timer.cancel();
-                                        return;
-                                      }
-                                      setSheetState(() {
-                                        cooldownLeft--;
-                                        if (cooldownLeft <= 0) {
-                                          cooldownLeft = 0;
-                                          pinError = null;
-                                          pinController.clear();
-                                          pin = '';
-                                          timer.cancel();
-                                        }
-                                      });
-                                    },
-                                  );
-                                }
-                              });
-                            }
-                          : null,
-                      icon: const Icon(Icons.verified_rounded),
-                      label: Text(
-                        cooldownLeft > 0
-                            ? 'Locked (${cooldownLeft}s)'
-                            : 'Yes, Transfer',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () => Navigator.of(statefulContext).pop(false),
-                      child: const Text('Review Again'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    sheetActive = false;
-    cooldownTimer?.cancel();
-
-    return result ?? false;
-  }
-
-  void _submit(GoRouter navigator) async {
-    FocusManager.instance.primaryFocus?.unfocus();
-    setState(() => _isSending = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() => _isSending = false);
-    if (!mounted) return;
-    final now = DateTime.now();
-    navigator.go(
-      '/payment-success',
-      extra: {
-        'amount': _amount,
-        'processedAt': now.toIso8601String(),
-        'reference': 'TRF#${now.millisecondsSinceEpoch}',
-        'title': 'Transfer Successful',
-        'message': 'Your transfer has been completed successfully.',
-      },
     );
   }
 
@@ -619,7 +350,6 @@ class _TransferScreenState extends State<TransferScreen> {
                       const SizedBox(height: 18),
                       _ConfirmButton(
                         canSubmit: _canSubmit,
-                        isSending: _isSending,
                         accent: accent,
                         theme: theme,
                         totalDebit: totalDebit,
@@ -673,7 +403,6 @@ class _TransferScreenState extends State<TransferScreen> {
                                 const SizedBox(height: 18),
                                 _ConfirmButton(
                                   canSubmit: _canSubmit,
-                                  isSending: _isSending,
                                   accent: accent,
                                   theme: theme,
                                   totalDebit: totalDebit,
@@ -816,7 +545,6 @@ class _AccountTile extends StatelessWidget {
 
 class _ConfirmButton extends StatelessWidget {
   final bool canSubmit;
-  final bool isSending;
   final Color accent;
   final ThemeData theme;
   final double totalDebit;
@@ -824,7 +552,6 @@ class _ConfirmButton extends StatelessWidget {
 
   const _ConfirmButton({
     required this.canSubmit,
-    required this.isSending,
     required this.accent,
     required this.theme,
     required this.totalDebit,
@@ -847,18 +574,10 @@ class _ConfirmButton extends StatelessWidget {
             : null,
       ),
       child: FilledButton.icon(
-        onPressed: canSubmit ? (isSending ? null : onPressed) : null,
-        icon: isSending
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.swap_horiz_rounded),
+        onPressed: canSubmit ? onPressed : null,
+        icon: const Icon(Icons.swap_horiz_rounded),
         label: Text(
-          isSending
-              ? 'Processing...'
-              : totalDebit > 0
+          totalDebit > 0
               ? 'Confirm Transfer (GH₵ ${totalDebit.toStringAsFixed(2)})'
               : 'Confirm Transfer',
         ),
@@ -933,51 +652,6 @@ class _SectionHeader extends StatelessWidget {
       ),
     ],
   );
-}
-
-class _ConfirmRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final bool emphasize;
-
-  const _ConfirmRow({
-    required this.label,
-    required this.value,
-    this.emphasize = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacitySafe(0.65),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Flexible(
-            child: Text(
-              value.isEmpty ? '—' : value,
-              textAlign: TextAlign.right,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
-                color: emphasize ? theme.colorScheme.primary : null,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _PageIntro extends StatelessWidget {
