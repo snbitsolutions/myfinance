@@ -15,6 +15,9 @@ class PaymentSuccessScreen extends StatelessWidget {
   final String? primaryActionRoute;
   final String? secondaryActionLabel;
   final String? secondaryActionRoute;
+  final String? account;
+  final String? paymentMethod;
+  final double? newBalance;
 
   const PaymentSuccessScreen({
     super.key,
@@ -27,6 +30,9 @@ class PaymentSuccessScreen extends StatelessWidget {
     this.primaryActionRoute,
     this.secondaryActionLabel,
     this.secondaryActionRoute,
+    this.account,
+    this.paymentMethod,
+    this.newBalance,
   });
 
   String _formatAmount() {
@@ -226,7 +232,23 @@ class PaymentSuccessScreen extends StatelessWidget {
               width: double.infinity,
               height: 52,
               child: OutlinedButton.icon(
-                onPressed: () => context.go(resolvedSecondaryActionRoute),
+                onPressed: () {
+                  if (resolvedSecondaryActionRoute == '/payment-receipt') {
+                    context.push(
+                      '/payment-receipt',
+                      extra: {
+                        'amount': amount,
+                        'processedAt': processedAt?.toIso8601String(),
+                        'reference': reference,
+                        'account': account,
+                        'paymentMethod': paymentMethod,
+                        'newBalance': newBalance,
+                      },
+                    );
+                  } else {
+                    context.go(resolvedSecondaryActionRoute);
+                  }
+                },
                 icon: const Icon(Icons.receipt_long_rounded),
                 label: Text(resolvedSecondaryActionLabel),
                 style: OutlinedButton.styleFrom(

@@ -14,8 +14,9 @@ import '../../core/services/notification_service.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
   final String? sourceLabel;
+  final String? returnRoute;
 
-  const PaymentScreen({super.key, this.sourceLabel});
+  const PaymentScreen({super.key, this.sourceLabel, this.returnRoute});
 
   @override
   ConsumerState<PaymentScreen> createState() => _PaymentScreenState();
@@ -46,6 +47,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   bool _isValidMomoNumber(String value) {
     final phone = value.trim();
     return RegExp(r'^0\d{9}$').hasMatch(phone);
+  }
+
+  String _resolveReturnRoute(String? explicitRoute) {
+    final normalized = (explicitRoute ?? '').trim();
+    if (normalized.isNotEmpty) {
+      return normalized.startsWith('/') ? normalized : '/$normalized';
+    }
+
+    final isDepositFlow = widget.sourceLabel == 'Deposit';
+    return isDepositFlow ? '/savings' : '/home';
   }
 
   Future<void> _handleProceed() async {
@@ -98,8 +109,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           ),
         );
         if (!mounted) return;
+        final returnRoute = _resolveReturnRoute(widget.returnRoute);
+        final isSavingsReturn = returnRoute.startsWith('/savings');
+        final successUri = Uri(
+          path: '/payment-success',
+          queryParameters: {'returnRoute': returnRoute},
+        );
         context.go(
-          '/payment-success',
+          successUri.toString(),
           extra: {
             'amount': amount,
             'processedAt': DateTime.now().toIso8601String(),
@@ -108,10 +125,27 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 response['reference'] ??
                 response['transactionId'] ??
                 'PAY#${DateTime.now().millisecondsSinceEpoch}',
-            'title': 'Payment Successful',
+            'title': widget.sourceLabel == 'Deposit'
+                ? 'Deposit Successful'
+                : 'Payment Successful',
             'message':
                 response['message'] ??
-                'Your transaction was completed successfully.',
+                (widget.sourceLabel == 'Deposit'
+                    ? 'Your deposit has been credited to your account.'
+                    : 'Your transaction was completed successfully.'),
+            'primaryActionRoute': returnRoute,
+            'primaryActionLabel': isSavingsReturn ? 'Done' : 'Go Home',
+            'secondaryActionLabel': widget.sourceLabel == 'Deposit'
+                ? 'View Receipt'
+                : null,
+            'secondaryActionRoute': widget.sourceLabel == 'Deposit'
+                ? '/payment-receipt'
+                : null,
+            'account': _selectedInternalAccount,
+            'paymentMethod': isMomo
+                ? '$_method ($_selectedMomoProvider)'
+                : '$_method ($_selectedInternalAccount)',
+            'newBalance': response['new_balance'],
           },
         );
       } else {
@@ -127,12 +161,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           ),
         );
         if (!mounted) return;
+        final returnRoute = _resolveReturnRoute(widget.returnRoute);
         context.go(
-          '/payment-failed',
+          '/payment-failed?returnRoute=${Uri.encodeComponent(returnRoute)}',
           extra: {
             'amount': amount,
             'message':
                 response['message'] ?? 'Your payment could not be completed.',
+            'returnRoute': returnRoute,
+            'isDeposit': widget.sourceLabel == 'Deposit',
           },
         );
       }
@@ -178,7 +215,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         : '$_method ($_selectedMomoProvider)';
 
     return AppScaffold(
-      title: useExistingAccount
+      title: widget.sourceLabel == 'Deposit'
+          ? 'Deposit'
+          : useExistingAccount
           ? 'Buy Shares'
           : isInvestment
           ? 'Invest'
@@ -186,364 +225,388 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isTablet = constraints.maxWidth >= Responsive.medium;
-          final content = Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                _PaymentHero(
-                  theme: theme,
-                  method: selectedSource,
-                  subtitle: useExistingAccount || isInvestment
-                      ? 'Selected account'
-                      : 'Selected method',
-                ),
+          final content = SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              16 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Column(
+                children: [
+                  _PaymentHero(
+                    theme: theme,
+                    method: selectedSource,
+                    subtitle: useExistingAccount || isInvestment
+                        ? 'Selected account'
+                        : 'Selected method',
+                  ),
 
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                AppCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _PaymentSectionHeader(
-                        title: 'Amount',
-                        subtitle: 'Enter how much you want to pay',
-                        icon: Icons.payments_rounded,
-                        theme: theme,
-                      ),
-                      const SizedBox(height: 10),
-                      ModernInput(
-                        label: 'Amount to Pay',
-                        hintText: 'e.g., 500',
-                        controller: _amountController,
-                        keyboardType: TextInputType.number,
-                        prefixText: 'GH₵ ',
-                        onChanged: (_) => setState(() {}),
-                      ),
-                      const SizedBox(height: 16),
-                      _PaymentSectionHeader(
-                        title: useExistingAccount
-                            ? 'Source Account'
-                            : 'Payment Method',
-                        subtitle: useExistingAccount
-                            ? 'Funds will be debited from your existing account.'
-                            : isInvestment
-                            ? 'Choose how you want to make this investment.'
-                            : 'Choose your preferred payment method.',
-                        icon: Icons.account_balance_wallet_rounded,
-                        theme: theme,
-                      ),
-                      const SizedBox(height: 8),
-                      if (useExistingAccount)
-                        _PaymentDropdownShell(
-                          theme: theme,
-                          child: DropdownButton<String>(
-                            value: _selectedShareAccount,
-                            isExpanded: true,
-                            underline: const SizedBox(),
-                            icon: Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: theme.colorScheme.primary,
-                            ),
-                            items: _shareSourceAccounts
-                                .map(
-                                  (account) => DropdownMenuItem(
-                                    value: account,
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          account == 'Member Savings'
-                                              ? Icons.savings_rounded
-                                              : account == 'Current Savings'
-                                              ? Icons
-                                                    .account_balance_wallet_rounded
-                                              : Icons.account_tree_rounded,
-                                          size: 18,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(account),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (v) => setState(
-                              () => _selectedShareAccount =
-                                  v ?? _selectedShareAccount,
-                            ),
-                          ),
-                        )
-                      else
-                        _PaymentDropdownShell(
-                          theme: theme,
-                          child: DropdownButton<String>(
-                            value: _method,
-                            isExpanded: true,
-                            underline: const SizedBox(),
-                            icon: Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: theme.colorScheme.primary,
-                            ),
-                            items: _paymentMethods
-                                .map(
-                                  (m) => DropdownMenuItem(
-                                    value: m,
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          m == 'Account'
-                                              ? Icons
-                                                    .account_balance_wallet_rounded
-                                              : m == 'MoMo'
-                                              ? Icons.phone_android_rounded
-                                              : Icons.account_balance_rounded,
-                                          size: 18,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(m),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (v) =>
-                                setState(() => _method = v ?? _method),
-                          ),
-                        ),
-                      if (isAccountMethod) ...[
-                        const SizedBox(height: 12),
+                  AppCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         _PaymentSectionHeader(
-                          title: 'Account',
-                          subtitle:
-                              'Select the account to debit for this payment.',
-                          icon: Icons.account_balance_rounded,
+                          title: widget.sourceLabel == 'Deposit'
+                              ? 'Deposit Amount'
+                              : 'Amount',
+                          subtitle: widget.sourceLabel == 'Deposit'
+                              ? 'Enter how much you want to deposit'
+                              : 'Enter how much you want to pay',
+                          icon: Icons.payments_rounded,
                           theme: theme,
-                        ),
-                        const SizedBox(height: 8),
-                        _PaymentDropdownShell(
-                          theme: theme,
-                          child: DropdownButton<String>(
-                            value: _selectedInternalAccount,
-                            isExpanded: true,
-                            underline: const SizedBox(),
-                            icon: Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: theme.colorScheme.primary,
-                            ),
-                            items: _shareSourceAccounts
-                                .map(
-                                  (account) => DropdownMenuItem(
-                                    value: account,
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          account == 'Member Savings'
-                                              ? Icons.savings_rounded
-                                              : account == 'Current Savings'
-                                              ? Icons
-                                                    .account_balance_wallet_rounded
-                                              : Icons.account_tree_rounded,
-                                          size: 18,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(account),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (v) => setState(
-                              () => _selectedInternalAccount =
-                                  v ?? _selectedInternalAccount,
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (isMomo) ...[
-                        const SizedBox(height: 12),
-                        _PaymentSectionHeader(
-                          title: 'MoMo Details',
-                          subtitle:
-                              'Select provider and enter recipient number.',
-                          icon: Icons.phone_android_rounded,
-                          theme: theme,
-                        ),
-                        const SizedBox(height: 8),
-                        _PaymentDropdownShell(
-                          theme: theme,
-                          child: DropdownButton<String>(
-                            value: _selectedMomoProvider,
-                            isExpanded: true,
-                            underline: const SizedBox(),
-                            icon: Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: theme.colorScheme.primary,
-                            ),
-                            items: _momoProviders
-                                .map(
-                                  (provider) => DropdownMenuItem(
-                                    value: provider,
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.sim_card_rounded,
-                                          size: 18,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(provider),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (v) => setState(
-                              () => _selectedMomoProvider =
-                                  v ?? _selectedMomoProvider,
-                            ),
-                          ),
                         ),
                         const SizedBox(height: 10),
                         ModernInput(
-                          label: 'MoMo Number',
-                          hintText: 'e.g., 0241234567',
-                          controller: _momoPhoneController,
-                          keyboardType: TextInputType.phone,
-                          onChanged: (value) {
-                            final digitsOnly = value.replaceAll(
-                              RegExp(r'\D'),
-                              '',
-                            );
-                            final normalized = digitsOnly.length > 10
-                                ? digitsOnly.substring(0, 10)
-                                : digitsOnly;
-                            if (normalized != value) {
-                              _momoPhoneController.value = TextEditingValue(
-                                text: normalized,
-                                selection: TextSelection.collapsed(
-                                  offset: normalized.length,
-                                ),
-                              );
-                            }
-                            setState(() {});
-                          },
+                          label: widget.sourceLabel == 'Deposit'
+                              ? 'Amount to Deposit'
+                              : 'Amount to Pay',
+                          hintText: 'e.g., 500',
+                          controller: _amountController,
+                          keyboardType: TextInputType.number,
+                          prefixText: 'GH₵ ',
+                          onChanged: (_) => setState(() {}),
                         ),
-                        if (showMomoPhoneError) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            'Enter a valid Ghana number (10 digits, starts with 0).',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.error,
-                              fontWeight: FontWeight.w500,
+                        const SizedBox(height: 16),
+                        _PaymentSectionHeader(
+                          title: useExistingAccount
+                              ? 'Source Account'
+                              : 'Payment Method',
+                          subtitle: useExistingAccount
+                              ? 'Funds will be debited from your existing account.'
+                              : isInvestment
+                              ? 'Choose how you want to make this investment.'
+                              : 'Choose your preferred payment method.',
+                          icon: Icons.account_balance_wallet_rounded,
+                          theme: theme,
+                        ),
+                        const SizedBox(height: 8),
+                        if (useExistingAccount)
+                          _PaymentDropdownShell(
+                            theme: theme,
+                            child: DropdownButton<String>(
+                              value: _selectedShareAccount,
+                              isExpanded: true,
+                              underline: const SizedBox(),
+                              icon: Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                color: theme.colorScheme.primary,
+                              ),
+                              items: _shareSourceAccounts
+                                  .map(
+                                    (account) => DropdownMenuItem(
+                                      value: account,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            account == 'Member Savings'
+                                                ? Icons.savings_rounded
+                                                : account == 'Current Savings'
+                                                ? Icons
+                                                      .account_balance_wallet_rounded
+                                                : Icons.account_tree_rounded,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(account),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) => setState(
+                                () => _selectedShareAccount =
+                                    v ?? _selectedShareAccount,
+                              ),
+                            ),
+                          )
+                        else
+                          _PaymentDropdownShell(
+                            theme: theme,
+                            child: DropdownButton<String>(
+                              value: _method,
+                              isExpanded: true,
+                              underline: const SizedBox(),
+                              icon: Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                color: theme.colorScheme.primary,
+                              ),
+                              items: _paymentMethods
+                                  .map(
+                                    (m) => DropdownMenuItem(
+                                      value: m,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            m == 'Account'
+                                                ? Icons
+                                                      .account_balance_wallet_rounded
+                                                : m == 'MoMo'
+                                                ? Icons.phone_android_rounded
+                                                : Icons.account_balance_rounded,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(m),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) =>
+                                  setState(() => _method = v ?? _method),
+                            ),
+                          ),
+                        if (isAccountMethod) ...[
+                          const SizedBox(height: 12),
+                          _PaymentSectionHeader(
+                            title: 'Account',
+                            subtitle:
+                                'Select the account to debit for this payment.',
+                            icon: Icons.account_balance_rounded,
+                            theme: theme,
+                          ),
+                          const SizedBox(height: 8),
+                          _PaymentDropdownShell(
+                            theme: theme,
+                            child: DropdownButton<String>(
+                              value: _selectedInternalAccount,
+                              isExpanded: true,
+                              underline: const SizedBox(),
+                              icon: Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                color: theme.colorScheme.primary,
+                              ),
+                              items: _shareSourceAccounts
+                                  .map(
+                                    (account) => DropdownMenuItem(
+                                      value: account,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            account == 'Member Savings'
+                                                ? Icons.savings_rounded
+                                                : account == 'Current Savings'
+                                                ? Icons
+                                                      .account_balance_wallet_rounded
+                                                : Icons.account_tree_rounded,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(account),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) => setState(
+                                () => _selectedInternalAccount =
+                                    v ?? _selectedInternalAccount,
+                              ),
                             ),
                           ),
                         ],
-                      ],
-                      if (amt > 0) ...[
-                        const SizedBox(height: 14),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primaryContainer
-                                .withOpacitySafe(0.2),
-                            border: Border.all(
-                              color: theme.colorScheme.primary.withOpacitySafe(
-                                0.18,
+                        if (isMomo) ...[
+                          const SizedBox(height: 12),
+                          _PaymentSectionHeader(
+                            title: 'MoMo Details',
+                            subtitle:
+                                'Select provider and enter recipient number.',
+                            icon: Icons.phone_android_rounded,
+                            theme: theme,
+                          ),
+                          const SizedBox(height: 8),
+                          _PaymentDropdownShell(
+                            theme: theme,
+                            child: DropdownButton<String>(
+                              value: _selectedMomoProvider,
+                              isExpanded: true,
+                              underline: const SizedBox(),
+                              icon: Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                color: theme.colorScheme.primary,
+                              ),
+                              items: _momoProviders
+                                  .map(
+                                    (provider) => DropdownMenuItem(
+                                      value: provider,
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.sim_card_rounded,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(provider),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) => setState(
+                                () => _selectedMomoProvider =
+                                    v ?? _selectedMomoProvider,
                               ),
                             ),
-                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.receipt_long_rounded,
-                                    size: 18,
-                                    color: theme.colorScheme.primary,
+                          const SizedBox(height: 10),
+                          ModernInput(
+                            label: 'MoMo Number',
+                            hintText: 'e.g., 0241234567',
+                            controller: _momoPhoneController,
+                            keyboardType: TextInputType.phone,
+                            onChanged: (value) {
+                              final digitsOnly = value.replaceAll(
+                                RegExp(r'\D'),
+                                '',
+                              );
+                              final normalized = digitsOnly.length > 10
+                                  ? digitsOnly.substring(0, 10)
+                                  : digitsOnly;
+                              if (normalized != value) {
+                                _momoPhoneController.value = TextEditingValue(
+                                  text: normalized,
+                                  selection: TextSelection.collapsed(
+                                    offset: normalized.length,
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Payment Summary',
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      fontWeight: FontWeight.w600,
+                                );
+                              }
+                              setState(() {});
+                            },
+                          ),
+                          if (showMomoPhoneError) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              'Enter a valid Ghana number (10 digits, starts with 0).',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.error,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ],
+                        if (amt > 0) ...[
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primaryContainer
+                                  .withOpacitySafe(0.2),
+                              border: Border.all(
+                                color: theme.colorScheme.primary
+                                    .withOpacitySafe(0.18),
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.receipt_long_rounded,
+                                      size: 18,
+                                      color: theme.colorScheme.primary,
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Total',
-                                    style: theme.textTheme.bodyMedium,
-                                  ),
-                                  Text(
-                                    'GH₵${amt.toStringAsFixed(2)}',
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.bold),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                useExistingAccount
-                                    ? 'Source: $selectedSource'
-                                    : isInvestment
-                                    ? 'Investment method: $selectedSource'
-                                    : 'Method: $selectedSource',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurface
-                                      .withOpacitySafe(0.6),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      widget.sourceLabel == 'Deposit'
+                                          ? 'Deposit Summary'
+                                          : 'Payment Summary',
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                              if (isMomo) ...[
+                                const SizedBox(height: 10),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      widget.sourceLabel == 'Deposit'
+                                          ? 'Amount Deposited'
+                                          : 'Total',
+                                      style: theme.textTheme.bodyMedium,
+                                    ),
+                                    Text(
+                                      'GH₵${amt.toStringAsFixed(2)}',
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                  ],
+                                ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'MoMo number: ${momoPhone.isEmpty ? '-' : momoPhone}',
+                                  useExistingAccount
+                                      ? 'Source: $selectedSource'
+                                      : isInvestment
+                                      ? 'Investment method: $selectedSource'
+                                      : 'Method: $selectedSource',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: theme.colorScheme.onSurface
                                         .withOpacitySafe(0.6),
                                   ),
                                 ),
+                                if (isMomo) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'MoMo number: ${momoPhone.isEmpty ? '-' : momoPhone}',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurface
+                                          .withOpacitySafe(0.6),
+                                    ),
+                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
-                        ),
+                        ],
                       ],
-                    ],
-                  ),
-                ),
-
-                const Spacer(),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: FilledButton.icon(
-                    onPressed: canProceed && !_isSubmitting
-                        ? _handleProceed
-                        : null,
-                    icon: _isSubmitting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.lock_outline_rounded),
-                    label: Text(
-                      _isSubmitting ? 'Processing...' : 'Proceed to Payment',
                     ),
-                    style: FilledButton.styleFrom(
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                  ),
+
+                  const Spacer(),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton.icon(
+                      onPressed: canProceed && !_isSubmitting
+                          ? _handleProceed
+                          : null,
+                      icon: _isSubmitting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.lock_outline_rounded),
+                      label: Text(
+                        _isSubmitting
+                            ? 'Processing...'
+                            : widget.sourceLabel == 'Deposit'
+                            ? 'Make Deposit'
+                            : 'Proceed to Payment',
+                      ),
+                      style: FilledButton.styleFrom(
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
 

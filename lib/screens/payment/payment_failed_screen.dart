@@ -6,14 +6,30 @@ import 'package:go_router/go_router.dart';
 import '../../core/app_scaffold.dart';
 
 class PaymentFailedScreen extends StatelessWidget {
-  const PaymentFailedScreen({super.key});
+  final String returnRoute;
+  final bool isDeposit;
+  final double? amount;
+  final String? reason;
+
+  const PaymentFailedScreen({
+    super.key,
+    this.returnRoute = '/home',
+    this.isDeposit = false,
+    this.amount,
+    this.reason,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final retryRoute = isDeposit
+        ? '/payment/deposit'
+        : returnRoute.startsWith('/savings')
+        ? returnRoute
+        : '/home';
 
     return AppScaffold(
-      title: 'Payment Failed',
+      title: isDeposit ? 'Deposit Failed' : 'Payment Failed',
       showBack: false,
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -56,7 +72,7 @@ class PaymentFailedScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    'Payment Failed',
+                    isDeposit ? 'Deposit Failed' : 'Payment Failed',
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
@@ -64,7 +80,9 @@ class PaymentFailedScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'We could not complete this transaction at the moment.',
+                    isDeposit
+                        ? 'We couldn’t complete your deposit.'
+                        : 'We could not complete this transaction at the moment.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: Colors.white.withOpacitySafe(0.92),
@@ -106,7 +124,10 @@ class PaymentFailedScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Possible causes: insufficient funds or network timeout.',
+                    reason ??
+                        (isDeposit
+                            ? 'Mobile Money authorization was unsuccessful.'
+                            : 'Possible causes: insufficient funds or network timeout.'),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: theme.colorScheme.error,
@@ -120,9 +141,11 @@ class PaymentFailedScreen extends StatelessWidget {
               width: double.infinity,
               height: 52,
               child: FilledButton.icon(
-                onPressed: () => context.go('/payment'),
+                onPressed: () => context.go(
+                  '/payment?returnRoute=${Uri.encodeComponent(retryRoute)}',
+                ),
                 icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Retry Payment'),
+                label: Text(isDeposit ? 'Try Again' : 'Retry Payment'),
                 style: FilledButton.styleFrom(
                   elevation: 0,
                   backgroundColor: theme.colorScheme.error,
@@ -137,9 +160,13 @@ class PaymentFailedScreen extends StatelessWidget {
               width: double.infinity,
               height: 52,
               child: OutlinedButton.icon(
-                onPressed: () => context.go('/home'),
+                onPressed: () => context.go(retryRoute),
                 icon: const Icon(Icons.home_rounded),
-                label: const Text('Go Home'),
+                label: Text(
+                  isDeposit || retryRoute.startsWith('/savings')
+                      ? 'Back to Savings'
+                      : 'Go Home',
+                ),
                 style: OutlinedButton.styleFrom(
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
