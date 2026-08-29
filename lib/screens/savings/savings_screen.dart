@@ -1281,268 +1281,134 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
     Savings s,
     double goalCardMinHeight,
   ) {
-    final progress = (s.balance / s.target).clamp(0.0, 1.0);
-    final remaining = (s.target - s.balance).clamp(0.0, double.infinity);
-    final isCompleted = s.balance >= s.target;
+    // Render a savings account card similar to the provided reference image
     final accentColor = _goalAccentColor(theme, s.type);
-    final createdLabel =
-        '${s.createdAt.day}/${s.createdAt.month}/${s.createdAt.year}';
-    final maturityStatusLabel = s.maturityDate == null
-        ? null
-        : _maturityStatusLabel(s.maturityDate!);
+
+    // Masked account/identifier using last 4 characters of id (fallback to '0000')
+    final accSuffix = s.id.replaceAll(RegExp(r'[^0-9]'), '');
+    final masked = accSuffix.isNotEmpty
+        ? '•••• ${accSuffix.substring(accSuffix.length - (accSuffix.length >= 4 ? 4 : accSuffix.length))}'
+        : '•••• 0000';
+
     return AppCard(
       onTap: () => context.go('/savings/${s.id}'),
       child: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              accentColor.withOpacitySafe(0.10),
-              accentColor.withOpacitySafe(0.03),
-            ],
-          ),
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: accentColor.withOpacitySafe(0.12)),
+          border: Border.all(color: theme.colorScheme.outline.withOpacity(0.06)),
         ),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: goalCardMinHeight),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Top row: icon + title/subtitle | balance on the right
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: accentColor.withOpacitySafe(0.12),
+                      color: accentColor.withOpacitySafe(0.10),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(s.type.icon, color: accentColor, size: 24),
+                    child: Icon(s.type.icon, color: accentColor, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                s.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            if (isCompleted) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: accentColor.withOpacitySafe(0.12),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  'Completed',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: accentColor,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
+                        Text(
+                          s.title,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                         const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          children: [
-                            _buildInfoChip(
-                              theme,
-                              icon: s.type.icon,
-                              label: s.type.label,
-                            ),
-                            _buildInfoChip(
-                              theme,
-                              icon: Icons.schedule_outlined,
-                              label: 'Created $createdLabel',
-                            ),
-                          ],
-                        ),
-                        if (s.type == SavingsType.fixedDeposit &&
-                            s.interestRate != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Text(
-                              '${s.interestRate!.toStringAsFixed(2)}% p.a.',
-                              textScaler: const TextScaler.linear(1.0),
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.secondary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                        Text(
+                          s.type.description,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacitySafe(0.7),
                           ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          masked,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                          ),
+                        ),
                       ],
                     ),
                   ),
+                  const SizedBox(width: 12),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          'GH₵${s.balance.toStringAsFixed(2)}',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: accentColor,
-                          ),
+                      Text(
+                        'GH₵${s.balance.toStringAsFixed(2)}',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary,
                         ),
                       ),
+                      const SizedBox(height: 6),
                       Text(
-                        'of GH₵${s.target.toStringAsFixed(0)}',
-                        textScaler: const TextScaler.linear(1.0),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacitySafe(
-                            0.6,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        isCompleted
-                            ? 'Goal reached'
-                            : '${(progress * 100).toStringAsFixed(0)}% Complete',
-                        textScaler: const TextScaler.linear(1.0),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacitySafe(
-                            0.7,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        isCompleted
-                            ? 'Fully funded'
-                            : 'GH₵${remaining.toStringAsFixed(0)} left',
-                        textScaler: const TextScaler.linear(1.0),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: accentColor,
+                        'Available Balance',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.green[700],
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 8,
-                      backgroundColor: theme.colorScheme.onSurface
-                          .withOpacitySafe(0.06),
-                      color: accentColor,
-                    ),
-                  ),
                 ],
               ),
-              const SizedBox(height: 8),
-              if (s.maturityDate != null)
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildInfoChip(
-                      theme,
-                      icon: Icons.calendar_today,
-                      label:
-                          'Matures ${s.maturityDate!.day}/${s.maturityDate!.month}/${s.maturityDate!.year}',
-                      color: theme.colorScheme.secondary,
-                    ),
-                    if (maturityStatusLabel != null)
-                      _buildInfoChip(
-                        theme,
-                        icon: Icons.timelapse_rounded,
-                        label: maturityStatusLabel,
-                        color: isCompleted
-                            ? accentColor
-                            : theme.colorScheme.tertiary,
-                      ),
-                  ],
-                )
-              else
-                const SizedBox(height: 20),
+
               const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+
+              // Action row: Deposit | Withdraw | Transfer | Statement | More
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () => context.go('/savings/${s.id}'),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      child: Text(
-                        'View Details',
-                        textScaler: const TextScaler.linear(1.0),
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w700,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                    ),
+                  _savingsActionItem(
+                    context,
+                    icon: Icons.arrow_downward, // Deposit icon
+                    label: 'Deposit',
+                    onTap: () => context.go('/payment'),
+                    color: theme.colorScheme.primary,
                   ),
-                  const Spacer(),
-                  SizedBox(
-                    height: 34,
-                    child: isCompleted
-                        ? OutlinedButton.icon(
-                            onPressed: () => context.go('/savings/${s.id}'),
-                            icon: const Icon(
-                              Icons.visibility_outlined,
-                              size: 16,
-                            ),
-                            label: const Text('Review'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: accentColor,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                              ),
-                              side: BorderSide(
-                                color: accentColor.withOpacitySafe(0.35),
-                              ),
-                            ),
-                          )
-                        : FilledButton.icon(
-                            onPressed: () => context.go('/payment'),
-                            icon: const Icon(Icons.add, size: 16),
-                            label: const Text('Deposit'),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: accentColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                            ),
-                          ),
+                  _savingsActionItem(
+                    context,
+                    icon: Icons.arrow_upward, // Withdraw icon
+                    label: 'Withdraw',
+                    onTap: () => context.go('/savings/withdraw'),
+                    color: theme.colorScheme.error,
+                  ),
+                  _savingsActionItem(
+                    context,
+                    icon: Icons.swap_horiz_rounded,
+                    label: 'Transfer',
+                    onTap: () => context.go('/savings/transfer'),
+                    color: const Color(0xFF1B8A9B),
+                  ),
+                  _savingsActionItem(
+                    context,
+                    icon: Icons.description_outlined,
+                    label: 'Statement',
+                    onTap: () => context.go('/savings/${s.id}/statement'),
+                    color: theme.colorScheme.onSurface,
+                  ),
+                  _savingsActionItem(
+                    context,
+                    icon: Icons.more_horiz,
+                    label: 'More',
+                    onTap: () => _showSavingsMore(context, s),
+                    color: theme.colorScheme.onSurface,
                   ),
                 ],
               ),
@@ -1550,6 +1416,82 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _savingsActionItem(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color? color,
+  }) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color ?? theme.colorScheme.onSurface, size: 20),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withOpacitySafe(0.8),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSavingsMore(BuildContext context, Savings s) {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('More options', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 12),
+                ListTile(
+                  leading: const Icon(Icons.edit_outlined),
+                  title: const Text('Edit account'),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    context.go('/savings/${s.id}/edit');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline),
+                  title: const Text('Close account'),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    // placeholder - implement close flow later
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Close account coming soon')),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
