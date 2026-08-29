@@ -23,8 +23,8 @@ import '../screens/auth/otp_screen.dart';
 import '../screens/auth/set_pin_screen.dart';
 
 // Dashboard Tabs
-import '../screens/savings/savings_screen.dart';
 import '../screens/savings/savings_types_screen.dart';
+import '../screens/savings/savings_screen.dart';
 import '../screens/transactions/transactions_screen.dart';
 import '../screens/profile/profile_screen.dart';
 
@@ -367,12 +367,13 @@ class AppRouter {
                           builder: (context, state) => const PaymentHomeScreen(),
             ),
             GoRoute(
-                          path: '/savings',
-                          builder: (context, state) {
-                            // Show the Savings screen when tapping Savings from home.
+              path: '/savings',
+              builder: (context, state) {
+                // if a type query parameter is provided we could filter inside
+                // the savings screen; currently ignored.
                             return const SavingsScreen();
-                          },
-                        ),
+              },
+            ),
             GoRoute(
               path: '/savings/types',
               builder: (context, state) => const SavingsTypesScreen(),
