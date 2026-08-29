@@ -1,11 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/app_scaffold.dart';
+import '../../core/app_card.dart';
+
 class PaymentHomeScreen extends StatefulWidget {
   const PaymentHomeScreen({super.key});
 
   @override
   State<PaymentHomeScreen> createState() => _PaymentHomeScreenState();
+}
+
+/// Placeholder screen for the (now-empty) Payment page. The real payment flow
+/// screens remain available at their routes; this placeholder is returned when
+/// a user navigates to /payment with no specific source (we keep the route but
+/// show an intentionally empty page while payments are being rebuilt).
+class PaymentPlaceholderScreen extends StatelessWidget {
+  const PaymentPlaceholderScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppScaffold(
+      title: 'Payments',
+      showBack: false,
+      child: const Center(child: SizedBox.shrink()),
+    );
+  }
 }
 
 class _PaymentHomeScreenState extends State<PaymentHomeScreen> {
@@ -16,61 +36,252 @@ class _PaymentHomeScreenState extends State<PaymentHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tabs = ['Savings', 'Payments Hub', 'Bills'];
-
-    return Scaffold(
-      backgroundColor: softBg,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+    // Implement the Products home while keeping original tab widgets intact below.
+    return AppScaffold(
+      title: 'My Products',
+      showBack: false,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.search, color: Color(0xFF0C7D45)),
+          onPressed: () {},
+        ),
+        IconButton(
+          icon: const Icon(Icons.tune, color: Color(0xFF0C7D45)),
+          onPressed: () {},
+        ),
+      ],
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0E6E42),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.account_tree_outlined, color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'My Products',
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                color: Colors.black87,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'All your financial products\n in one place',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Colors.black54,
+                                height: 1.2,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
               const SizedBox(height: 18),
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: List.generate(tabs.length, (index) {
-                    final isSelected = _selectedTab == index;
-                    return Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _selectedTab = index),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isSelected ? green : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            tabs[index],
-                            textAlign: TextAlign.center,
+
+              // Portfolio summary card
+              AppCard(
+                onTap: () {},
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0E6E42), Color(0xFF0B5F37)],
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Portfolio Summary',
                             style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.black54,
+                              color: Colors.white,
                               fontWeight: FontWeight.w700,
-                              fontSize: 12,
                             ),
                           ),
+                          Row(
+                            children: const [
+                              Icon(Icons.remove_red_eye_outlined, color: Colors.white, size: 18),
+                              SizedBox(width: 8),
+                              Text('Hide balances', style: TextStyle(color: Colors.white70)),
+                            ],
+                          )
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          _SummaryTile(
+                            icon: Icons.savings_outlined,
+                            label: 'Total Savings',
+                            amount: 'GH₵ 72,400.00',
+                            count: '3 accounts',
+                            color: Colors.greenAccent,
+                          ),
+                          _DividerVertical(),
+                          _SummaryTile(
+                            icon: Icons.pie_chart_outline,
+                            label: 'Total Shares',
+                            amount: 'GH₵ 31,200.00',
+                            count: '1 account',
+                            color: Colors.amber,
+                          ),
+                          _DividerVertical(),
+                          _SummaryTile(
+                            icon: Icons.show_chart,
+                            label: 'Total Investments',
+                            amount: 'GH₵ 80,650.00',
+                            count: '2 investments',
+                            color: Colors.lightGreenAccent,
+                          ),
+                          _DividerVertical(),
+                          _SummaryTile(
+                            icon: Icons.description_outlined,
+                            label: 'Outstanding Loans',
+                            amount: 'GH₵ 45,000.00',
+                            count: '1 active loan',
+                            color: Colors.lightBlueAccent,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              Text(
+                'Product Categories',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+
+              // Products list
+              _productCategory(
+                context,
+                label: 'Savings',
+                description: 'All your savings accounts\n and balances',
+                amount: 'GH₵ 72,400.00',
+                count: '3 accounts',
+                color: const Color(0xFF0E6E42),
+                onTap: () => context.go('/savings'),
+              ),
+
+              _productCategory(
+                context,
+                label: 'Shares',
+                description: 'Your shareholding and\n share value',
+                amount: 'GH₵ 31,200.00',
+                count: '1 account',
+                color: const Color(0xFFFFB703),
+                onTap: () {},
+              ),
+
+              _productCategory(
+                context,
+                label: 'Investments',
+                description: 'Fixed deposits and other\n investments',
+                amount: 'GH₵ 80,650.00',
+                count: '2 investments',
+                color: const Color(0xFF0E6E42),
+                onTap: () {},
+              ),
+
+              _productCategory(
+                context,
+                label: 'Loans',
+                description: 'Your active loans and\n repayment status',
+                amount: 'GH₵ 45,000.00',
+                count: '1 active loan',
+                color: const Color(0xFF3B82F6),
+                onTap: () {},
+              ),
+
+              const SizedBox(height: 12),
+
+              // Promotional banner
+              AppCard(
+                onTap: () {},
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: const Color(0xFFEFF7EF),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Grow with Adepa',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFF0C7D45),
+                                  ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Explore more savings, investment\n and loan opportunities tailored\n for you.',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black54),
+                            ),
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0E6E42),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () {},
+                              child: const Text('Explore Opportunities'),
+                            ),
+                          ],
                         ),
                       ),
-                    );
-                  }),
+                      const SizedBox(width: 12),
+                      // Illustration placeholder
+                      Container(
+                        width: 88,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Center(child: Icon(Icons.account_balance_wallet, color: Color(0xFF0E6E42), size: 36)),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 18),
-              Expanded(
-                child: IndexedStack(
-                  index: _selectedTab,
-                  children: const [
-                    _SavingsTab(),
-                    _PaymentHubTab(),
-                    _BillsTab(),
-                  ],
-                ),
-              ),
+
+              const SizedBox(height: 28),
+
+              // Bottom spacing to mimic bottom navigation bar spacing in design
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -527,6 +738,169 @@ class _BillsTab extends StatelessWidget {
       ],
     );
   }
+}
+
+// Small helper used in the portfolio summary
+class _SummaryTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String amount;
+  final String count;
+  final Color color;
+
+  const _SummaryTile({
+    required this.icon,
+    required this.label,
+    required this.amount,
+    required this.count,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 18),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              amount,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              count,
+              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DividerVertical extends StatelessWidget {
+  const _DividerVertical({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 64,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      color: Colors.white24,
+    );
+  }
+}
+
+// Helper function for product category rows used in the product list
+Widget _productCategory(
+  BuildContext context, {
+  required String label,
+  required String description,
+  required String amount,
+  required String count,
+  required Color color,
+  required VoidCallback onTap,
+}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.06)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 6,
+            height: 56,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.account_balance_wallet_outlined, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                amount,
+                style: TextStyle(
+                  color: color == const Color(0xFFFFB703) ? const Color(0xFFFF8A00) : const Color(0xFF0C7D45),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                count,
+                style: TextStyle(color: color.withOpacity(0.9), fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right, color: Colors.black54),
+        ],
+      ),
+    ),
+  );
 }
 
 class _QuickActionTile extends StatelessWidget {

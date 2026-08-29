@@ -13,17 +13,37 @@ abstract class BaseService {
   );
 
   Map<String, dynamic> normalizeResponsePayload(dynamic raw) {
-    if (raw is! Map) {
+    if (raw == null) {
       return <String, dynamic>{};
     }
 
-    final response = Map<String, dynamic>.from(raw);
+    final response = raw is Map
+        ? Map<String, dynamic>.from(raw)
+        : <String, dynamic>{'data': raw};
+
     final payload = AuthSession.extractPayload(response);
-    return <String, dynamic>{
+
+    final normalized = <String, dynamic>{
       ...payload,
       if (response.containsKey('status')) 'status': response['status'],
       if (response.containsKey('message')) 'message': response['message'],
+      if (response.containsKey('pagination'))
+        'pagination': response['pagination'],
+      if (response.containsKey('meta')) 'meta': response['meta'],
+      if (response.containsKey('error')) 'error': response['error'],
+      if (response.containsKey('data')) 'data': response['data'],
     };
+
+    // Preserve arrays/objects nested under the server's data envelope without
+    // losing any sibling metadata like pagination or status.
+    if (response.containsKey('data') && response['data'] is Map) {
+      final nested = Map<String, dynamic>.from(response['data'] as Map);
+      for (final entry in nested.entries) {
+        normalized.putIfAbsent(entry.key, () => entry.value);
+      }
+    }
+
+    return normalized;
   }
 
   bool isBackendEmptyPayload(dynamic raw) {
@@ -155,8 +175,9 @@ class AuthService extends BaseService {
     return handleApiCall(() async {
       final request = <String, dynamic>{
         if (phoneNumber.trim().isNotEmpty) 'phone_number': phoneNumber,
-        'pin': int.tryParse(pin) ?? pin,
-        'account_number': int.tryParse(accountNumber) ?? accountNumber,
+        // Keep as string so leading zeros are preserved during OTP/PIN checks.
+        'pin': pin.trim(),
+        'account_number': accountNumber.trim(),
         's_key': AppConstants.defaultMobileApiSKey,
       };
 
@@ -165,7 +186,6 @@ class AuthService extends BaseService {
       final response = await _httpClient.post<dynamic>(
         ApiEndpoints.confirmPin,
         data: request,
-        options: BaseService.stccuFormOptions,
       );
 
       final data = response.data;
@@ -174,6 +194,111 @@ class AuthService extends BaseService {
       AppLogger.logApiResponse('POST', ApiEndpoints.confirmPin, result);
       return result;
     });
+  }
+
+  /// Sends the documented login OTP request. The mobile API identifies a
+  /// member by the last five digits of their account number.
+  Map<String, int> _loginIdentifierPayload({
+    required String phoneNumber,
+    required String accountNumber,
+  }) {
+    return <String, int>{
+      // The backend expects numeric values for both identifiers, not strings.
+      'phone_number': int.parse(_toInternationalPhoneNumber(phoneNumber)),
+      'member_id': _memberIdFromAccountNumber(accountNumber),
+    };
+  }
+
+  Future<void> sendLoginOtp({
+    required String phoneNumber,
+    required String accountNumber,
+  }) async {
+    return handleApiCall(() async {
+      final request = _loginIdentifierPayload(
+        phoneNumber: phoneNumber,
+        accountNumber: accountNumber,
+      );
+
+      AppLogger.logApiRequest('POST', ApiEndpoints.sendLoginOtp, request);
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.sendLoginOtp,
+        data: request,
+      );
+
+      if (response.statusCode == 200 && isBackendEmptyPayload(response.data)) {
+        AppLogger.warning(
+          'Legacy STCCU OTP endpoint returned an empty payload; this is not a valid success response.',
+        );
+        throw AuthException(
+          message:
+              'The OTP service returned an empty response. Please verify the member credentials and API contract.',
+        );
+      }
+
+      final result = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse('POST', ApiEndpoints.sendLoginOtp, result);
+
+      if (!AuthSession.isSuccessStatus(result['status'])) {
+        throw AuthException(
+          message:
+              result['message'] as String? ??
+              'The OTP service returned an empty or invalid response.',
+        );
+      }
+    });
+  }
+
+  /// Verifies the SMS code issued during login. This is deliberately distinct
+  /// from [confirmPin], which is for PIN sign-in.
+  Future<Map<String, dynamic>> verifyLoginOtp({
+    required String accountNumber,
+    required String otp,
+  }) async {
+    return handleApiCall(() async {
+      final request = <String, dynamic>{
+        'member_id': _memberIdFromAccountNumber(accountNumber),
+        'otp': int.parse(otp.trim()),
+      };
+
+      AppLogger.logApiRequest('POST', ApiEndpoints.verifyLoginOtp, request);
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.verifyLoginOtp,
+        data: request,
+      );
+
+      if (response.statusCode == 200 && isBackendEmptyPayload(response.data)) {
+        AppLogger.warning(
+          'Legacy STCCU verify-login-OTP endpoint returned an empty payload; this is not a valid verification response.',
+        );
+        throw AuthException(
+          message:
+              'The OTP verification endpoint returned an empty response. Please verify the member credentials and API contract.',
+        );
+      }
+
+      final result = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse('POST', ApiEndpoints.verifyLoginOtp, result);
+      return result;
+    });
+  }
+
+  int _memberIdFromAccountNumber(String accountNumber) {
+    final digits = accountNumber.replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 5) {
+      throw ValidationException(
+        message: 'Account number must contain at least five digits.',
+      );
+    }
+    return int.parse(digits.substring(digits.length - 5));
+  }
+
+  String _toInternationalPhoneNumber(String phoneNumber) {
+    final digits = phoneNumber.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('233')) return digits;
+    if (digits.startsWith('0') && digits.length == 10) {
+      return '233${digits.substring(1)}';
+    }
+    throw ValidationException(message: 'Enter a valid Ghana phone number.');
   }
 
   /// Register a new member via /register
@@ -194,7 +319,6 @@ class AuthService extends BaseService {
       final response = await _httpClient.post<dynamic>(
         ApiEndpoints.register,
         data: request,
-        options: BaseService.stccuFormOptions,
       );
 
       final raw = response.data;
@@ -282,7 +406,6 @@ class AuthService extends BaseService {
       final response = await _httpClient.post<dynamic>(
         ApiEndpoints.setPin,
         data: request,
-        options: BaseService.stccuFormOptions,
       );
 
       final raw = response.data;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
@@ -62,6 +63,9 @@ const List<_InternalAccount> _internalAccounts = [
 
 const List<int> _quickTransferAmounts = [50, 100, 200, 500];
 
+/// Types of transfer destinations supported by the transfer flow.
+enum TransferDestination { internal, member, bank, mobile }
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 class TransferScreen extends StatefulWidget {
@@ -76,9 +80,26 @@ class _TransferScreenState extends State<TransferScreen> {
   String? _toAccountId;
   final _amountController = TextEditingController();
 
+  // Selected destination (internal accounts, member, bank, or mobile money)
+  TransferDestination _destination = TransferDestination.internal;
+
+  // External recipient inputs
+  final TextEditingController _memberIdController = TextEditingController();
+  final TextEditingController _bankAccountController = TextEditingController();
+  final TextEditingController _bankNameController = TextEditingController();
+  final TextEditingController _mobileNumberController = TextEditingController();
+
+  // Resolved / verified recipient info (mocked)
+  String? _resolvedRecipientName;
+  bool _recipientVerified = false;
+
   @override
   void dispose() {
     _amountController.dispose();
+    _memberIdController.dispose();
+    _bankAccountController.dispose();
+    _bankNameController.dispose();
+    _mobileNumberController.dispose();
     super.dispose();
   }
 
@@ -96,11 +117,37 @@ class _TransferScreenState extends State<TransferScreen> {
 
   double get _amount => double.tryParse(_amountController.text) ?? 0;
 
+  double get _feeRate {
+    switch (_destination) {
+      case TransferDestination.internal:
+        return 0.005; // 0.5%
+      case TransferDestination.member:
+        return 0.002; // 0.2%
+      case TransferDestination.bank:
+        return 0.01; // 1%
+      case TransferDestination.mobile:
+        return 0.008; // 0.8%
+    }
+  }
+
   bool get _canSubmit {
-    final from = _fromAccount;
-    if (from == null || _toAccountId == null) return false;
-    if (_fromAccountId == _toAccountId) return false;
+    // amount must be valid
     if (_amount <= 0) return false;
+
+    // always require a from account
+    final from = _fromAccount;
+    if (from == null) return false;
+
+    // for internal transfers both from and to accounts must be selected
+    if (_destination == TransferDestination.internal) {
+      if (_toAccountId == null) return false;
+      if (_fromAccountId == _toAccountId) return false;
+      if (_amount > from.balance) return false;
+      return true;
+    }
+
+    // for external destinations ensure recipient is verified and balance suffices
+    if (!_recipientVerified) return false;
     if (_amount > from.balance) return false;
     return true;
   }
@@ -111,20 +158,35 @@ class _TransferScreenState extends State<TransferScreen> {
 
   Future<void> _onConfirmTransferPressed() async {
     FocusManager.instance.primaryFocus?.unfocus();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Transfers are unavailable until secure backend transfer verification is connected.',
-        ),
-      ),
-    );
+    if (!_canSubmit) return;
+
+    // Mock processing and navigate to success screen with basic details
+    final extra = <String, dynamic>{
+      'amount': _amount,
+      'title': 'Transfer Successful',
+      'message': 'Your transfer has been processed successfully.',
+      'primaryActionRoute': '/home',
+      'account': _fromAccount?.name ?? '',
+      'paymentMethod': _destination == TransferDestination.bank
+          ? 'Bank'
+          : _destination == TransferDestination.mobile
+              ? 'Mobile Money'
+              : _destination == TransferDestination.member
+                  ? 'Member'
+                  : 'Internal',
+      'processedAt': DateTime.now().toIso8601String(),
+      'reference': 'TXN${DateTime.now().millisecondsSinceEpoch}',
+    };
+
+    // Navigate to the existing payment success screen which can display the summary
+    context.go('/payment-success', extra: extra);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isTablet = MediaQuery.sizeOf(context).width >= 900;
-    final fee = _amount * 0.005;
+    final fee = _amount * _feeRate;
     final totalDebit = _amount + fee;
     const gap = SizedBox(height: 12);
     final accent = theme.colorScheme.primary;
@@ -175,8 +237,71 @@ class _TransferScreenState extends State<TransferScreen> {
                     _PageIntro(theme: theme),
                     gap,
 
-                    // From Account
+                    // Destination selector (Internal, Member, Bank, Mobile Money)
                     AppCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SectionHeader(
+                            title: 'Select Destination',
+                            subtitle: 'Choose where you want to send money',
+                            icon: Icons.send_rounded,
+                            theme: theme,
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              ChoiceChip(
+                                label: const Text('Internal'),
+                                selected: _destination == TransferDestination.internal,
+                                onSelected: (v) => setState(() {
+                                  _destination = TransferDestination.internal;
+                                  _recipientVerified = false;
+                                  _resolvedRecipientName = null;
+                                  _toAccountId = null;
+                                }),
+                              ),
+                              ChoiceChip(
+                                label: const Text('Member'),
+                                selected: _destination == TransferDestination.member,
+                                onSelected: (v) => setState(() {
+                                  _destination = TransferDestination.member;
+                                  _recipientVerified = false;
+                                  _resolvedRecipientName = null;
+                                  _toAccountId = null;
+                                }),
+                              ),
+                              ChoiceChip(
+                                label: const Text('Bank'),
+                                selected: _destination == TransferDestination.bank,
+                                onSelected: (v) => setState(() {
+                                  _destination = TransferDestination.bank;
+                                  _recipientVerified = false;
+                                  _resolvedRecipientName = null;
+                                  _toAccountId = null;
+                                }),
+                              ),
+                              ChoiceChip(
+                                label: const Text('Mobile Money'),
+                                selected: _destination == TransferDestination.mobile,
+                                onSelected: (v) => setState(() {
+                                  _destination = TransferDestination.mobile;
+                                  _recipientVerified = false;
+                                  _resolvedRecipientName = null;
+                                  _toAccountId = null;
+                                }),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    gap,
+
+                    // From Account
+                    if (_destination == TransferDestination.internal)
+                      AppCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -227,7 +352,8 @@ class _TransferScreenState extends State<TransferScreen> {
                     ),
 
                     // To Account
-                    AppCard(
+                    if (_destination == TransferDestination.internal)
+                      AppCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -258,6 +384,101 @@ class _TransferScreenState extends State<TransferScreen> {
                     ),
 
                     gap,
+
+                    // Recipient selection for external destinations
+                    if (_destination != TransferDestination.internal)
+                      AppCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _SectionHeader(
+                              title: 'Select Recipient',
+                              subtitle: 'Choose or enter recipient details',
+                              icon: Icons.person_rounded,
+                              theme: theme,
+                            ),
+                            const SizedBox(height: 10),
+                            if (_destination == TransferDestination.member) ...[
+                              ModernInput(
+                                label: 'Member ID or Phone',
+                                controller: _memberIdController,
+                                hintText: 'e.g. 00483921 or 0241234567',
+                                onChanged: (_) => setState(() { _recipientVerified = false; }),
+                              ),
+                              const SizedBox(height: 8),
+                              FilledButton(
+                                onPressed: _memberIdController.text.trim().isEmpty
+                                    ? null
+                                    : () => setState(() {
+                                          // Mock verification - treat input as found
+                                          _resolvedRecipientName = 'Recipient: ${_memberIdController.text.trim()}';
+                                          _recipientVerified = true;
+                                        }),
+                                child: const Text('Find Member'),
+                              ),
+                            ] else if (_destination == TransferDestination.bank) ...[
+                              ModernInput(
+                                label: 'Bank Name',
+                                controller: _bankNameController,
+                                hintText: 'e.g. GCB Bank',
+                                onChanged: (_) => setState(() { _recipientVerified = false; }),
+                              ),
+                              const SizedBox(height: 8),
+                              ModernInput(
+                                label: 'Account Number',
+                                controller: _bankAccountController,
+                                hintText: 'e.g. 1234567890',
+                                onChanged: (_) => setState(() { _recipientVerified = false; }),
+                              ),
+                              const SizedBox(height: 8),
+                              FilledButton(
+                                onPressed: (_bankNameController.text.trim().isEmpty || _bankAccountController.text.trim().isEmpty)
+                                    ? null
+                                    : () => setState(() {
+                                          _resolvedRecipientName = '${_bankNameController.text.trim()} • ${_bankAccountController.text.trim()}';
+                                          _recipientVerified = true;
+                                        }),
+                                child: const Text('Verify Bank Account'),
+                              ),
+                            ] else if (_destination == TransferDestination.mobile) ...[
+                              ModernInput(
+                                label: 'Mobile Number',
+                                controller: _mobileNumberController,
+                                hintText: 'e.g. 0241234567',
+                                onChanged: (_) => setState(() { _recipientVerified = false; }),
+                              ),
+                              const SizedBox(height: 8),
+                              FilledButton(
+                                onPressed: _mobileNumberController.text.trim().isEmpty
+                                    ? null
+                                    : () => setState(() {
+                                          _resolvedRecipientName = 'Mobile: ${_mobileNumberController.text.trim()}';
+                                          _recipientVerified = true;
+                                        }),
+                                child: const Text('Verify Number'),
+                              ),
+                            ],
+                            if (_recipientVerified && _resolvedRecipientName != null) ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary.withOpacitySafe(0.06),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.check_circle, color: Colors.green),
+                                    const SizedBox(width: 10),
+                                    Expanded(child: Text(_resolvedRecipientName!)),
+                                    TextButton(onPressed: () => setState(() { _recipientVerified = false; }), child: const Text('Edit')),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
 
                     // Amount entry
                     AppCard(
@@ -346,7 +567,7 @@ class _TransferScreenState extends State<TransferScreen> {
                         ),
                       ),
                       gap,
-                      _FeeSummary(amount: _amount, theme: theme),
+                      _FeeSummary(amount: _amount, theme: theme, feeRate: _feeRate),
                       const SizedBox(height: 18),
                       _ConfirmButton(
                         canSubmit: _canSubmit,
@@ -399,7 +620,7 @@ class _TransferScreenState extends State<TransferScreen> {
                           Expanded(
                             child: Column(
                               children: [
-                                _FeeSummary(amount: _amount, theme: theme),
+                                _FeeSummary(amount: _amount, theme: theme, feeRate: _feeRate),
                                 const SizedBox(height: 18),
                                 _ConfirmButton(
                                   canSubmit: _canSubmit,
@@ -719,11 +940,12 @@ class _PageIntro extends StatelessWidget {
 class _FeeSummary extends StatelessWidget {
   final double amount;
   final ThemeData theme;
-  const _FeeSummary({required this.amount, required this.theme});
+  final double? feeRate;
+  const _FeeSummary({required this.amount, required this.theme, this.feeRate});
   @override
   Widget build(BuildContext context) {
     if (amount <= 0) return const SizedBox.shrink();
-    final fee = amount * 0.005;
+    final fee = amount * (feeRate ?? 0.005);
     final total = amount + fee;
     return AppCard(
       child: Column(

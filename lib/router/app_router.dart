@@ -23,7 +23,6 @@ import '../screens/auth/otp_screen.dart';
 import '../screens/auth/set_pin_screen.dart';
 
 // Dashboard Tabs
-import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/savings/savings_screen.dart';
 import '../screens/savings/savings_types_screen.dart';
 import '../screens/transactions/transactions_screen.dart';
@@ -39,9 +38,11 @@ import '../screens/loans/repayment_screen.dart';
 import '../screens/payment/payment_screen.dart';
 import '../screens/payment/payment_success_screen.dart';
 import '../screens/payment/payment_failed_screen.dart';
+import '../screens/payment/payment_receipt_screen.dart';
+import '../screens/payment/payment_home_screen.dart';
 import '../screens/savings/create_savings_screen.dart';
-import '../screens/savings/savings_detail_screen.dart';
 import '../screens/savings/savings_model.dart';
+import '../screens/savings/account_detail_screen.dart';
 import '../screens/savings/savings_success_screen.dart';
 import '../screens/savings/transfer_screen.dart';
 import '../screens/savings/withdraw_savings_screen.dart';
@@ -277,7 +278,7 @@ class AppRouter {
 
   static GoRouter _createRouter() {
     final configuredRouter = GoRouter(
-      initialLocation: AppRouter.isDebugAuthBypassEnabled() ? '/home' : '/',
+      initialLocation: '/',
       redirect: (context, state) => _handleRedirect(state),
       errorBuilder: (context, state) {
         final errorMessage = state.error?.toString();
@@ -363,16 +364,15 @@ class AppRouter {
             // Tabs
             GoRoute(
               path: '/home',
-              builder: (context, state) => const DashboardScreen(),
+                          builder: (context, state) => const PaymentHomeScreen(),
             ),
             GoRoute(
-              path: '/savings',
-              builder: (context, state) {
-                // if a type query parameter is provided we could filter inside
-                // the savings screen; currently ignored.
-                return const SavingsScreen();
-              },
-            ),
+                          path: '/savings',
+                          builder: (context, state) {
+                            // Show the Savings screen when tapping Savings from home.
+                            return const SavingsScreen();
+                          },
+                        ),
             GoRoute(
               path: '/savings/types',
               builder: (context, state) => const SavingsTypesScreen(),
@@ -426,15 +426,39 @@ class AppRouter {
               builder: (context, state) => const RepaymentScreen(),
             ),
             GoRoute(
+              path: '/payment/deposit',
+              builder: (context, state) => const PaymentScreen(
+                sourceLabel: 'Deposit',
+                returnRoute: '/savings',
+              ),
+            ),
+            GoRoute(
               path: '/payment',
               builder: (context, state) {
                 final source = state.uri.queryParameters['source'];
+                if (source == null) {
+                                  return const PaymentPlaceholderScreen();
+                }
+                final extra = state.extra is Map<String, dynamic>
+                    ? state.extra as Map<String, dynamic>
+                    : <String, dynamic>{};
+                final rawReturnRoute =
+                    state.uri.queryParameters['returnRoute'] ??
+                    extra['returnRoute'] as String? ??
+                    extra['primaryActionRoute'] as String? ??
+                    '/home';
+                final returnRoute = rawReturnRoute.trim().isEmpty
+                    ? '/home'
+                    : rawReturnRoute;
                 return PaymentScreen(
                   sourceLabel: source == 'existing_account'
                       ? 'Existing account'
                       : source == 'investment'
                       ? 'Investment'
+                      : source == 'deposit'
+                      ? 'Deposit'
                       : null,
+                  returnRoute: returnRoute,
                 );
               },
             ),
@@ -442,6 +466,15 @@ class AppRouter {
               path: '/payment-success',
               builder: (context, state) {
                 final extra = state.extra;
+                final queryReturnRoute =
+                    state.uri.queryParameters['returnRoute'];
+                final fallbackReturnRoute =
+                    queryReturnRoute ??
+                    (extra is Map<String, dynamic>
+                        ? (extra['primaryActionRoute'] as String?)
+                        : null) ??
+                    '/home';
+
                 if (extra is Map<String, dynamic>) {
                   final rawAmount = extra['amount'];
                   final rawProcessedAt = extra['processedAt'];
@@ -452,6 +485,9 @@ class AppRouter {
                   final rawPrimaryActionRoute = extra['primaryActionRoute'];
                   final rawSecondaryActionLabel = extra['secondaryActionLabel'];
                   final rawSecondaryActionRoute = extra['secondaryActionRoute'];
+                  final rawAccount = extra['account'];
+                  final rawPaymentMethod = extra['paymentMethod'];
+                  final rawNewBalance = extra['newBalance'];
 
                   final amount = rawAmount is num ? rawAmount.toDouble() : null;
                   final processedAt = rawProcessedAt is String
@@ -471,12 +507,19 @@ class AppRouter {
                       : null;
                   final primaryActionRoute = rawPrimaryActionRoute is String
                       ? rawPrimaryActionRoute
-                      : null;
+                      : fallbackReturnRoute;
                   final secondaryActionLabel = rawSecondaryActionLabel is String
                       ? rawSecondaryActionLabel
                       : null;
                   final secondaryActionRoute = rawSecondaryActionRoute is String
                       ? rawSecondaryActionRoute
+                      : null;
+                  final account = rawAccount is String ? rawAccount : null;
+                  final paymentMethod = rawPaymentMethod is String
+                      ? rawPaymentMethod
+                      : null;
+                  final newBalance = rawNewBalance is num
+                      ? rawNewBalance.toDouble()
                       : null;
 
                   return PaymentSuccessScreen(
@@ -489,14 +532,76 @@ class AppRouter {
                     primaryActionRoute: primaryActionRoute,
                     secondaryActionLabel: secondaryActionLabel,
                     secondaryActionRoute: secondaryActionRoute,
+                    account: account,
+                    paymentMethod: paymentMethod,
+                    newBalance: newBalance,
                   );
                 }
-                return const PaymentSuccessScreen();
+
+                return PaymentSuccessScreen(
+                  primaryActionRoute: fallbackReturnRoute,
+                  primaryActionLabel: fallbackReturnRoute.startsWith('/savings')
+                      ? 'Back to Savings'
+                      : 'Go Home',
+                );
               },
             ),
             GoRoute(
               path: '/payment-failed',
-              builder: (context, state) => const PaymentFailedScreen(),
+              builder: (context, state) {
+                final extra = state.extra;
+                final returnRoute =
+                    state.uri.queryParameters['returnRoute'] ??
+                    (extra is Map<String, dynamic>
+                        ? (extra['returnRoute'] as String?)
+                        : null) ??
+                    '/home';
+                return PaymentFailedScreen(
+                  returnRoute: returnRoute,
+                  isDeposit: extra is Map<String, dynamic>
+                      ? extra['isDeposit'] == true
+                      : false,
+                  amount: extra is Map<String, dynamic> && extra['amount'] is num
+                      ? (extra['amount'] as num).toDouble()
+                      : null,
+                  reason: extra is Map<String, dynamic> &&
+                          extra['message'] is String
+                      ? extra['message'] as String
+                      : null,
+                );
+              },
+            ),
+            GoRoute(
+              path: '/payment-receipt',
+              builder: (context, state) {
+                final extra = state.extra;
+                final amount =
+                    extra is Map<String, dynamic> && extra['amount'] is num
+                    ? (extra['amount'] as num).toDouble()
+                    : null;
+                return PaymentReceiptScreen(
+                  amount: amount,
+                  processedAt:
+                      extra is Map<String, dynamic> &&
+                          extra['processedAt'] is String
+                      ? DateTime.tryParse(extra['processedAt'] as String)
+                      : null,
+                  reference: extra is Map<String, dynamic>
+                      ? extra['reference'] as String?
+                      : null,
+                  account: extra is Map<String, dynamic>
+                      ? extra['account'] as String?
+                      : null,
+                  paymentMethod: extra is Map<String, dynamic>
+                      ? extra['paymentMethod'] as String?
+                      : null,
+                  newBalance:
+                      extra is Map<String, dynamic> &&
+                          extra['newBalance'] is num
+                      ? (extra['newBalance'] as num).toDouble()
+                      : null,
+                );
+              },
             ),
             GoRoute(
               path: '/savings/create',
@@ -547,11 +652,7 @@ class AppRouter {
               path: '/savings/:id',
               builder: (context, state) {
                 final id = state.pathParameters['id']!;
-                final extra = state.extra;
-                return SavingsDetailScreen(
-                  savingsId: id,
-                  savings: extra is Savings ? extra : null,
-                );
+                return AccountDetailScreen(accountId: id);
               },
             ),
             GoRoute(

@@ -144,8 +144,12 @@ class ApiEndpoints {
   static const String confirmPhoneNumber = '/mobileapp-api/confirmPhoneNumber';
   static const String confirmAccountNumber =
       '/mobileapp-api/confirmAccountNumber';
-  static const String confirmPin = '/mobileapp-api/verifyPin';
-  static const String register = '/register';
+  // Use the published mobile app OTP endpoints directly so they do not depend on
+  // the older STCCU base URL.
+  static const String sendLoginOtp = 'https://adepaye.com/api/mobileapp-api/sendOtp';
+  static const String verifyLoginOtp = 'https://adepaye.com/api/mobileapp-api/verifyOtp';
+  static const String confirmPin = '/verifyPin';
+  static const String register = 'https://adepaye.com/mobileapp-api/register';
   static const String changePin = '/mobileapp-api/changePin';
   static const String setPin = '/mobileapp-api/setPin';
 

@@ -84,62 +84,68 @@ class _MainShellState extends ConsumerState<MainShell> {
             _OfflineBanner(isOnline: isOnline),
             Expanded(
               child: Row(
-          children: [
-            NavigationRail(
-              selectedIndex: currentIndex,
-              onDestinationSelected: (index) {
-                if (index == 0) context.go('/home');
-                if (index == 1) context.go('/savings');
-                if (index == 2) context.go('/transactions');
-                if (index == 3) context.go('/profile');
-              },
-              extended: Responsive.isLarge(context),
-              useIndicator: true,
-              leading: Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: FloatingActionButton.small(
-                  onPressed: () => context.go('/home'),
-                  child: const Icon(Icons.home_rounded),
-                ),
+                children: [
+                  NavigationRail(
+                    selectedIndex: currentIndex,
+                    onDestinationSelected: (index) {
+                      if (index == 0) context.go('/home');
+                      if (index == 1) context.go('/savings');
+                      if (index == 2) context.go('/payment');
+                      if (index == 3) context.go('/transactions');
+                      if (index == 4) context.go('/profile');
+                    },
+                    extended: Responsive.isLarge(context),
+                    useIndicator: true,
+                    leading: Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: FloatingActionButton.small(
+                        onPressed: () => context.go('/home'),
+                        child: const Icon(Icons.home_rounded),
+                      ),
+                    ),
+                    trailing: Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: IconButton(
+                        tooltip: 'Savings types',
+                        onPressed: () {
+                          HapticFeedback.mediumImpact();
+                          context.go('/savings/types');
+                        },
+                        icon: const Icon(Icons.tune_rounded),
+                      ),
+                    ),
+                    destinations: const [
+                      NavigationRailDestination(
+                        icon: Icon(Icons.home_outlined),
+                        selectedIcon: Icon(Icons.home_rounded),
+                        label: Text('Home'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.grid_view_outlined),
+                        selectedIcon: Icon(Icons.grid_view_outlined),
+                        label: Text('Products'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.swap_horiz_outlined),
+                        selectedIcon: Icon(Icons.swap_horiz_rounded),
+                        label: Text('Payments'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.receipt_long_outlined),
+                        selectedIcon: Icon(Icons.receipt_long_rounded),
+                        label: Text('Activity'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.more_horiz),
+                        selectedIcon: Icon(Icons.more_horiz),
+                        label: Text('More'),
+                      ),
+                    ],
+                  ),
+                  const VerticalDivider(width: 1),
+                  Expanded(child: widget.child),
+                ],
               ),
-              trailing: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: IconButton(
-                  tooltip: 'Savings types',
-                  onPressed: () {
-                    HapticFeedback.mediumImpact();
-                    context.go('/savings/types');
-                  },
-                  icon: const Icon(Icons.tune_rounded),
-                ),
-              ),
-              destinations: const [
-                NavigationRailDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home_rounded),
-                  label: Text('Home'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.savings_outlined),
-                  selectedIcon: Icon(Icons.savings_rounded),
-                  label: Text('Savings'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.swap_horiz_outlined),
-                  selectedIcon: Icon(Icons.swap_horiz_rounded),
-                  label: Text('Transactions'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.person_outline_rounded),
-                  selectedIcon: Icon(Icons.person_rounded),
-                  label: Text('Profile'),
-                ),
-              ],
-            ),
-            const VerticalDivider(width: 1),
-            Expanded(child: widget.child),
-          ],
-        ),
             ),
           ],
         ),
@@ -156,10 +162,10 @@ class _MainShellState extends ConsumerState<MainShell> {
       bottomNavigationBar: SafeArea(
         top: false,
         child: Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
           decoration: BoxDecoration(
-            color:
-                theme.bottomNavigationBarTheme.backgroundColor ??
-                theme.colorScheme.surface,
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.08),
@@ -179,7 +185,7 @@ class _MainShellState extends ConsumerState<MainShell> {
               ),
               _ShellNavItem(
                 icon: Icons.savings,
-                label: 'Savings',
+                label: 'Products',
                 selected: currentIndex == 1,
                 onTap: () => context.go('/savings'),
                 onLongPress: () {
@@ -189,14 +195,20 @@ class _MainShellState extends ConsumerState<MainShell> {
               ),
               _ShellNavItem(
                 icon: Icons.swap_horiz,
-                label: 'Transactions',
+                label: 'Payments',
                 selected: currentIndex == 2,
+                onTap: () => context.go('/payment'),
+              ),
+              _ShellNavItem(
+                icon: Icons.receipt_long_outlined,
+                label: 'Activity',
+                selected: currentIndex == 3,
                 onTap: () => context.go('/transactions'),
               ),
               _ShellNavItem(
-                icon: Icons.person,
-                label: 'Profile',
-                selected: currentIndex == 3,
+                icon: Icons.more_horiz,
+                label: 'More',
+                selected: currentIndex == 4,
                 onTap: () => context.go('/profile'),
               ),
             ],
@@ -210,8 +222,13 @@ class _MainShellState extends ConsumerState<MainShell> {
     final location = GoRouterState.of(context).uri.path;
 
     if (location.startsWith('/savings')) return 1;
-    if (location.startsWith('/transactions')) return 2;
-    if (location.startsWith('/profile')) return 3;
+    if (location.startsWith('/payment')) return 2;
+    if (location.startsWith('/transactions')) return 3;
+    if (location.startsWith('/profile') ||
+        location.startsWith('/settings') ||
+        location.startsWith('/notifications')) {
+      return 4;
+    }
     return 0;
   }
 }
@@ -261,6 +278,16 @@ class _ShellNavItem extends StatelessWidget {
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: tint,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: selected ? 18 : 0,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: selectedColor,
+                    borderRadius: BorderRadius.circular(99),
                   ),
                 ),
               ],

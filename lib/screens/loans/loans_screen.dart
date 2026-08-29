@@ -424,7 +424,7 @@ class _ActiveLoanView extends StatelessWidget {
           deposit: ActionItem(
             label: 'Apply',
             icon: Icons.add_circle_outline_rounded,
-            color: const Color(0xFFB86A14),
+            color: theme.colorScheme.primary,
             onTap: () => context.go('/apply-loan'),
           ),
           withdraw: ActionItem(
@@ -436,13 +436,13 @@ class _ActiveLoanView extends StatelessWidget {
           transfer: ActionItem(
             label: 'Details',
             icon: Icons.receipt_long_rounded,
-            color: const Color(0xFF1F7AE0),
+            color: theme.colorScheme.primary,
             onTap: () => context.go('/loan-detail'),
           ),
           extra: ActionItem(
             label: 'View Application Status',
             icon: Icons.timelapse_rounded,
-            color: const Color(0xFF5C6BC0),
+            color: theme.colorScheme.primary,
             onTap: () => context.go('/loan-status'),
           ),
         ),

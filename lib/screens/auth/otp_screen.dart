@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,6 +10,8 @@ import '../../core/exceptions/app_exceptions.dart';
 import '../../core/models/notification_models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/services/notification_service.dart';
+import '../../core/services/secure_auth_storage.dart';
+import '../../core/utils/error_handler.dart';
 
 class OtpScreen extends ConsumerStatefulWidget {
   const OtpScreen({
@@ -25,10 +30,68 @@ class OtpScreen extends ConsumerStatefulWidget {
 class _OtpScreenState extends ConsumerState<OtpScreen> {
   final TextEditingController _otpController = TextEditingController();
   bool _isSubmitting = false;
+  bool _isResending = false;
+  Timer? _resendTimer;
+  int _resendSecondsRemaining = 0;
 
-  bool get _isValid => _otpController.text.trim().length == 4;
+  bool get _isValid =>
+      ErrorHandler.validateOtp(_otpController.text.trim()) == null;
 
   String get _normalizedOtp => _otpController.text.trim();
+
+  @override
+  void initState() {
+    super.initState();
+    _startResendCooldown();
+  }
+
+  void _startResendCooldown() {
+    _resendTimer?.cancel();
+    setState(() => _resendSecondsRemaining = 60);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || _resendSecondsRemaining <= 1) {
+        timer.cancel();
+        if (mounted) setState(() => _resendSecondsRemaining = 0);
+        return;
+      }
+      setState(() => _resendSecondsRemaining--);
+    });
+  }
+
+  Future<void> _handleResendCode() async {
+    if (_isResending || _resendSecondsRemaining > 0) return;
+
+    setState(() => _isResending = true);
+    try {
+      await ref
+          .read(authProvider.notifier)
+          .sendLoginOtp(
+            phoneNumber: widget.phoneNumber,
+            accountNumber: widget.accountNumber,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Code resend requested. Please check your SMS.'),
+        ),
+      );
+      _startResendCooldown();
+    } on AppException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not resend code right now.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isResending = false);
+      }
+    }
+  }
 
   Future<void> _handleVerify() async {
     if (_isSubmitting || !_isValid) return;
@@ -57,7 +120,25 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       ref.invalidate(loansProvider);
       ref.invalidate(savingsProvider);
       if (!mounted) return;
-      context.go('/home');
+
+      final pin = await SecureAuthStorage.instance.readPin() ?? '';
+      if (!mounted) return;
+      final hasSavedPin = pin.isNotEmpty;
+      if (hasSavedPin) {
+        context.go('/home');
+        return;
+      }
+
+      final destination = Uri(
+        path: '/set-pin',
+        queryParameters: {
+          'mode': 'signin',
+          'phoneNumber': widget.phoneNumber,
+          'accountNumber': widget.accountNumber,
+        },
+      );
+      if (!mounted) return;
+      context.go(destination.toString());
     } on AppException catch (e) {
       await NotificationService.instance.addNotification(
         AppNotification(
@@ -95,6 +176,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     _otpController.dispose();
     super.dispose();
   }
@@ -178,7 +260,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'A 4-digit code was sent to ${widget.phoneNumber}',
+                        'A 4-digit code should be sent to ${widget.phoneNumber}',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.white70,
@@ -214,7 +296,10 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                                 const SizedBox(height: 8),
                                 TextField(
                                   controller: _otpController,
-                                  keyboardType: TextInputType.number,
+                                keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
                                   maxLength: 4,
                                   textAlign: TextAlign.center,
                                   style: theme.textTheme.headlineMedium
@@ -298,6 +383,31 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                               ),
                             ),
                             const SizedBox(height: 16),
+                            TextButton(
+                              onPressed: _isResending ||
+                                      _resendSecondsRemaining > 0
+                                  ? null
+                                  : _handleResendCode,
+                              child: Text(
+                                _isResending
+                                    ? 'Requesting code...'
+                                    : _resendSecondsRemaining > 0
+                                    ? 'Resend code (${_resendSecondsRemaining}s)'
+                                    : 'Resend code',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              'If the code does not arrive, tap Resend code and confirm your number is correct.',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white70,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
                             TextButton(
                               onPressed: () => context.go('/login'),
                               child: Text(

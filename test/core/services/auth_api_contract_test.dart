@@ -1,12 +1,19 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:adepa_teachers/core/constants/app_constants.dart';
+import 'package:adepa_teachers/core/models/auth_state.dart';
 import 'package:adepa_teachers/core/models/auth_session.dart';
+import 'package:adepa_teachers/core/services/api_service.dart';
 
 void main() {
   group('Auth API contract', () {
     test('uses the documented mobileapp-api auth routes', () {
-      expect(ApiEndpoints.register, '/mobileapp-api/register');
-      expect(ApiEndpoints.confirmPin, '/mobileapp-api/verifyPin');
+      expect(
+        ApiEndpoints.register,
+        'https://adepaye.com/mobileapp-api/register',
+      );
+      expect(ApiEndpoints.confirmPin, '/verifyPin');
+      expect(ApiEndpoints.sendLoginOtp, 'https://adepaye.com/api/mobileapp-api/sendOtp');
+      expect(ApiEndpoints.verifyLoginOtp, 'https://adepaye.com/api/mobileapp-api/verifyOtp');
       expect(ApiEndpoints.setPin, '/mobileapp-api/setPin');
       expect(ApiEndpoints.changePin, '/mobileapp-api/changePin');
     });
@@ -33,6 +40,13 @@ void main() {
       expect(AuthSession.isSuccessStatus(0), isFalse);
     });
 
+    test('detects legacy empty payloads from STCCU OTP endpoints', () {
+      final service = AuthService();
+      expect(service.isBackendEmptyPayload(''), isTrue);
+      expect(service.isBackendEmptyPayload('""'), isTrue);
+      expect(service.normalizeResponsePayload('')['data'], isEmpty);
+    });
+
     test('extracts tokens from nested data payloads', () {
       final session = AuthSession.fromResponse({
         'data': {
@@ -43,5 +57,18 @@ void main() {
       expect(session?.accessToken, 'abc123');
       expect(session?.refreshToken, 'refresh456');
     });
+
+    test(
+      'supports documented verification without an issued session token',
+      () {
+        final state = AuthState.authenticated(
+          userId: '10600000040752',
+          userEmail: '233241952608',
+        );
+
+        expect(state.isAuthenticated, isTrue);
+        expect(state.authToken, isNull);
+      },
+    );
   });
 }

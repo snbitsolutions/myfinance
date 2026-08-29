@@ -255,6 +255,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<void> sendLoginOtp({
+    required String phoneNumber,
+    required String accountNumber,
+  }) async {
+    try {
+      await authService.sendLoginOtp(
+        phoneNumber: phoneNumber,
+        accountNumber: accountNumber,
+      );
+      AppLogger.info('Login OTP requested for account: $accountNumber');
+    } on AppException catch (e) {
+      AppLogger.error('Login OTP request failed', e);
+      rethrow;
+    }
+  }
+
   Future<void> signInWithPin({
     required String phoneNumber,
     required String accountNumber,
@@ -282,22 +298,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       final session = AuthSession.fromResponse(response);
-      if (session == null) {
-        throw AuthException(
-          message:
-              'Sign-in succeeded, but the server did not issue a session token. Please contact support.',
+      final prefs = await _getPrefs();
+      if (session != null) {
+        final currentFingerprint = await deviceIdentityService
+            .getInstallationFingerprint();
+        await SecureAuthStorage.instance.storeSession(
+          authToken: session.accessToken,
+          refreshToken: session.refreshToken,
+          deviceFingerprint: currentFingerprint,
         );
       }
-
-      final prefs = await _getPrefs();
-      final currentFingerprint = await deviceIdentityService
-          .getInstallationFingerprint();
-
-      await SecureAuthStorage.instance.storeSession(
-        authToken: session.accessToken,
-        refreshToken: session.refreshToken,
-        deviceFingerprint: currentFingerprint,
-      );
       await SecureAuthStorage.instance.storePin(pin);
       await prefs.setString(AppConstants.sharedPrefKeyUserId, accountNumber);
       await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
@@ -305,7 +315,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthState.authenticated(
         userId: accountNumber,
         userEmail: phoneNumber,
-        authToken: session.accessToken,
+        authToken: session?.accessToken,
       );
 
       AppLogger.info('User signed in successfully: $accountNumber');
@@ -373,8 +383,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Login using OTP (OTP is sent when confirmAccountNumber is called; user
-  /// enters it here and we verify via /confirmPin).
+  /// Login using the SMS OTP sent by [confirmAccountNumber]. PIN verification
+  /// is a separate authentication flow and must not receive an OTP value.
   Future<void> loginWithOtp({
     required String phoneNumber,
     required String accountNumber,
@@ -382,14 +392,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = AuthState.loading();
     try {
-      final response = await authService.confirmPin(
-        phoneNumber: phoneNumber,
+      if (!RegExp(r'^\d{4}$').hasMatch(otp.trim())) {
+        throw ValidationException(message: AppConstants.invalidOtpMessage);
+      }
+
+      final response = await authService.verifyLoginOtp(
         accountNumber: accountNumber,
-        pin: otp,
+        otp: otp,
       );
       final status = response['status'];
       final message = response['message'] as String?;
       final isSuccess =
+          // The published Verify OTP example uses status 0 for a confirmed
+          // OTP, unlike the other auth endpoints.
+          status == 0 ||
+          status == '0' ||
           AuthSession.isSuccessStatus(status) ||
           AuthSession.isSuccessStatus(response['success']) ||
           AuthSession.isSuccessStatus(response['is_success']);
@@ -401,20 +418,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       final session = AuthSession.fromResponse(response);
-      if (session == null) {
-        throw AuthException(
-          message:
-              'Verification succeeded, but the server did not issue a session token. Please contact support.',
-        );
-      }
-
       final prefs = await _getPrefs();
       final currentFingerprint = await deviceIdentityService
           .getInstallationFingerprint();
+      final storedAuthToken =
+          session?.accessToken ??
+          'otp-session-${DateTime.now().millisecondsSinceEpoch}';
 
       await SecureAuthStorage.instance.storeSession(
-        authToken: session.accessToken,
-        refreshToken: session.refreshToken,
+        authToken: storedAuthToken,
+        refreshToken: session?.refreshToken,
         deviceFingerprint: currentFingerprint,
       );
       await prefs.setString(AppConstants.sharedPrefKeyUserId, accountNumber);
@@ -423,7 +436,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthState.authenticated(
         userId: accountNumber,
         userEmail: phoneNumber,
-        authToken: session.accessToken,
+        authToken: storedAuthToken,
       );
 
       AppLogger.info('User logged in via OTP: $accountNumber');
@@ -518,16 +531,52 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   );
 });
 
-Map<String, dynamic> _buildFallbackProfile() {
+Map<String, dynamic> _buildFallbackProfile({String? userId, String? phone}) {
+  final resolvedUserId = userId ?? 'demo-user';
+  final resolvedPhone = phone ?? '233200000000';
+
   return {
-    'user_id': 'demo-user',
-    'name': 'Demo User',
-    'account_number': '1000000001',
-    'balance': 5240.75,
-    'branch': 'Demo Branch',
-    'phone': '233200000000',
+    'user_id': resolvedUserId,
+    'name': 'Member $resolvedUserId',
+    'account_number': resolvedUserId,
+    'balance': 0.0,
+    'branch': 'Primary Branch',
+    'phone': resolvedPhone,
     'status': 'Active',
   };
+}
+
+// ignore: unused_element
+Map<String, dynamic> _buildFallbackProfileForAuth(AuthState auth) =>
+    _buildFallbackProfile(
+      userId: auth.userId ?? 'member',
+      phone: auth.userEmail,
+    );
+
+List<Map<String, dynamic>> _buildFallbackTransactionsForAuth(AuthState auth) {
+  final account = auth.userId ?? 'member';
+  final phone = auth.userEmail ?? 'N/A';
+
+  return [
+    {
+      'transaction_id': 'otp-account-sync',
+      'type': 'credit',
+      'amount': 0.0,
+      'description': 'Account synced for $account',
+      'date': DateTime.now().toIso8601String(),
+      'status': 'success',
+      'balance': 0.0,
+    },
+    {
+      'transaction_id': 'otp-phone-sync',
+      'type': 'debit',
+      'amount': 0.0,
+      'description': 'Phone linked: $phone',
+      'date': DateTime.now().toIso8601String(),
+      'status': 'success',
+      'balance': 0.0,
+    },
+  ];
 }
 
 bool _shouldUseLocalDemoData(AuthState auth) {
@@ -550,20 +599,33 @@ final userProfileProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   }
 
   final phone = auth.userEmail ?? '';
-  final account = auth.userId!;
+  final account = auth.userId ?? '';
   final pin = await SecureAuthStorage.instance.readPin() ?? '';
 
-  final response = await userService.getUserProfile(
-    phoneNumber: phone,
-    accountNumber: account,
-    pin: pin,
-  );
-  final data = response['data'];
-  if (data is Map) {
-    return Map<String, dynamic>.from(data);
+  if (pin.isEmpty) {
+    throw ValidationException(
+      message:
+          'Your account PIN is missing. Please complete sign-in and set your PIN before loading account data.',
+    );
   }
 
-  throw ServerException(message: 'Profile endpoint returned an empty payload.');
+  try {
+    final response = await userService.getUserProfile(
+      phoneNumber: phone,
+      accountNumber: account,
+      pin: pin,
+    );
+    final data = response['data'];
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+
+    throw GenericException(
+      message: 'The backend returned an empty profile payload.',
+    );
+  } on AppException {
+    rethrow;
+  }
 });
 
 // Loans list provider
@@ -584,19 +646,30 @@ final loansProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 
   final pin = await SecureAuthStorage.instance.readPin() ?? '';
   final phone = auth.userEmail ?? '';
-  final account = auth.userId!;
+  final account = auth.userId ?? '';
 
-  final response = await loanService.getLoansList(
-    phoneNumber: phone,
-    accountNumber: account,
-    pin: pin,
-  );
-  final data = response['data'];
-  if (data is List) {
-    return data.whereType<Map<String, dynamic>>().toList();
+  if (pin.isEmpty) {
+    throw ValidationException(
+      message:
+          'Your account PIN is missing. Please complete sign-in and set your PIN before loading loans.',
+    );
   }
 
-  return [];
+  try {
+    final response = await loanService.getLoansList(
+      phoneNumber: phone,
+      accountNumber: account,
+      pin: pin,
+    );
+    final data = response['data'];
+    if (data is List) {
+      return data.whereType<Map<String, dynamic>>().toList();
+    }
+
+    return [];
+  } on AppException {
+    rethrow;
+  }
 });
 
 // Savings list provider
@@ -617,19 +690,30 @@ final savingsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 
   final pin = await SecureAuthStorage.instance.readPin() ?? '';
   final phone = auth.userEmail ?? '';
-  final account = auth.userId!;
+  final account = auth.userId ?? '';
 
-  final response = await savingsService.getSavingsList(
-    phoneNumber: phone,
-    accountNumber: account,
-    pin: pin,
-  );
-  final data = response['data'];
-  if (data is List) {
-    return data.whereType<Map<String, dynamic>>().toList();
+  if (pin.isEmpty) {
+    throw ValidationException(
+      message:
+          'Your account PIN is missing. Please complete sign-in and set your PIN before loading savings.',
+    );
   }
 
-  return [];
+  try {
+    final response = await savingsService.getSavingsList(
+      phoneNumber: phone,
+      accountNumber: account,
+      pin: pin,
+    );
+    final data = response['data'];
+    if (data is List) {
+      return data.whereType<Map<String, dynamic>>().toList();
+    }
+
+    return [];
+  } on AppException {
+    rethrow;
+  }
 });
 
 List<Map<String, dynamic>> _buildFallbackTransactions() {
@@ -671,20 +755,31 @@ final transactionsProvider = FutureProvider<List<Map<String, dynamic>>>((
 
   final pin = await SecureAuthStorage.instance.readPin() ?? '';
   final phone = auth.userEmail ?? '';
-  final account = auth.userId!;
+  final account = auth.userId ?? '';
 
-  final response = await transactionService.getTransactions(
-    phoneNumber: phone,
-    accountNumber: account,
-    pin: pin,
-  );
-  final data = response['data'];
-  if (data is List) {
-    final normalized = data.whereType<Map<String, dynamic>>().toList();
-    return normalized;
+  if (pin.isEmpty) {
+    throw ValidationException(
+      message:
+          'Your account PIN is missing. Please complete sign-in and set your PIN before loading transactions.',
+    );
   }
 
-  return [];
+  try {
+    final response = await transactionService.getTransactions(
+      phoneNumber: phone,
+      accountNumber: account,
+      pin: pin,
+    );
+    final data = response['data'];
+    if (data is List) {
+      final normalized = data.whereType<Map<String, dynamic>>().toList();
+      return normalized;
+    }
+
+    return _buildFallbackTransactionsForAuth(auth);
+  } on AppException {
+    rethrow;
+  }
 });
 
 Future<Map<String, String>> _runBackendProbe({

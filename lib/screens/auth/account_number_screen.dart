@@ -51,7 +51,7 @@ class _AccountNumberScreenState extends ConsumerState<AccountNumberScreen> {
 
       await ref
           .read(authProvider.notifier)
-          .confirmAccountNumber(
+          .sendLoginOtp(
             phoneNumber: widget.phoneNumber,
             accountNumber: _normalizedAccountNumber,
           );

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,11 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize core services
-  await SecureAuthStorage.instance.initialize();
-  await HttpClient.instance.initializePreferences();
-  await NetworkService.instance.initialize();
-  await DeviceIdentityService().primeInstallationId();
+  await _initializeCoreServices();
 
   final prefs = await SharedPreferences.getInstance();
   final savedDebugBypass = prefs.getBool(
@@ -29,11 +27,10 @@ void main() async {
         AppConstants.debugApiPhoneNumber.trim().isNotEmpty &&
         AppConstants.debugApiAccountNumber.trim().isNotEmpty;
 
-    // Keep debug bypass opt-in: only auto-enable when test identity is
-    // provided, and auto-disable stale bypass when identity is absent.
-    if (hasSeededIdentity && savedDebugBypass == null) {
-      await prefs.setBool(AppConstants.sharedPrefKeyDebugBypassAuth, true);
-    } else if (!hasSeededIdentity && savedDebugBypass == true) {
+    // Keep debug bypass opt-in only. Do not silently auto-enable it just
+    // because a test identity is present; otherwise the app skips the login flow
+    // and starts on the home screen.
+    if (!hasSeededIdentity && savedDebugBypass == true) {
       await prefs.setBool(AppConstants.sharedPrefKeyDebugBypassAuth, false);
     }
   }
@@ -43,6 +40,26 @@ void main() async {
   }
 
   runApp(const ProviderScope(child: AdepaTeachersApp()));
+}
+
+Future<void> _initializeCoreServices() async {
+  try {
+    await _initializeCoreServicesSequentially().timeout(
+      const Duration(seconds: 8),
+    );
+  } on TimeoutException {
+    debugPrint('Core service initialization timed out; starting the app.');
+  } catch (error, stackTrace) {
+    debugPrint('Core service initialization failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+}
+
+Future<void> _initializeCoreServicesSequentially() async {
+  await SecureAuthStorage.instance.initialize();
+  await HttpClient.instance.initializePreferences();
+  await NetworkService.instance.initialize();
+  await DeviceIdentityService().primeInstallationId();
 }
 
 Future<void> _seedDebugBypassIdentity(SharedPreferences prefs) async {

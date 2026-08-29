@@ -25,8 +25,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   String get _normalizedPhoneNumber {
     final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+    // The documented OTP endpoint expects Ghana's international format.
     if (digits.startsWith('233')) return digits;
-    if (digits.startsWith('0')) return '233${digits.substring(1)}';
+    if (digits.startsWith('0') && digits.length == 10) {
+      return '233${digits.substring(1)}';
+    }
     return digits;
   }
 
