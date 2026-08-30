@@ -290,7 +290,13 @@ class _SavingsDetailScreenState extends State<SavingsDetailScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: () => context.pop(),
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/home');
+                      }
+                    },
                     icon: const Icon(
                       Icons.arrow_back_ios_new_rounded,
                       size: 26,
@@ -558,18 +564,22 @@ class _SavingsDetailScreenState extends State<SavingsDetailScreen> {
                             icon: Icons.arrow_downward,
                             label: 'Deposit',
                             active: true,
+                            onTap: () => context.go('/savings/${widget.savingsId}/deposit'),
                           ),
                           _ActionButton(
                             icon: Icons.arrow_upward,
                             label: 'Withdraw',
+                            onTap: () {},
                           ),
                           _ActionButton(
                             icon: Icons.swap_horiz,
                             label: 'Transfer',
+                            onTap: () {},
                           ),
                           _ActionButton(
                             icon: Icons.receipt_long_rounded,
                             label: 'Statement',
+                            onTap: () {},
                           ),
                         ],
                       ),
@@ -842,46 +852,6 @@ class _SavingsDetailScreenState extends State<SavingsDetailScreen> {
                 ),
               ),
             ),
-            Container(
-              height: 78,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(
-                  top: BorderSide(color: Color(0xFFE9EAE8), width: 1),
-                ),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _BottomNavItem(
-                    icon: Icons.home_rounded,
-                    label: 'Home',
-                    active: false,
-                  ),
-                  _BottomNavItem(
-                    icon: Icons.grid_view_rounded,
-                    label: 'Products',
-                    active: false,
-                  ),
-                  _BottomNavItem(
-                    icon: Icons.payments_rounded,
-                    label: 'Payments',
-                    active: false,
-                  ),
-                  _BottomNavItem(
-                    icon: Icons.bar_chart_rounded,
-                    label: 'Activity',
-                    active: true,
-                  ),
-                  _BottomNavItem(
-                    icon: Icons.more_horiz_rounded,
-                    label: 'More',
-                    active: false,
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),
@@ -893,42 +863,48 @@ class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool active;
+  final VoidCallback? onTap;
 
   const _ActionButton({
     required this.icon,
     required this.label,
     this.active = false,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 72,
-      child: Column(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: active ? const Color(0xFFE9F5ED) : const Color(0xFFF4F5F4),
-              borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: SizedBox(
+        width: 72,
+        child: Column(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: active ? const Color(0xFFE9F5ED) : const Color(0xFFF4F5F4),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: active ? const Color(0xFF2E8B57) : Colors.black87,
+                size: 22,
+              ),
             ),
-            child: Icon(
-              icon,
-              color: active ? const Color(0xFF2E8B57) : Colors.black87,
-              size: 22,
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: active ? const Color(0xFF2E8B57) : Colors.black87,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: active ? const Color(0xFF2E8B57) : Colors.black87,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1038,37 +1014,3 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
-class _BottomNavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool active;
-
-  const _BottomNavItem({
-    required this.icon,
-    required this.label,
-    required this.active,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(
-          icon,
-          color: active ? const Color(0xFF2E8B57) : const Color(0xFF6B736F),
-          size: 24,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: active ? const Color(0xFF2E8B57) : const Color(0xFF6B736F),
-            fontSize: 11,
-            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-}

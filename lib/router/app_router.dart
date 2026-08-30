@@ -28,9 +28,15 @@ import '../screens/error/app_error_screen.dart';
 import '../screens/payment/payment_home_screen.dart';
 import '../screens/payment/payment_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../screens/savings/create_savings_screen.dart';
 import '../screens/savings/products_screen.dart';
+import '../screens/savings/savings_deposit_screen.dart';
 import '../screens/savings/savings_detail_screen.dart';
+import '../screens/savings/savings_model.dart';
 import '../screens/savings/savings_screen.dart';
+import '../screens/savings/savings_types_screen.dart';
+import '../screens/savings/transfer_screen.dart';
+import '../screens/savings/withdraw_savings_screen.dart';
 import '../screens/transactions/transactions_screen.dart';
 
 class AppRouter {
@@ -346,11 +352,69 @@ class AppRouter {
               builder: (context, state) => const SavingsScreen(),
             ),
             GoRoute(
+              path: '/savings/create',
+              builder: (context, state) {
+                final type = state.uri.queryParameters['type'];
+                final selectedType = switch (type) {
+                  'current' => SavingsType.currentSaving,
+                  'kiddy' => SavingsType.kiddySaving,
+                  'fixed' => SavingsType.fixedDeposit,
+                  _ => SavingsType.memberSaving,
+                };
+                return CreateSavingsScreen(initialType: selectedType);
+              },
+            ),
+            GoRoute(
+              path: '/savings/types',
+              builder: (context, state) => const SavingsTypesScreen(),
+            ),
+            GoRoute(
+              path: '/savings/withdraw',
+              builder: (context, state) => const WithdrawSavingsScreen(),
+            ),
+            GoRoute(
+              path: '/savings/transfer',
+              builder: (context, state) => const TransferScreen(),
+            ),
+            GoRoute(
+              path: '/savings/products',
+              builder: (context, state) => const ProductsScreen(),
+            ),
+            GoRoute(
               path: '/savings/:id',
               builder: (context, state) {
                 final id = state.pathParameters['id'] ?? 'custom-savings';
                 return SavingsDetailScreen(savingsId: id);
               },
+            ),
+            GoRoute(
+              path: '/savings/:id/deposit',
+              builder: (context, state) {
+                final id = state.pathParameters['id'] ?? 'custom-savings';
+                return SavingsDepositScreen(savingsId: id);
+              },
+            ),
+            GoRoute(
+              path: '/savings/:id/withdraw',
+              builder: (context, state) {
+                final id = state.pathParameters['id'] ?? 'custom-savings';
+                return WithdrawSavingsScreen(savingsId: id);
+              },
+            ),
+            GoRoute(
+              path: '/savings/:id/transfer',
+              builder: (context, state) => const TransferScreen(),
+            ),
+            GoRoute(
+              path: '/savings/:id/statement',
+              builder: (context, state) {
+                final id = state.pathParameters['id'] ?? 'custom-savings';
+                return SavingsDetailScreen(savingsId: id);
+              },
+            ),
+            GoRoute(
+              path: '/savings/:id/edit',
+              builder: (context, state) => const CreateSavingsScreen(),
             ),
             GoRoute(
               path: '/products',
