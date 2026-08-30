@@ -1,287 +1,80 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/app_scaffold.dart';
-import '../../core/app_card.dart';
-
-class PaymentHomeScreen extends StatefulWidget {
+class PaymentHomeScreen extends StatelessWidget {
   const PaymentHomeScreen({super.key});
 
   @override
-  State<PaymentHomeScreen> createState() => _PaymentHomeScreenState();
-}
-
-/// Placeholder screen for the (now-empty) Payment page. The real payment flow
-/// screens remain available at their routes; this placeholder is returned when
-/// a user navigates to /payment with no specific source (we keep the route but
-/// show an intentionally empty page while payments are being rebuilt).
-class PaymentPlaceholderScreen extends StatelessWidget {
-  const PaymentPlaceholderScreen({super.key});
-
-  @override
   Widget build(BuildContext context) {
-    return AppScaffold(
-      title: 'Payments',
-      showBack: false,
-      child: const Center(child: SizedBox.shrink()),
-    );
-  }
-}
+    final theme = Theme.of(context);
 
-class _PaymentHomeScreenState extends State<PaymentHomeScreen> {
-  static const green = Color(0xFF0C7D45);
-  static const softBg = Color(0xFFF5F6F4);
-
-  int _selectedTab = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    // Implement the Products home while keeping original tab widgets intact below.
-    return AppScaffold(
-      title: 'My Products',
-      showBack: false,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.search, color: Color(0xFF0C7D45)),
-          onPressed: () {},
-        ),
-        IconButton(
-          icon: const Icon(Icons.tune, color: Color(0xFF0C7D45)),
-          onPressed: () {},
-        ),
-      ],
-      child: SafeArea(
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F2),
+      body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0E6E42),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.account_tree_outlined, color: Colors.white),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'My Products',
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                color: Colors.black87,
-                                fontWeight: FontWeight.w800,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'All your financial products\n in one place',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Colors.black54,
-                                height: 1.2,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
+              const SizedBox(height: 8),
+              _TopHeader(),
               const SizedBox(height: 18),
-
-              // Portfolio summary card
-              AppCard(
-                onTap: () {},
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0E6E42), Color(0xFF0B5F37)],
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Portfolio Summary',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Row(
-                            children: const [
-                              Icon(Icons.remove_red_eye_outlined, color: Colors.white, size: 18),
-                              SizedBox(width: 8),
-                              Text('Hide balances', style: TextStyle(color: Colors.white70)),
-                            ],
-                          )
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          _SummaryTile(
-                            icon: Icons.savings_outlined,
-                            label: 'Total Savings',
-                            amount: 'GH₵ 72,400.00',
-                            count: '3 accounts',
-                            color: Colors.greenAccent,
-                          ),
-                          _DividerVertical(),
-                          _SummaryTile(
-                            icon: Icons.pie_chart_outline,
-                            label: 'Total Shares',
-                            amount: 'GH₵ 31,200.00',
-                            count: '1 account',
-                            color: Colors.amber,
-                          ),
-                          _DividerVertical(),
-                          _SummaryTile(
-                            icon: Icons.show_chart,
-                            label: 'Total Investments',
-                            amount: 'GH₵ 80,650.00',
-                            count: '2 investments',
-                            color: Colors.lightGreenAccent,
-                          ),
-                          _DividerVertical(),
-                          _SummaryTile(
-                            icon: Icons.description_outlined,
-                            label: 'Outstanding Loans',
-                            amount: 'GH₵ 45,000.00',
-                            count: '1 active loan',
-                            color: Colors.lightBlueAccent,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
+              _PortfolioSummaryCard(),
+              const SizedBox(height: 26),
               Text(
                 'Product Categories',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1A2A22),
+                ),
               ),
-              const SizedBox(height: 8),
-
-              // Products list
-              _productCategory(
-                context,
-                label: 'Savings',
-                description: 'All your savings accounts\n and balances',
+              const SizedBox(height: 12),
+              _CategoryTile(
+                icon: Icons.savings_rounded,
+                iconColor: const Color(0xFF0B8F57),
+                tint: const Color(0xFFEAF4EE),
+                title: 'Savings',
+                subtitle: 'All your savings accounts\nand balances',
                 amount: 'GH₵ 72,400.00',
                 count: '3 accounts',
-                color: const Color(0xFF0E6E42),
+                amountColor: const Color(0xFF0B8F57),
                 onTap: () => context.go('/savings'),
               ),
-
-              _productCategory(
-                context,
-                label: 'Shares',
-                description: 'Your shareholding and\n share value',
+              const SizedBox(height: 10),
+              _CategoryTile(
+                icon: Icons.pie_chart_rounded,
+                iconColor: const Color(0xFFD49A1F),
+                tint: const Color(0xFFF8F0E1),
+                title: 'Shares',
+                subtitle: 'Your shareholding and\nshare value',
                 amount: 'GH₵ 31,200.00',
                 count: '1 account',
-                color: const Color(0xFFFFB703),
-                onTap: () {},
+                amountColor: const Color(0xFFD49A1F),
               ),
-
-              _productCategory(
-                context,
-                label: 'Investments',
-                description: 'Fixed deposits and other\n investments',
+              const SizedBox(height: 10),
+              _CategoryTile(
+                icon: Icons.trending_up_rounded,
+                iconColor: const Color(0xFF2E8B57),
+                tint: const Color(0xFFEAF5EE),
+                title: 'Investments',
+                subtitle: 'Fixed deposits and other\ninvestments',
                 amount: 'GH₵ 80,650.00',
                 count: '2 investments',
-                color: const Color(0xFF0E6E42),
-                onTap: () {},
+                amountColor: const Color(0xFF0B8F57),
               ),
-
-              _productCategory(
-                context,
-                label: 'Loans',
-                description: 'Your active loans and\n repayment status',
+              const SizedBox(height: 10),
+              _CategoryTile(
+                icon: Icons.description_outlined,
+                iconColor: const Color(0xFF3E7DBF),
+                tint: const Color(0xFFEAF3FF),
+                title: 'Loans',
+                subtitle: 'Your active loans and\nrepayment status',
                 amount: 'GH₵ 45,000.00',
                 count: '1 active loan',
-                color: const Color(0xFF3B82F6),
-                onTap: () {},
+                amountColor: const Color(0xFF3E7DBF),
               ),
-
-              const SizedBox(height: 12),
-
-              // Promotional banner
-              AppCard(
-                onTap: () {},
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: const Color(0xFFEFF7EF),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Grow with Adepa',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: const Color(0xFF0C7D45),
-                                  ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Explore more savings, investment\n and loan opportunities tailored\n for you.',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black54),
-                            ),
-                            const SizedBox(height: 12),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0E6E42),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: () {},
-                              child: const Text('Explore Opportunities'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // Illustration placeholder
-                      Container(
-                        width: 88,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Center(child: Icon(Icons.account_balance_wallet, color: Color(0xFF0E6E42), size: 36)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // Bottom spacing to mimic bottom navigation bar spacing in design
-              const SizedBox(height: 24),
+              const SizedBox(height: 26),
+              _GrowCard(),
             ],
           ),
         ),
@@ -290,576 +83,306 @@ class _PaymentHomeScreenState extends State<PaymentHomeScreen> {
   }
 }
 
-class _SavingsTab extends StatelessWidget {
-  const _SavingsTab();
-
+class _TopHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      children: [
-        // Text(
-        //   'Good morning, Kennedy',
-        //   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-        //     fontWeight: FontWeight.w800,
-        //     color: Colors.black87,
-        //   ),
-        // ),
-        // const SizedBox(height: 4),
-        // Text(
-        //   'Your account is ready for your next payment',
-        //   style: Theme.of(
-        //     context,
-        //   ).textTheme.bodyMedium?.copyWith(color: Colors.black54),
-        // ),
-        // const SizedBox(height: 18),
-        GestureDetector(
-          onTap: () => context.go('/savings'),
-          child: Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0E6E42), Color(0xFF0B5F37)],
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Member Savings',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'GH₵ 45,000.00',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '+ GH₵ 1,120.00 this month',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.82),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right, color: Colors.white, size: 28),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Text(
-          'Quick actions',
-          style: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 10),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 4,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1,
-          children: [
-            _QuickActionTile(
-              icon: Icons.download_outlined,
-              label: 'Deposit',
-              onTap: () => context.go('/savings'),
-            ),
-            _QuickActionTile(
-              icon: Icons.upload_outlined,
-              label: 'Withdraw',
-              onTap: () => context.go('/payment'),
-            ),
-            _QuickActionTile(
-              icon: Icons.swap_horiz,
-              label: 'Transfer',
-              onTap: () => context.go('/transfer'),
-            ),
-            _QuickActionTile(
-              icon: Icons.wallet,
-              label: 'Payments',
-              onTap: () => context.go('/payment'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        GestureDetector(
-          onTap: () => context.go('/payment'),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEAF4EE),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.credit_card,
-                    color: Color(0xFF0C7D45),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Enjoy seamless banking and instant transfers.',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(color: Colors.black87),
-                  ),
-                ),
-                const Icon(Icons.chevron_right, color: Colors.black54),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            Text(
-              'Recent transactions',
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const Spacer(),
-            Text(
-              'View all',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: const Color(0xFF0C7D45),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _TransactionItem(
-          icon: Icons.arrow_downward,
-          label: 'Deposit',
-          detail: 'From Mobile Money',
-          amount: 'GH₵ 1,000.00',
-          positive: true,
-        ),
-        const SizedBox(height: 10),
-        _TransactionItem(
-          icon: Icons.arrow_upward,
-          label: 'Transfer',
-          detail: 'To John Mensah',
-          amount: 'GH₵ 1,000.00',
-          positive: false,
-        ),
-      ],
-    );
-  }
-}
-
-class _PaymentHubTab extends StatelessWidget {
-  const _PaymentHubTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Container(
-          padding: const EdgeInsets.all(18),
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF0E6E42), Color(0xFF0B5F37)],
-            ),
-            borderRadius: BorderRadius.circular(18),
+            color: const Color(0xFF0E5A3E),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0E5A3E).withValues(alpha: 0.18),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          child: Row(
+          child: const Icon(Icons.eco_rounded, color: Colors.white, size: 26),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Total paid this month',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.75),
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'GH₵ 8,640.00',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
+              Text(
+                'My Products',
+                style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF183326),
+                  letterSpacing: -0.7,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.trending_up_rounded,
-                  color: Colors.white,
-                  size: 24,
+              const SizedBox(height: 2),
+              Text(
+                'All your financial products\nin one place',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: const Color(0xFF5F6E66),
+                  height: 1.25,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 18),
-        GestureDetector(
-          onTap: () => context.go('/transfer'),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF4EE),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.verified_outlined,
-                    color: Color(0xFF0C7D45),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Make payments quickly and securely.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
-                const Icon(Icons.chevron_right, color: Colors.black54),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 18),
-        Text(
-          'Pay money',
-          style: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 12),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 3,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 0.9,
-          children: [
-            _ServiceTile(
-              label: 'Airtime',
-              icon: Icons.phone_iphone,
-              onTap: () => context.go('/payment'),
-            ),
-            _ServiceTile(
-              label: 'Data',
-              icon: Icons.signal_cellular_4_bar,
-              onTap: () => context.go('/payment'),
-            ),
-            _ServiceTile(
-              label: 'Bills',
-              icon: Icons.receipt_long,
-              onTap: () => context.go('/payment'),
-            ),
-            _ServiceTile(
-              label: 'Transfer',
-              icon: Icons.swap_horiz,
-              onTap: () => context.go('/transfer'),
-            ),
-            _ServiceTile(
-              label: 'Loan',
-              icon: Icons.account_balance_wallet,
-              onTap: () => context.go('/loan-status'),
-            ),
-            _ServiceTile(
-              label: 'Donations',
-              icon: Icons.favorite_border,
-              onTap: () => context.go('/payment'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        Text(
-          'Manage payments',
-          style: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 12),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 2.3,
-          children: const [
-            _ManagerTile(icon: Icons.receipt_long, label: 'Standing Orders'),
-            _ManagerTile(
-              icon: Icons.check_circle_outline,
-              label: 'Saved Payees',
-            ),
-            _ManagerTile(icon: Icons.shield_outlined, label: 'Payment Limits'),
-            _ManagerTile(icon: Icons.credit_card, label: 'Cards'),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _BillsTab extends StatelessWidget {
-  const _BillsTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      children: [
-        TextField(
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.white,
-            hintText: 'Search billers',
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 14,
-            ),
-            prefixIcon: const Icon(Icons.search, color: Colors.black54),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none,
-            ),
-          ),
-        ),
-        const SizedBox(height: 18),
-        Text(
-          'Categories',
-          style: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 10),
-        const Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _CategoryChip(label: 'All', selected: true),
-            _CategoryChip(label: 'Utilities'),
-            _CategoryChip(label: 'TV & Internet'),
-            _CategoryChip(label: 'Education'),
-            _CategoryChip(label: 'Others'),
-          ],
-        ),
-        const SizedBox(height: 18),
+        const SizedBox(width: 10),
         Row(
           children: [
-            Text(
-              'Popular billers',
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const Spacer(),
-            Text(
-              'View all',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: const Color(0xFF0C7D45),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            _HeaderButton(icon: Icons.search_rounded),
+            const SizedBox(width: 8),
+            _HeaderButton(icon: Icons.tune_rounded),
           ],
         ),
-        const SizedBox(height: 12),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 3,
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 0.85,
-          children: const [
-            _BillerLogo(label: 'ECG'),
-            _BillerLogo(label: 'Ghana Water'),
-            _BillerLogo(label: 'DSTV'),
-            _BillerLogo(label: 'GoTv'),
-            _BillerLogo(label: 'NHIS'),
-            _BillerLogo(label: 'Betway'),
-          ],
-        ),
-        const SizedBox(height: 18),
-        _BillItem(
-          label: 'Electricity Company of Ghana',
-          subtitle: 'Pay your electricity bills',
-        ),
-        const SizedBox(height: 10),
-        _BillItem(
-          label: 'Ghana Water Company Limited',
-          subtitle: 'Pay your water bills',
-        ),
-        const SizedBox(height: 10),
-        _BillItem(label: 'DSTV', subtitle: 'Pay your DSTV subscription'),
       ],
     );
   }
 }
 
-// Small helper used in the portfolio summary
-class _SummaryTile extends StatelessWidget {
+class _HeaderButton extends StatelessWidget {
   final IconData icon;
-  final String label;
-  final String amount;
-  final String count;
-  final Color color;
 
-  const _SummaryTile({
-    required this.icon,
-    required this.label,
-    required this.amount,
-    required this.count,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: color, size: 18),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 11,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              amount,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              count,
-              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DividerVertical extends StatelessWidget {
-  const _DividerVertical({super.key});
+  const _HeaderButton({required this.icon});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 1,
-      height: 64,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      color: Colors.white24,
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFDBE2DD)),
+      ),
+      child: Icon(icon, color: const Color(0xFF1E312A), size: 22),
     );
   }
 }
 
-// Helper function for product category rows used in the product list
-Widget _productCategory(
-  BuildContext context, {
-  required String label,
-  required String description,
-  required String amount,
-  required String count,
-  required Color color,
-  required VoidCallback onTap,
-}) {
-  return GestureDetector(
-    onTap: onTap,
-    child: Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+class _PortfolioSummaryCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.06)),
+        color: const Color(0xFF0E5A3E),
+        borderRadius: BorderRadius.circular(22),
       ),
-      child: Row(
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Portfolio Summary',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Row(
+                children: [
+                  const Icon(Icons.visibility_off_rounded, color: Colors.white, size: 15),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Hide balances',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _SummaryTile(
+                  label: 'Total Savings',
+                  value: 'GH₵ 72,400.00',
+                  sub: '3 accounts',
+                  icon: Icons.savings_rounded,
+                  iconColor: const Color(0xFFEAF5EE),
+                  accent: const Color(0xFF9FD6B8),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _SummaryTile(
+                  label: 'Total Shares',
+                  value: 'GH₵ 31,200.00',
+                  sub: '1 account',
+                  icon: Icons.pie_chart_rounded,
+                  iconColor: const Color(0xFFFCE9BF),
+                  accent: const Color(0xFFF2C75C),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _SummaryTile(
+                  label: 'Total Investments',
+                  value: 'GH₵ 80,650.00',
+                  sub: '2 investments',
+                  icon: Icons.trending_up_rounded,
+                  iconColor: const Color(0xFFEAF5EE),
+                  accent: const Color(0xFF6CD29D),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _SummaryTile(
+                  label: 'Outstanding Loans',
+                  value: 'GH₵ 45,000.00',
+                  sub: '1 active loan',
+                  icon: Icons.description_outlined,
+                  iconColor: const Color(0xFFE7F0FF),
+                  accent: const Color(0xFF9ABCF7),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final String sub;
+  final IconData icon;
+  final Color iconColor;
+  final Color accent;
+
+  const _SummaryTile({
+    required this.label,
+    required this.value,
+    required this.sub,
+    required this.icon,
+    required this.iconColor,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 6,
-            height: 56,
+            width: 28,
+            height: 28,
             decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(6),
+              color: iconColor.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 18, color: iconColor),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.white.withValues(alpha: 0.78),
             ),
           ),
-          const SizedBox(width: 12),
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
             ),
-            child: Icon(Icons.account_balance_wallet_outlined, color: color),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: accent,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                sub,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.8),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final Color tint;
+  final String title;
+  final String subtitle;
+  final String amount;
+  final String count;
+  final Color amountColor;
+  final VoidCallback? onTap;
+
+  const _CategoryTile({
+    required this.icon,
+    required this.iconColor,
+    required this.tint,
+    required this.title,
+    required this.subtitle,
+    required this.amount,
+    required this.count,
+    required this.amountColor,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final card = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE7EDE8)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: tint,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: iconColor, size: 28),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -867,321 +390,199 @@ Widget _productCategory(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  label,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                  title,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF1C3029),
+                  ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
-                  description,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54),
+                  subtitle,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF66756B),
+                    height: 1.25,
+                  ),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 amount,
-                style: TextStyle(
-                  color: color == const Color(0xFFFFB703) ? const Color(0xFFFF8A00) : const Color(0xFF0C7D45),
-                  fontWeight: FontWeight.w800,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: amountColor,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 count,
-                style: TextStyle(color: color.withOpacity(0.9), fontSize: 12),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF5E6C66),
+                ),
               ),
             ],
           ),
+          const SizedBox(width: 4),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: const Color(0xFF7B8A7F),
+            size: 28,
+          ),
+        ],
+      ),
+    );
+
+    if (onTap == null) {
+      return card;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: card,
+      ),
+    );
+  }
+}
+
+class _GrowCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 18, 14, 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFDCEFE3),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Grow with Adepa',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF183326),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Explore more savings, investment\nand loan opportunities tailored\nfor you.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF425A4E),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0E5A3E),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Explore Opportunities',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(width: 8),
-          const Icon(Icons.chevron_right, color: Colors.black54),
-        ],
-      ),
-    ),
-  );
-}
-
-class _QuickActionTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _QuickActionTile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: const Color(0xFF0C7D45), size: 24),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TransactionItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String detail;
-  final String amount;
-  final bool positive;
-
-  const _TransactionItem({
-    required this.icon,
-    required this.label,
-    required this.detail,
-    required this.amount,
-    required this.positive,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF4EE),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: const Color(0xFF0C7D45), size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          SizedBox(
+            width: 120,
+            height: 120,
+            child: Stack(
+              alignment: Alignment.bottomCenter,
               children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                Positioned(
+                  bottom: 8,
+                  left: 18,
+                  child: _CoinStack(count: 4),
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 16,
+                  child: Container(
+                    width: 58,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0E5A3E),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.eco_rounded, color: Colors.white, size: 28),
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  detail,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.black.withValues(alpha: 0.55),
+                Positioned(
+                  bottom: 56,
+                  right: 26,
+                  child: Transform.rotate(
+                    angle: -0.25,
+                    child: Container(
+                      width: 54,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB6D9A0),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          Text(
-            amount,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: positive ? const Color(0xFF0C7D45) : Colors.black87,
-            ),
-          ),
         ],
       ),
     );
   }
 }
 
-class _ServiceTile extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
+class _CoinStack extends StatelessWidget {
+  final int count;
 
-  const _ServiceTile({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
+  const _CoinStack({required this.count});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: const Color(0xFF0C7D45), size: 22),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ManagerTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _ManagerTile({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: const Color(0xFF0C7D45), size: 18),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CategoryChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-
-  const _CategoryChip({required this.label, this.selected = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: selected ? const Color(0xFFEAF4EE) : const Color(0xFFF4F5F3),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: selected ? const Color(0xFF0C7D45) : Colors.black54,
-        ),
-      ),
-    );
-  }
-}
-
-class _BillerLogo extends StatelessWidget {
-  final String label;
-
-  const _BillerLogo({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Center(
-        child: Text(
-          label,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
-          textAlign: TextAlign.center,
-        ),
-      ),
-    );
-  }
-}
-
-class _BillItem extends StatelessWidget {
-  final String label;
-  final String subtitle;
-
-  const _BillItem({required this.label, required this.subtitle});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(count, (index) {
+        return Transform.translate(
+          offset: Offset(index * 4.0, 0),
+          child: Container(
+            width: 18,
+            height: 18,
             decoration: BoxDecoration(
-              color: const Color(0xFFEAF4EE),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.receipt_long,
-              color: Color(0xFF0C7D45),
-              size: 18,
+              color: const Color(0xFFEAC05F),
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFCF9F2A), width: 2),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.black.withValues(alpha: 0.55),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right, color: Colors.black54),
-        ],
-      ),
+        );
+      }),
     );
   }
 }

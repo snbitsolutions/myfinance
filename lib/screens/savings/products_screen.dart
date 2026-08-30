@@ -6,20 +6,13 @@ class ProductsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Products'),
-        centerTitle: true,
-      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Products', style: theme.textTheme.headlineSmall),
-              const SizedBox(height: 12),
               Expanded(
                 child: ListView(
                   children: [

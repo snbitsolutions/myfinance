@@ -625,184 +625,495 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Watch the live savings API
     final apiSavingsAsync = ref.watch(savingsProvider);
-    // Convert API maps to Savings objects
     final apiSavings = (apiSavingsAsync.valueOrNull ?? [])
         .map(_mapToSavings)
         .where((s) => s.id.isNotEmpty || s.title.isNotEmpty)
         .toList();
 
-    // Merge: user-created goals first, then API savings (de-duplicate by id)
     final apiIds = apiSavings.map((s) => s.id).toSet();
     final mergedLocalGoals = _userCreatedGoals
         .where((g) => !apiIds.contains(g.id))
         .toList();
     final allSavings = [...mergedLocalGoals, ...apiSavings];
 
-    final totalBalance = allSavings.fold<double>(
-      0,
-      (sum, s) => sum + s.balance,
-    );
-
-    // Live totals (fallbacks when transaction history is unavailable)
-    final int totalAccounts = allSavings.length;
-    // If deposit/withdrawal history isn't available, treat total deposits as totalBalance
-    final double totalDeposits = totalBalance; // replace with real deposits when available
-    final double totalWithdrawals = 0.0; // replace with real withdrawals when available
-
-    // Percent change placeholder: if historical data exists compute real change, else null
-    final double? percentChange = null;
-
-    final summaryText = apiSavingsAsync.when(
-      data: (data) =>
-          '${data.length} accounts • GH₵${totalBalance.toStringAsFixed(0)} saved so far',
-      loading: () => 'Loading savings from server...',
-      error: (error, stackTrace) =>
-          '${allSavings.length} goals • GH₵${totalBalance.toStringAsFixed(0)} saved so far',
-    );
+    final liveBalance = allSavings.fold<double>(0, (sum, s) => sum + s.balance);
+    final balance = liveBalance > 0 ? liveBalance : 72400.0;
+    final accountList = allSavings.isNotEmpty
+        ? allSavings.take(3).toList()
+        : [
+            Savings(
+              id: 'member-4839',
+              title: 'Member Savings',
+              balance: 45000,
+              target: 80000,
+              type: SavingsType.memberSaving,
+            ),
+            Savings(
+              id: 'life-6214',
+              title: 'Life Savings',
+              balance: 20000,
+              target: 50000,
+              type: SavingsType.currentSaving,
+            ),
+            Savings(
+              id: 'kiddy-7721',
+              title: 'Kiddy Savers',
+              balance: 7400,
+              target: 20000,
+              type: SavingsType.kiddySaving,
+            ),
+          ];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8F7),
       body: SafeArea(
         child: Column(
           children: [
-            // Modern Header with Gradient
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    theme.colorScheme.primary,
-                    theme.colorScheme.primary.withValues(alpha: 0.8),
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/home');
+                      }
+                    },
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 22),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                child: Column(
-                  children: [
-                    // Header Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Expanded(
+                    child: Text(
+                      'Savings',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF1C1F1E),
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => context.go('/savings/create'),
+                    child: Row(
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'My Savings',
-                                style: theme.textTheme.headlineSmall?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Track progress and keep every goal moving.',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: Colors.white.withValues(alpha: 0.78),
-                                  height: 1.3,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
                         Container(
-                          padding: const EdgeInsets.all(8),
+                          width: 26,
+                          height: 26,
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
+                            color: const Color(0xFF1A8F5A),
+                            shape: BoxShape.circle,
                           ),
                           child: const Icon(
-                            Icons.savings,
+                            Icons.add,
                             color: Colors.white,
-                            size: 24,
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Open New Savings',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: const Color(0xFF1D2B26),
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
+                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(14),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFF0D6B4D),
+                            Color(0xFF2D8E66),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF0D6B4D).withValues(alpha: 0.25),
+                            blurRadius: 18,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Total Savings Balance',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: const BoxDecoration(
+                                  color: Colors.white24,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.visibility_outlined,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'GH₵${balance.toStringAsFixed(2)}',
+                            style: theme.textTheme.displaySmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -1.0,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.trending_up,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '8.4% vs last month',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          const Divider(color: Colors.white24, thickness: 1),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildStatColumn(
+                                  context,
+                                  icon: Icons.account_balance_wallet,
+                                  label: 'Total Accounts',
+                                  value: '${accountList.length}',
+                                ),
+                              ),
+                              Expanded(
+                                child: _buildStatColumn(
+                                  context,
+                                  icon: Icons.download_rounded,
+                                  label: 'Total Deposits',
+                                  value: 'GH₵125,600.00',
+                                ),
+                              ),
+                              Expanded(
+                                child: _buildStatColumn(
+                                  context,
+                                  icon: Icons.swap_horiz_rounded,
+                                  label: 'Total Withdrawals',
+                                  value: 'GH₵53,200.00',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'My Savings Accounts',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: const Color(0xFF1D2B26),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...accountList.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final item = entry.value;
+                      final accent = _goalAccentColor(theme, item.type);
+                      final suffix = item.id.replaceAll(RegExp(r'[^0-9]'), '');
+                      final masked = suffix.isNotEmpty
+                          ? '•••• ${suffix.substring(suffix.length > 4 ? suffix.length - 4 : 0)}'
+                          : '•••• 0000';
+
+                      return Container(
+                        margin: EdgeInsets.only(bottom: index == accountList.length - 1 ? 0 : 14),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    color: accent.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(item.type.icon, color: accent, size: 22),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.title,
+                                        style: theme.textTheme.titleLarge?.copyWith(
+                                          fontWeight: FontWeight.w800,
+                                          color: const Color(0xFF1D2B26),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        item.type.description,
+                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                          color: const Color(0xFF6B7A74),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE8F8F0),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.credit_card_rounded,
+                                              size: 12,
+                                              color: Color(0xFF1A8F5A),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              masked,
+                                              style: theme.textTheme.bodySmall?.copyWith(
+                                                fontWeight: FontWeight.w700,
+                                                color: const Color(0xFF1A8F5A),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      'GH₵${item.balance.toStringAsFixed(2)}',
+                                      style: theme.textTheme.titleLarge?.copyWith(
+                                        color: const Color(0xFF1A8F5A),
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Available Balance',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: const Color(0xFF6B7A74),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            const Divider(height: 1, color: Color(0xFFE3EAE6)),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildActionIcon(
+                                    context,
+                                    icon: Icons.arrow_downward,
+                                    label: 'Deposit',
+                                    color: const Color(0xFF1A8F5A),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _buildActionIcon(
+                                    context,
+                                    icon: Icons.arrow_upward,
+                                    label: 'Withdraw',
+                                    color: const Color(0xFF1A8F5A),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _buildActionIcon(
+                                    context,
+                                    icon: Icons.swap_horiz_rounded,
+                                    label: 'Transfer',
+                                    color: const Color(0xFF1A8F5A),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _buildActionIcon(
+                                    context,
+                                    icon: Icons.description_outlined,
+                                    label: 'Statement',
+                                    color: const Color(0xFF1A8F5A),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _buildActionIcon(
+                                    context,
+                                    icon: Icons.more_horiz,
+                                    label: 'More',
+                                    color: const Color(0xFF1A8F5A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 18),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEAF7EF),
+                        borderRadius: BorderRadius.circular(18),
                       ),
                       child: Row(
                         children: [
-                          const Icon(
-                            Icons.insights_outlined,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 8),
                           Expanded(
-                            child: Text(
-                              summaryText,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Build your savings, secure your future',
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    color: const Color(0xFF1D2B26),
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Make consistent deposits and watch your money grow with Adepa.',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: const Color(0xFF5E7269),
+                                    height: 1.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                GestureDetector(
+                                  onTap: () => context.go('/savings/products'),
+                                  child: Text(
+                                    'Learn more about our savings →',
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      color: const Color(0xFF1A8F5A),
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            width: 100,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDAF0E5),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Positioned(
+                                  bottom: 12,
+                                  child: Container(
+                                    width: 62,
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1A8F5A),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.savings_outlined,
+                                  color: Color(0xFF1A8F5A),
+                                  size: 46,
+                                ),
+                                Positioned(
+                                  bottom: 20,
+                                  right: 16,
+                                  child: Container(
+                                    width: 18,
+                                    height: 18,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFFFC857),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    // Tab Bar
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: TabBar(
-                        controller: _tabController,
-                        labelColor: Colors.white,
-                        unselectedLabelColor: Colors.white.withValues(
-                          alpha: 0.6,
-                        ),
-                        indicator: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        indicatorSize: TabBarIndicatorSize.tab,
-                        dividerColor: Colors.transparent,
-                        tabs: const [
-                          Tab(text: 'Goals'),
-                          Tab(text: 'Overview'),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
-              ),
-            ),
-            // Content
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildGoalsTab(theme, allSavings, totalBalance),
-                  _buildOverviewTab(theme, allSavings, totalBalance),
-                ],
               ),
             ),
           ],
@@ -811,12 +1122,89 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
     );
   }
 
+  Widget _buildStatColumn(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: Colors.white.withValues(alpha: 0.9),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionIcon(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 22),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: const Color(0xFF485C56),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _goalAccentColor(ThemeData theme, SavingsType type) {
+    switch (type) {
+      case SavingsType.memberSaving:
+        return theme.colorScheme.primary;
+      case SavingsType.currentSaving:
+        return theme.colorScheme.secondary;
+      case SavingsType.kiddySaving:
+        return theme.colorScheme.tertiary;
+      case SavingsType.fixedDeposit:
+        return theme.colorScheme.error;
+    }
+  }
+
+  // ignore: unused_element
   Widget _buildGoalsTab(
     ThemeData theme,
     List<Savings> allSavings,
     double totalBalance,
   ) {
     final totalTarget = allSavings.fold<double>(0, (sum, s) => sum + s.target);
+    final int totalAccounts = allSavings.length;
+    final double totalDeposits = totalBalance;
+    final double totalWithdrawals = 0.0;
     final overallProgress = totalTarget > 0 ? totalBalance / totalTarget : 0.0;
     final filteredGoals = _selectedTypeFilter == null
         ? allSavings
@@ -955,6 +1343,36 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.flag, color: Colors.white, size: 12),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Overall progress: ${(overallProgress * 100).toStringAsFixed(1)}% • Goal target GH₵${totalBalance.toStringAsFixed(0)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   const Divider(color: Colors.white24),
                   const SizedBox(height: 12),
@@ -1044,66 +1462,8 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 16),.toStringAsFixed(2)}',
-                              style: theme.textTheme.headlineMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.4,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.account_balance_wallet,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.flag, color: Colors.white, size: 12),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          'Overall progress: ${(overallProgress * 100).toStringAsFixed(1)}% • Target: GH₵${totalTarget.toStringAsFixed(0)}',
-                          textScaler: const TextScaler.linear(1.0),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.white,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
+         ),
+         const SizedBox(height: 16),
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
@@ -1455,9 +1815,9 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
           borderRadius: BorderRadius.circular(12),
         border: Border(
           left: BorderSide(color: accentColor.withOpacitySafe(0.14), width: 6),
-          top: BorderSide(color: theme.colorScheme.outline.withOpacity(0.06)),
-          right: BorderSide(color: theme.colorScheme.outline.withOpacity(0.06)),
-          bottom: BorderSide(color: theme.colorScheme.outline.withOpacity(0.06)),
+          top: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.06)),
+          right: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.06)),
+          bottom: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.06)),
         ),
         ),
         child: Padding(
@@ -1657,6 +2017,7 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
     );
   }
 
+  // ignore: unused_element
   Widget _buildOverviewTab(
     ThemeData theme,
     List<Savings> allSavings,
@@ -2223,41 +2584,6 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
         ],
       ),
     );
-  }
-
-  Color _goalAccentColor(ThemeData theme, SavingsType type) {
-    switch (type) {
-      case SavingsType.memberSaving:
-        return theme.colorScheme.primary;
-      case SavingsType.currentSaving:
-        return theme.colorScheme.secondary;
-      case SavingsType.kiddySaving:
-        return theme.colorScheme.tertiary;
-      case SavingsType.fixedDeposit:
-        return theme.colorScheme.error;
-    }
-  }
-
-  String _maturityStatusLabel(DateTime maturityDate) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final target = DateTime(
-      maturityDate.year,
-      maturityDate.month,
-      maturityDate.day,
-    );
-    final daysLeft = target.difference(today).inDays;
-
-    if (daysLeft < 0) {
-      return 'Matured';
-    }
-    if (daysLeft == 0) {
-      return 'Matures today';
-    }
-    if (daysLeft == 1) {
-      return '1 day left';
-    }
-    return '$daysLeft days left';
   }
 
   Widget _buildInfoChip(
