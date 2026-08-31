@@ -44,6 +44,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   String _selectedInternalAccount = _shareSourceAccounts.first;
   String _selectedMomoProvider = _momoProviders.first;
 
+  bool get _isDepositFlow =>
+      (widget.sourceLabel ?? '').trim().toLowerCase() == 'deposit';
+
   bool _isValidMomoNumber(String value) {
     final phone = value.trim();
     return RegExp(r'^0\d{9}$').hasMatch(phone);
@@ -55,7 +58,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       return normalized.startsWith('/') ? normalized : '/$normalized';
     }
 
-    final isDepositFlow = widget.sourceLabel == 'Deposit';
+    final isDepositFlow = (widget.sourceLabel ?? '').toLowerCase() == 'deposit';
     return isDepositFlow ? '/savings' : '/home';
   }
 
@@ -66,6 +69,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final useExistingAccount = widget.sourceLabel == 'Existing account';
     final isMomo = !useExistingAccount && _method == 'MoMo';
     final momoPhone = _momoPhoneController.text.trim();
+    final isDepositFlow = _isDepositFlow;
     final canProceed = amount > 0 && (!isMomo || _isValidMomoNumber(momoPhone));
 
     if (!canProceed) return;
@@ -125,22 +129,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 response['reference'] ??
                 response['transactionId'] ??
                 'PAY#${DateTime.now().millisecondsSinceEpoch}',
-            'title': widget.sourceLabel == 'Deposit'
-                ? 'Deposit Successful'
-                : 'Payment Successful',
+            'title': isDepositFlow ? 'Deposit Successful' : 'Payment Successful',
             'message':
                 response['message'] ??
-                (widget.sourceLabel == 'Deposit'
+                (isDepositFlow
                     ? 'Your deposit has been credited to your account.'
                     : 'Your transaction was completed successfully.'),
             'primaryActionRoute': returnRoute,
             'primaryActionLabel': isSavingsReturn ? 'Done' : 'Go Home',
-            'secondaryActionLabel': widget.sourceLabel == 'Deposit'
-                ? 'View Receipt'
-                : null,
-            'secondaryActionRoute': widget.sourceLabel == 'Deposit'
-                ? '/payment-receipt'
-                : null,
+            'secondaryActionLabel': isDepositFlow ? 'View Receipt' : null,
+            'secondaryActionRoute': isDepositFlow ? '/payment-receipt' : null,
             'account': _selectedInternalAccount,
             'paymentMethod': isMomo
                 ? '$_method ($_selectedMomoProvider)'
@@ -169,7 +167,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             'message':
                 response['message'] ?? 'Your payment could not be completed.',
             'returnRoute': returnRoute,
-            'isDeposit': widget.sourceLabel == 'Deposit',
+            'isDeposit': _isDepositFlow,
           },
         );
       }
@@ -199,6 +197,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final amt = double.tryParse(_amountController.text) ?? 0;
+    final isDepositFlow = _isDepositFlow;
     final useExistingAccount = widget.sourceLabel == 'Existing account';
     final isInvestment = widget.sourceLabel == 'Investment';
     final isMomo = !useExistingAccount && _method == 'MoMo';
@@ -215,7 +214,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         : '$_method ($_selectedMomoProvider)';
 
     return AppScaffold(
-      title: widget.sourceLabel == 'Deposit'
+      title: isDepositFlow
           ? 'Deposit'
           : useExistingAccount
           ? 'Buy Shares'
@@ -251,10 +250,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _PaymentSectionHeader(
-                          title: widget.sourceLabel == 'Deposit'
+                          title: isDepositFlow
                               ? 'Deposit Amount'
                               : 'Amount',
-                          subtitle: widget.sourceLabel == 'Deposit'
+                          subtitle: isDepositFlow
                               ? 'Enter how much you want to deposit'
                               : 'Enter how much you want to pay',
                           icon: Icons.payments_rounded,
@@ -262,7 +261,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         ),
                         const SizedBox(height: 10),
                         ModernInput(
-                          label: widget.sourceLabel == 'Deposit'
+                          label: isDepositFlow
                               ? 'Amount to Deposit'
                               : 'Amount to Pay',
                           hintText: 'e.g., 500',
@@ -514,7 +513,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
-                                      widget.sourceLabel == 'Deposit'
+                                      isDepositFlow
                                           ? 'Deposit Summary'
                                           : 'Payment Summary',
                                       style: theme.textTheme.bodyMedium
@@ -530,7 +529,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
-                                      widget.sourceLabel == 'Deposit'
+                                      isDepositFlow
                                           ? 'Amount Deposited'
                                           : 'Total',
                                       style: theme.textTheme.bodyMedium,
@@ -574,7 +573,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     ),
                   ),
 
-                  const Spacer(),
+                  const SizedBox(height: 16),
 
                   SizedBox(
                     width: double.infinity,
@@ -593,7 +592,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       label: Text(
                         _isSubmitting
                             ? 'Processing...'
-                            : widget.sourceLabel == 'Deposit'
+                            : isDepositFlow
                             ? 'Make Deposit'
                             : 'Proceed to Payment',
                       ),

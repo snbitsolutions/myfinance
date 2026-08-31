@@ -54,10 +54,12 @@ class MainShell extends StatelessWidget {
     final currentIndex = _resolveIndex(currentLocation);
     final isStandaloneSavingsView =
         currentLocation == '/savings' || currentLocation.startsWith('/savings/');
+    final isStandalonePaymentView =
+        currentLocation == '/payment' || currentLocation.startsWith('/payment/');
 
     return Scaffold(
       body: SafeArea(child: child),
-      bottomNavigationBar: isStandaloneSavingsView
+      bottomNavigationBar: isStandaloneSavingsView || isStandalonePaymentView
           ? null
           : Container(
               decoration: BoxDecoration(

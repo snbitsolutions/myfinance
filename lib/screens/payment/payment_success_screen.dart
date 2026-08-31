@@ -36,66 +36,29 @@ class PaymentSuccessScreen extends StatelessWidget {
   });
 
   String _formatAmount() {
-    final value = amount ?? 500;
+    final value = amount ?? 1000;
     return 'GH₵${value.toStringAsFixed(2)}';
-  }
-
-  String _formatProcessedAt() {
-    final value = processedAt ?? DateTime.now();
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
-    final minute = value.minute.toString().padLeft(2, '0');
-    final period = value.hour >= 12 ? 'PM' : 'AM';
-    return '${months[value.month - 1]} ${value.day}, ${value.year} • $hour:$minute $period';
   }
 
   String _formatReference() {
     if (reference != null && reference!.trim().isNotEmpty) {
       return reference!.trim();
     }
-    return 'TXN#${DateTime.now().millisecondsSinceEpoch}';
+    return 'ADEPA-${DateTime.now().millisecondsSinceEpoch}';
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final resolvedTitle =
-        (title != null && title!.trim().isNotEmpty)
-        ? title!
-        : 'Payment Successful';
+        (title != null && title!.trim().isNotEmpty) ? title! : 'Deposit Successful!';
     final resolvedMessage =
         (message != null && message!.trim().isNotEmpty)
-        ? message!
-        : 'Your transaction was completed successfully.';
-    final resolvedPrimaryActionLabel =
-      (primaryActionLabel != null && primaryActionLabel!.trim().isNotEmpty)
-      ? primaryActionLabel!
-      : 'Go Home';
-    final resolvedPrimaryActionRoute =
-      (primaryActionRoute != null && primaryActionRoute!.trim().isNotEmpty)
-      ? primaryActionRoute!
-      : '/home';
-    final resolvedSecondaryActionLabel =
-      (secondaryActionLabel != null && secondaryActionLabel!.trim().isNotEmpty)
-      ? secondaryActionLabel!
-      : 'View Transactions';
-    final resolvedSecondaryActionRoute =
-      (secondaryActionRoute != null && secondaryActionRoute!.trim().isNotEmpty)
-      ? secondaryActionRoute!
-      : '/transactions';
+            ? message!
+            : 'Your deposit has been credited to your account.';
+    final resolvedAccount = account ?? 'Member Savings';
+    final resolvedPaymentMethod = paymentMethod ?? 'Mobile Money';
+    final resolvedNewBalance = newBalance ?? 46000;
 
     return AppScaffold(
       title: resolvedTitle,
@@ -104,158 +67,210 @@ class PaymentSuccessScreen extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    theme.colorScheme.primary,
-                    theme.colorScheme.primary.withOpacitySafe(0.8),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: theme.colorScheme.primary.withOpacitySafe(0.22),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacitySafe(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check_circle_rounded,
-                      size: 64,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    resolvedTitle,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    resolvedMessage,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withOpacitySafe(0.92),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            AppCard(
-              backgroundColor: theme.colorScheme.primaryContainer
-                  .withOpacitySafe(0.1),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.receipt_long_rounded,
-                        size: 18,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Transaction Summary',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+            // Success Icon with decorative dots
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                // Decorative dots scattered around
+                ..._generateDecorativeDots(),
+                // Center checkmark icon
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withOpacitySafe(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  _PaymentDetail(
-                    label: 'Amount',
-                    value: _formatAmount(),
-                    theme: theme,
+                  child: const Icon(Icons.check_rounded, size: 56, color: Colors.white),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Title
+            Text(
+              resolvedTitle,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Message
+            Text(
+              resolvedMessage,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacitySafe(0.7),
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Amount Section
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  'Amount Deposited',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
                   ),
-                  const SizedBox(height: 12),
-                  Divider(
-                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _formatAmount(),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: theme.colorScheme.primary,
                   ),
-                  const SizedBox(height: 12),
-                  _PaymentDetail(
-                    label: 'Processed On',
-                    value: _formatProcessedAt(),
-                    theme: theme,
-                  ),
-                  const SizedBox(height: 12),
-                  Divider(
-                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
-                  ),
-                  const SizedBox(height: 12),
-                  _PaymentDetail(
-                    label: 'Reference',
-                    value: _formatReference(),
-                    theme: theme,
-                    isMonospace: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            // Account Card
+            AppCard(
+              child: Row(
+                children: [
+                  Icon(Icons.savings_rounded, color: theme.colorScheme.primary, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          resolvedAccount,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '•••• 4839',
+                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 14),
+            // Balance Card (light green background)
+            AppCard(
+              backgroundColor: const Color(0xFFF0F8EF),
+              child: Row(
+                children: [
+                  Icon(Icons.trending_up_rounded, color: theme.colorScheme.primary, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'New Available Balance',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'GH₵${resolvedNewBalance.toStringAsFixed(2)}',
+                          style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Transaction Details
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Transaction Details',
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _TransactionDetailRow(
+              icon: Icons.receipt_rounded,
+              label: 'Amount',
+              value: _formatAmount(),
+              theme: theme,
+            ),
+            _TransactionDetailRow(
+              icon: Icons.money_off_rounded,
+              label: 'Transaction Fee',
+              value: 'GH₵ 0.00',
+              theme: theme,
+            ),
+            _TransactionDetailRow(
+              icon: Icons.calendar_today_rounded,
+              label: 'Date',
+              value: '26 Aug 2026',
+              theme: theme,
+            ),
+            _TransactionDetailRow(
+              icon: Icons.access_time_rounded,
+              label: 'Time',
+              value: '10:42 AM',
+              theme: theme,
+            ),
+            _TransactionDetailRow(
+              icon: Icons.tag_rounded,
+              label: 'Reference',
+              value: _formatReference(),
+              theme: theme,
+            ),
+            _TransactionDetailRow(
+              icon: Icons.credit_card_rounded,
+              label: 'Payment Method',
+              value: resolvedPaymentMethod,
+              theme: theme,
+            ),
+            const SizedBox(height: 24),
+            // Buttons
             SizedBox(
               width: double.infinity,
-              height: 52,
-              child: FilledButton.icon(
-                onPressed: () => context.go(resolvedPrimaryActionRoute),
-                icon: const Icon(Icons.home_rounded),
-                label: Text(resolvedPrimaryActionLabel),
-                style: FilledButton.styleFrom(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+              height: 50,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  context.push(
+                    Uri(
+                      path: '/payment-receipt',
+                      queryParameters: {
+                        'amount': amount?.toString() ?? '1000',
+                        'reference': _formatReference(),
+                        'account': resolvedAccount,
+                        'paymentMethod': resolvedPaymentMethod,
+                        'newBalance': newBalance?.toString() ?? '46000',
+                      },
+                    ).toString(),
+                  );
+                },
+                icon: const Icon(Icons.receipt_long_rounded),
+                label: const Text('View Receipt'),
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
-              height: 52,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  if (resolvedSecondaryActionRoute == '/payment-receipt') {
-                    context.push(
-                      '/payment-receipt',
-                      extra: {
-                        'amount': amount,
-                        'processedAt': processedAt?.toIso8601String(),
-                        'reference': reference,
-                        'account': account,
-                        'paymentMethod': paymentMethod,
-                        'newBalance': newBalance,
-                      },
-                    );
-                  } else {
-                    context.go(resolvedSecondaryActionRoute);
-                  }
-                },
-                icon: const Icon(Icons.receipt_long_rounded),
-                label: Text(resolvedSecondaryActionLabel),
-                style: OutlinedButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+              height: 50,
+              child: FilledButton(
+                onPressed: () => context.go('/savings'),
+                style: FilledButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  backgroundColor: theme.colorScheme.primary,
                 ),
+                child: const Text('Done'),
               ),
             ),
           ],
@@ -263,40 +278,74 @@ class PaymentSuccessScreen extends StatelessWidget {
       ),
     );
   }
+
+  List<Widget> _generateDecorativeDots() {
+    final colors = [
+      const Color(0xFFB8E6C0),
+      const Color(0xFFC8F0D0),
+      const Color(0xFFF4D89F),
+    ];
+    final positions = [
+      const Offset(-40, -30),
+      const Offset(50, -25),
+      const Offset(-35, 35),
+      const Offset(45, 40),
+      const Offset(-15, -50),
+      const Offset(25, -45),
+    ];
+
+    return List.generate(
+      positions.length,
+      (index) => Positioned(
+        left: positions[index].dx,
+        top: positions[index].dy,
+        child: Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: colors[index % colors.length],
+            shape: BoxShape.circle,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _PaymentDetail extends StatelessWidget {
+class _TransactionDetailRow extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
   final ThemeData theme;
-  final bool isMonospace;
 
-  const _PaymentDetail({
+  const _TransactionDetailRow({
+    required this.icon,
     required this.label,
     required this.value,
     required this.theme,
-    this.isMonospace = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: theme.colorScheme.primary),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacitySafe(0.7),
+            ),
           ),
-        ),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            fontFamily: isMonospace ? 'monospace' : null,
+          const Spacer(),
+          Text(
+            value,
+            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

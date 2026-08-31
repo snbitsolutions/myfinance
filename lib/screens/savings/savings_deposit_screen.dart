@@ -417,14 +417,15 @@ class _SavingsDepositScreenState extends State<SavingsDepositScreen> {
                       child: FilledButton(
                         onPressed: _canContinue
                             ? () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Deposit of GH₵ ${_amount.toStringAsFixed(2)} is queued for $_selectedMethod.',
-                                    ),
-                                  ),
-                                );
-                                context.go('/savings/${widget.savingsId}');
+                                final returnRoute = '/savings/${widget.savingsId}';
+                                final destination = Uri(
+                                  path: '/payment',
+                                  queryParameters: {
+                                    'returnRoute': returnRoute,
+                                    'sourceLabel': 'Deposit',
+                                  },
+                                ).toString();
+                                context.go(destination);
                               }
                             : null,
                         style: FilledButton.styleFrom(

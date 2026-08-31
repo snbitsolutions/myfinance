@@ -25,9 +25,22 @@ import '../screens/auth/set_pin_screen.dart';
 
 // Starter app shell only. All feature code has been cleared to allow a clean rebuild.
 import '../screens/error/app_error_screen.dart';
+import '../screens/investment/investment_activity_screen.dart';
+import '../screens/investment/investment_screen.dart';
+import '../screens/loans/apply_loan_screen.dart';
+import '../screens/loans/loan_detail_screen.dart';
+import '../screens/loans/loan_status_screen.dart';
+import '../screens/loans/loans_screen.dart';
+import '../screens/loans/repayment_screen.dart';
+import '../screens/notifications/notifications_screen.dart';
+import '../screens/payment/payment_failed_screen.dart';
 import '../screens/payment/payment_home_screen.dart';
+import '../screens/payment/payment_receipt_screen.dart';
 import '../screens/payment/payment_screen.dart';
+import '../screens/payment/payment_success_screen.dart';
+import '../screens/profile/kyc_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../screens/profile/settings_screen.dart';
 import '../screens/savings/create_savings_screen.dart';
 import '../screens/savings/products_screen.dart';
 import '../screens/savings/savings_deposit_screen.dart';
@@ -338,6 +351,140 @@ class AppRouter {
           },
         ),
 
+        GoRoute(
+          path: '/payment',
+          builder: (context, state) {
+            final query = state.uri.queryParameters;
+            final extra = state.extra as Map<String, dynamic>?;
+            return PaymentScreen(
+              sourceLabel: extra?['sourceLabel'] as String? ??
+                  query['sourceLabel'],
+              returnRoute: extra?['returnRoute'] as String? ??
+                  query['returnRoute'],
+            );
+          },
+        ),
+        GoRoute(
+          path: '/payment/deposit',
+          redirect: (context, state) {
+            final query = state.uri.queryParameters;
+            final returnRoute = query['returnRoute'] ?? '/savings';
+            return Uri(
+              path: '/payment',
+              queryParameters: {
+                'sourceLabel': 'Deposit',
+                'returnRoute': returnRoute,
+              },
+            ).toString();
+          },
+        ),
+        GoRoute(
+          path: '/payment-success',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>? ?? const {};
+            return PaymentSuccessScreen(
+              amount: (extra['amount'] as num?)?.toDouble(),
+              processedAt: extra['processedAt'] != null
+                  ? DateTime.tryParse(extra['processedAt'] as String? ?? '')
+                  : null,
+              reference: extra['reference'] as String?,
+              title: extra['title'] as String?,
+              message: extra['message'] as String?,
+              primaryActionLabel: extra['primaryActionLabel'] as String?,
+              primaryActionRoute: extra['primaryActionRoute'] as String?,
+              secondaryActionLabel: extra['secondaryActionLabel'] as String?,
+              secondaryActionRoute: extra['secondaryActionRoute'] as String?,
+              account: extra['account'] as String?,
+              paymentMethod: extra['paymentMethod'] as String?,
+              newBalance: (extra['newBalance'] as num?)?.toDouble(),
+            );
+          },
+        ),
+        GoRoute(
+          path: '/payment-failed',
+          builder: (context, state) {
+            final query = state.uri.queryParameters;
+            final extra = state.extra as Map<String, dynamic>? ?? const {};
+            final returnRoute = extra['returnRoute'] as String? ??
+                query['returnRoute'] ??
+                '/home';
+            final amount = (extra['amount'] as num?)?.toDouble() ??
+                double.tryParse(query['amount'] ?? '') ??
+                0;
+            final reason = extra['message'] as String? ?? query['reason'];
+            return PaymentFailedScreen(
+              returnRoute: returnRoute,
+              isDeposit: extra['isDeposit'] as bool? ??
+                  query['isDeposit'] == 'true',
+              amount: amount,
+              reason: reason,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/payment-receipt',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>? ?? const {};
+            return PaymentReceiptScreen(
+              amount: (extra['amount'] as num?)?.toDouble(),
+              processedAt: extra['processedAt'] != null
+                  ? DateTime.tryParse(extra['processedAt'] as String? ?? '')
+                  : null,
+              reference: extra['reference'] as String?,
+              account: extra['account'] as String?,
+              paymentMethod: extra['paymentMethod'] as String?,
+              newBalance: (extra['newBalance'] as num?)?.toDouble(),
+            );
+          },
+        ),
+        GoRoute(
+          path: '/transactions',
+          builder: (context, state) => const TransactionsScreen(),
+        ),
+        GoRoute(
+          path: '/notifications',
+          builder: (context, state) => const NotificationsScreen(),
+        ),
+        GoRoute(
+          path: '/settings',
+          builder: (context, state) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/kyc',
+          builder: (context, state) => const KycScreen(),
+        ),
+        GoRoute(
+          path: '/profile/edit',
+          builder: (context, state) => const ProfileScreen(),
+        ),
+        GoRoute(
+          path: '/loans',
+          builder: (context, state) => const LoansScreen(),
+        ),
+        GoRoute(
+          path: '/apply-loan',
+          builder: (context, state) => const ApplyLoanScreen(),
+        ),
+        GoRoute(
+          path: '/loan-status',
+          builder: (context, state) => const LoanStatusScreen(),
+        ),
+        GoRoute(
+          path: '/loan-detail',
+          builder: (context, state) => const LoanDetailScreen(),
+        ),
+        GoRoute(
+          path: '/repayment',
+          builder: (context, state) => const RepaymentScreen(),
+        ),
+        GoRoute(
+          path: '/investment',
+          builder: (context, state) => const InvestmentScreen(),
+        ),
+        GoRoute(
+          path: '/investment/activity',
+          builder: (context, state) => const InvestmentActivityScreen(),
+        ),
         ShellRoute(
           builder: (context, state, child) {
             return MainShell(child: child);

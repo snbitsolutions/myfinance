@@ -16,7 +16,8 @@ class AppConstants {
   // Feature Flags
   static const bool enableBiometric = false;
   static const bool enableNotifications = false;
-  static const bool enableOfflineMode = false;
+  // Temporary offline UI mode while the payment flow pages are being refined.
+  static const bool enableOfflineMode = true;
   static const bool disableApiAuthInDebug = true;
   static const String debugApiPhoneNumber = String.fromEnvironment(
     'DEBUG_API_PHONE',

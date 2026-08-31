@@ -1501,7 +1501,12 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
               label: 'Deposit',
               icon: Icons.add_circle_outline,
               color: theme.colorScheme.primary,
-              onTap: () => context.go('/payment'),
+              onTap: () => context.go(
+                Uri(
+                  path: '/payment/deposit',
+                  queryParameters: {'returnRoute': '/savings'},
+                ).toString(),
+              ),
               onLongPress: _showSavingsTypeLongPressPicker,
             ),
             withdraw: ActionItem(

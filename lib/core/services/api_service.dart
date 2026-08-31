@@ -967,6 +967,16 @@ class PaymentService extends BaseService {
         throw ValidationException(message: 'Amount must be greater than zero');
       }
 
+      if (AppConstants.enableOfflineMode) {
+        final transactionId = 'TXN_OFFLINE_${DateTime.now().millisecondsSinceEpoch}';
+        return {
+          'status': 'success',
+          'message': 'Payment successful',
+          'transaction_id': transactionId,
+          'new_balance': amount + 250,
+        };
+      }
+
       final request = <String, dynamic>{
         'phone_number': phoneNumber,
         'account_number': accountNumber,
