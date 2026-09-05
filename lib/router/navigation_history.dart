@@ -50,11 +50,49 @@ class NavigationHistory {
 
     if (_history.isNotEmpty) {
       final previous = _history.last;
-      context.go(previous);
+      if (previous != current) {
+        context.go(previous);
+        return;
+      }
+    }
+
+    final fallbackFromPath = _fallbackRouteForPath(current);
+    if (fallbackFromPath != null) {
+      context.go(fallbackFromPath);
       return;
     }
 
     context.go(fallbackRoute);
+  }
+
+  String? _fallbackRouteForPath(String? current) {
+    if (current == null || current.isEmpty) return null;
+
+    final path = current.split('?').first.split('#').first;
+
+    if (path == '/loan-detail' || path.startsWith('/loans/')) {
+      return '/loans';
+    }
+
+    if (path == '/loan-status' ||
+        path == '/apply-loan' ||
+        path == '/repayment') {
+      return '/loans';
+    }
+
+    if (path.startsWith('/shares/')) {
+      return '/shares';
+    }
+
+    if (path.startsWith('/savings/')) {
+      return '/savings';
+    }
+
+    if (path.startsWith('/payment')) {
+      return '/home';
+    }
+
+    return null;
   }
 
   String? _currentLocation(GoRouter router) {

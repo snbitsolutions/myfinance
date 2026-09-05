@@ -582,9 +582,11 @@ List<Map<String, dynamic>> _buildFallbackTransactionsForAuth(AuthState auth) {
 bool _shouldUseLocalDemoData(AuthState auth) {
   // Temporary local/dev fallback for testing. Flip this off once the real
   // authentication/API flow is ready to be restored.
+  // Temporarily disable backend API calls by default so the app can render with
+  // local/mock data while the UI is being refined.
   const useLocalDemoData = bool.fromEnvironment(
     'USE_LOCAL_DEMO_DATA',
-    defaultValue: false,
+    defaultValue: true,
   );
   return useLocalDemoData;
 }

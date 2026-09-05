@@ -80,7 +80,7 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(top: 6, bottom: 10),
+          padding: const EdgeInsets.only(top: 4, bottom: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -104,7 +104,7 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 'Tap a card to continue to a service',
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -128,7 +128,7 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
             );
           },
           child: Container(
-            padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
               borderRadius: BorderRadius.circular(16),
@@ -186,7 +186,7 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _TopHeader(firstName: firstName),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                       if (isTablet)
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -434,49 +434,95 @@ class _TopHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final notificationService = NotificationService.instance;
+    final initials = firstName.trim().isEmpty
+        ? 'U'
+        : firstName.trim()[0].toUpperCase();
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Welcome back, $firstName',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () {
+              if (!context.mounted) return;
+              context.push('/profile');
+            },
+            child: Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    theme.colorScheme.primary,
+                    theme.colorScheme.primary.withValues(alpha: 0.7),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.24),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                initials,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
-            const SizedBox(height: 2),
-            Row(
-              children: [
-                Text(
-                  'Your finances at a glance',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Hi, $firstName',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
                 ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    'Secure',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w700,
+              ),
+              const SizedBox(height: 3),
+              Row(
+                children: [
+                  Text(
+                    'Your finances at a glance',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      'Secure',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
         Material(
           color: Colors.transparent,
@@ -635,7 +681,7 @@ class _AccountInfoCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 16, 16, 18),
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -643,8 +689,8 @@ class _AccountInfoCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        width: 44,
-                        height: 44,
+                        width: 40,
+                        height: 40,
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.22),
                           shape: BoxShape.circle,
@@ -654,11 +700,12 @@ class _AccountInfoCard extends StatelessWidget {
                           initials.isEmpty ? 'U' : initials,
                           style: theme.textTheme.labelLarge?.copyWith(
                             color: _DashboardUi.cardTextColor,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -667,10 +714,10 @@ class _AccountInfoCard extends StatelessWidget {
                               viewData.accountName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.1,
-                                height: 1.05,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.08,
+                                height: 1.08,
                                 color: _DashboardUi.cardTextColor,
                               ),
                             ),
@@ -681,15 +728,14 @@ class _AccountInfoCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.labelMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                letterSpacing: 0.25,
+                                letterSpacing: 0.18,
                                 color: _DashboardUi.cardTextColor.withValues(
                                   alpha: 0.78,
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 3),
                             Text(
-                              'Current Account · Gold Member',
+                              'Primary account · Budget synced',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.labelSmall?.copyWith(
@@ -704,7 +750,7 @@ class _AccountInfoCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
@@ -715,7 +761,7 @@ class _AccountInfoCard extends StatelessWidget {
                           textColor: _DashboardUi.cardTextColor,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: _CardInfoTile(
                           icon: Icons.credit_card_outlined,
@@ -726,77 +772,115 @@ class _AccountInfoCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  // Live balance
+                  const SizedBox(height: 10),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
+                      horizontal: 12,
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.22),
+                        color: Colors.white.withValues(alpha: 0.18),
                       ),
                     ),
                     child: Row(
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Available Balance',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: _DashboardUi.cardTextColor.withValues(
-                                  alpha: 0.72,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    'Available Balance',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: _DashboardUi.cardTextColor
+                                          .withValues(alpha: 0.72),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    Icons.trending_up_rounded,
+                                    size: 12,
+                                    color: Colors.greenAccent.shade100,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'GH₵ ${viewData.availableBalance.toStringAsFixed(2)}',
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  color: _DashboardUi.cardTextColor,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.6,
                                 ),
-                                fontWeight: FontWeight.w500,
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'GH₵ ${viewData.availableBalance.toStringAsFixed(2)}',
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                color: _DashboardUi.cardTextColor,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                        const Spacer(),
+                        const SizedBox(width: 12),
                         Container(
-                          padding: const EdgeInsets.all(8),
+                          width: 40,
+                          height: 40,
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(
                             Icons.account_balance_wallet_outlined,
                             color: Colors.white,
-                            size: 20,
+                            size: 18,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _InfoPill(
+                          label: 'Income',
+                          value: '+GH₵ 2.8k',
+                          color: const Color(0xFFB8F1CB),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _InfoPill(
+                          label: 'Spend',
+                          value: '-GH₵ 1.2k',
+                          color: const Color(0xFFFFE4B5),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _InfoPill(
+                          label: 'Saved',
+                          value: 'GH₵ 18.4k',
+                          color: const Color(0xFFD8EEFF),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
                   Align(
                     alignment: Alignment.bottomRight,
                     child: Transform.translate(
-                      offset: const Offset(2, 3),
+                      offset: const Offset(0, 1),
                       child: Wrap(
                         spacing: 8,
                         runAlignment: WrapAlignment.end,
                         alignment: WrapAlignment.end,
                         children: [
-                          // Tier Badge
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
+                              horizontal: 10,
+                              vertical: 5,
                             ),
                             decoration: BoxDecoration(
                               color: Colors.amber.withValues(alpha: 0.18),
@@ -810,7 +894,7 @@ class _AccountInfoCard extends StatelessWidget {
                               children: [
                                 Icon(
                                   Icons.star_rounded,
-                                  size: 13,
+                                  size: 12,
                                   color: Colors.amber.shade300,
                                 ),
                                 const SizedBox(width: 4),
@@ -819,13 +903,12 @@ class _AccountInfoCard extends StatelessWidget {
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: Colors.amber.shade300,
                                     fontWeight: FontWeight.w700,
-                                    fontSize: 11,
+                                    fontSize: 10,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          // Alert Badge (if needed)
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
@@ -843,7 +926,7 @@ class _AccountInfoCard extends StatelessWidget {
                               children: [
                                 Icon(
                                   statusStyle.icon,
-                                  size: 12,
+                                  size: 11,
                                   color: statusStyle.textColor,
                                 ),
                                 const SizedBox(width: 4),
@@ -852,7 +935,7 @@ class _AccountInfoCard extends StatelessWidget {
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: statusStyle.textColor,
                                     fontWeight: FontWeight.w700,
-                                    fontSize: 11,
+                                    fontSize: 10,
                                   ),
                                 ),
                               ],
@@ -937,6 +1020,66 @@ class _CardInfoTile extends StatelessWidget {
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: textColor.withValues(alpha: 0.94),
                     fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoPill extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _InfoPill({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ],
@@ -1126,7 +1269,7 @@ class _QuickActions extends StatelessWidget {
           return SizedBox(
             width: itemWidth,
             child: AspectRatio(
-              aspectRatio: 1.28,
+              aspectRatio: 1.18,
               child: _QuickAction(
                 icon: item.icon,
                 label: item.label,
@@ -1184,7 +1327,7 @@ const List<_QuickActionItem> _quickActionItems = [
   _QuickActionItem(
     icon: Icons.trending_up,
     label: 'Investment',
-    route: '/investment',
+    route: '/investments',
     accentColor: Color(0xFF1F7AE0),
   ),
   _QuickActionItem(
@@ -1251,35 +1394,35 @@ class _QuickAction extends StatelessWidget {
       opacity: disabled ? 0.38 : 1.0,
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           child: Ink(
             width: double.infinity,
             height: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
             decoration: BoxDecoration(
               color: surfaceTint,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(22),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  accentColor.withValues(alpha: 0.10),
+                  accentColor.withValues(alpha: 0.12),
                   surfaceTint,
                   surfaceTint,
                 ],
               ),
               border: Border.all(
-                color: accentColor.withValues(alpha: 0.18),
+                color: accentColor.withValues(alpha: 0.16),
                 width: 1.2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: accentColor.withValues(alpha: 0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
+                  color: accentColor.withValues(alpha: 0.10),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
                 ),
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.04),
@@ -1302,8 +1445,8 @@ class _QuickAction extends StatelessWidget {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            accentColor.withValues(alpha: 0.22),
-                            accentColor.withValues(alpha: 0.10),
+                            accentColor.withValues(alpha: 0.20),
+                            accentColor.withValues(alpha: 0.08),
                           ],
                         ),
                         border: Border.all(
@@ -1343,6 +1486,28 @@ class _QuickAction extends StatelessWidget {
                     height: 1.05,
                   ),
                 ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: accentColor.withValues(alpha: 0.82),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Open',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: accentColor,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.12,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -1368,10 +1533,25 @@ class _RecentTransactions extends ConsumerWidget {
         Row(
           children: [
             Text(
-              'Recent Transactions',
+              'Activity',
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.1,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEAF5EE),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                'Live',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: const Color(0xFF2E8B57),
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             const Spacer(),
@@ -1381,7 +1561,7 @@ class _RecentTransactions extends ConsumerWidget {
                 padding: EdgeInsets.zero,
               ),
               onPressed: () => context.go('/transactions'),
-              child: const Text('See all'),
+              child: const Text('View all'),
             ),
           ],
         ),
@@ -1397,17 +1577,18 @@ class _RecentTransactions extends ConsumerWidget {
             }
             final recent = txns.take(5).toList();
             return Container(
+              padding: const EdgeInsets.symmetric(vertical: 8),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(22),
                 border: Border.all(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.22),
+                  color: theme.colorScheme.outline.withValues(alpha: 0.18),
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 5),
                   ),
                 ],
               ),
@@ -1417,13 +1598,13 @@ class _RecentTransactions extends ConsumerWidget {
                 itemCount: recent.length,
                 separatorBuilder: (_, _) => Divider(
                   height: 1,
-                  indent: 60,
-                  color: theme.colorScheme.outline.withValues(alpha: 0.20),
+                  indent: 64,
+                  color: theme.colorScheme.outline.withValues(alpha: 0.16),
                 ),
                 itemBuilder: (_, i) => Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                    horizontal: 14,
+                    vertical: 10,
                   ),
                   child: _DashboardTransactionTile(txn: recent[i]),
                 ),
@@ -1447,6 +1628,7 @@ class _DashboardTransactionTile extends StatelessWidget {
     final amount = (txn['amount'] as num?)?.toDouble() ?? 0.0;
     final description = txn['description'] as String? ?? '';
     final dateStr = txn['date'] as String? ?? '';
+    final status = (txn['status'] as String? ?? 'completed').toLowerCase();
 
     DateTime? date;
     try {
@@ -1454,25 +1636,25 @@ class _DashboardTransactionTile extends StatelessWidget {
     } catch (_) {}
 
     final accentColor = isCredit
-        ? theme.colorScheme.primary
-        : theme.colorScheme.error;
+        ? const Color(0xFF2E8B57)
+        : const Color(0xFF1C1F1E);
+    final badgeColor = status == 'pending'
+        ? const Color(0xFFE2A93B)
+        : const Color(0xFF2E8B57);
+
+    final label = description.isEmpty ? 'Transaction' : description;
+    final icon = _transactionIcon(label, isCredit);
 
     return Row(
       children: [
         Container(
-          width: 38,
-          height: 38,
+          width: 42,
+          height: 42,
           decoration: BoxDecoration(
-            color: accentColor.withValues(alpha: 0.10),
-            shape: BoxShape.circle,
+            color: isCredit ? const Color(0xFFEAF5EE) : const Color(0xFFF3F4F6),
+            borderRadius: BorderRadius.circular(14),
           ),
-          child: Icon(
-            isCredit
-                ? Icons.arrow_downward_rounded
-                : Icons.arrow_upward_rounded,
-            size: 17,
-            color: accentColor,
-          ),
+          child: Icon(icon, size: 18, color: accentColor),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -1480,16 +1662,17 @@ class _DashboardTransactionTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                description.isEmpty ? 'Transaction' : description,
+                label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
+              const SizedBox(height: 2),
               if (date != null)
                 Text(
-                  DateFormat('MMM d, y').format(date),
+                  DateFormat('MMM d, y • h:mm a').format(date),
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
                   ),
@@ -1497,15 +1680,60 @@ class _DashboardTransactionTile extends StatelessWidget {
             ],
           ),
         ),
-        Text(
-          '${isCredit ? '+' : '-'} ₵${amount.toStringAsFixed(2)}',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: accentColor,
-          ),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              '${isCredit ? '+' : '-'} ₵${amount.toStringAsFixed(2)}',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: accentColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: badgeColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                status == 'pending' ? 'Pending' : 'Completed',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: badgeColor,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
+  }
+
+  IconData _transactionIcon(String label, bool isCredit) {
+    final value = label.toLowerCase();
+    if (value.contains('airtime') ||
+        value.contains('bill') ||
+        value.contains('payment')) {
+      return Icons.phone_iphone_rounded;
+    }
+    if (value.contains('save') || value.contains('deposit')) {
+      return Icons.savings_rounded;
+    }
+    if (value.contains('loan') || value.contains('repay')) {
+      return Icons.account_balance_wallet_rounded;
+    }
+    if (value.contains('share') ||
+        value.contains('stock') ||
+        value.contains('investment')) {
+      return Icons.trending_up_rounded;
+    }
+    if (isCredit) {
+      return Icons.arrow_downward_rounded;
+    }
+    return Icons.arrow_upward_rounded;
   }
 }
 

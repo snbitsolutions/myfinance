@@ -27,6 +27,22 @@ class _AccountNumberScreenState extends ConsumerState<AccountNumberScreen> {
 
   String get _normalizedAccountNumber => _accountController.text.trim();
 
+  String _maskedPhoneNumber() {
+    final digits = widget.phoneNumber.replaceAll(RegExp(r'\D'), '');
+    if (digits.length <= 4) {
+      return '••••';
+    }
+
+    final safeDigits = digits.length >= 6 ? digits : digits.padRight(6, '0');
+    final visibleStart = 2;
+    final visibleEnd = 2;
+    final hiddenCount = safeDigits.length - visibleStart - visibleEnd;
+    final hidden = List.filled(hiddenCount > 0 ? hiddenCount : 0, '*').join();
+    final masked =
+        '${safeDigits.substring(0, visibleStart)}$hidden${safeDigits.substring(safeDigits.length - visibleEnd)}';
+    return masked;
+  }
+
   Future<void> _handleContinue() async {
     if (_isSubmitting) return;
 
@@ -118,7 +134,7 @@ class _AccountNumberScreenState extends ConsumerState<AccountNumberScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 children: [
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 24),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: IconButton(
@@ -132,23 +148,23 @@ class _AccountNumberScreenState extends ConsumerState<AccountNumberScreen> {
                       icon: const Icon(Icons.arrow_back, color: Colors.white),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Text(
                     'Sign in',
-                    style: theme.textTheme.displaySmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
-                    'Enter the account number linked to ${widget.phoneNumber}',
+                    'Enter the account number linked to ${_maskedPhoneNumber()}',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: Colors.white70,
                     ),
                   ),
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 28),
                   Container(
                     padding: const EdgeInsets.all(28),
                     decoration: BoxDecoration(

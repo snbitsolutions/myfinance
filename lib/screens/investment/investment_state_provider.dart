@@ -97,7 +97,41 @@ class InvestmentState {
 class InvestmentNotifier extends StateNotifier<InvestmentState> {
   static const _storageKey = 'investment_state_v1';
 
-  InvestmentNotifier() : super(const InvestmentState()) {
+  InvestmentNotifier()
+      : super(
+          InvestmentState(
+            selectedPlanName: 'Dividend Growth',
+            activePlans: 3,
+            totalInvested: 5480.0,
+            lastStartedAt: DateTime.now().subtract(const Duration(days: 2)),
+            activities: [
+              InvestmentActivityEntry(
+                reference: 'INV-2025-1084',
+                planName: 'Dividend Growth',
+                amount: 1800,
+                startedAt: DateTime.now().subtract(
+                  const Duration(days: 2, hours: 5),
+                ),
+              ),
+              InvestmentActivityEntry(
+                reference: 'INV-2025-0749',
+                planName: 'Fixed Income',
+                amount: 1350,
+                startedAt: DateTime.now().subtract(
+                  const Duration(days: 7, hours: 2),
+                ),
+              ),
+              InvestmentActivityEntry(
+                reference: 'INV-2025-0312',
+                planName: 'Youth Savings Plan',
+                amount: 2330,
+                startedAt: DateTime.now().subtract(
+                  const Duration(days: 11, hours: 4),
+                ),
+              ),
+            ],
+          ),
+        ) {
     _restore();
   }
 

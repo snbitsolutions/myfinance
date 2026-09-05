@@ -21,11 +21,6 @@ class MainShell extends StatelessWidget {
   static const List<_BottomNavItem> _items = [
     _BottomNavItem(label: 'Home', icon: Icons.home_rounded, route: '/home'),
     _BottomNavItem(
-      label: 'Product',
-      icon: Icons.grid_view_rounded,
-      route: '/products',
-    ),
-    _BottomNavItem(
       label: 'Pay',
       icon: Icons.payment_rounded,
       route: '/pay',
@@ -56,10 +51,12 @@ class MainShell extends StatelessWidget {
         currentLocation == '/savings' || currentLocation.startsWith('/savings/');
     final isStandalonePaymentView =
         currentLocation == '/payment' || currentLocation.startsWith('/payment/');
+    final isStandaloneLoansView =
+        currentLocation == '/loans' || currentLocation.startsWith('/loans/');
 
     return Scaffold(
       body: SafeArea(child: child),
-      bottomNavigationBar: isStandaloneSavingsView || isStandalonePaymentView
+      bottomNavigationBar: isStandaloneSavingsView || isStandalonePaymentView || isStandaloneLoansView
           ? null
           : Container(
               decoration: BoxDecoration(

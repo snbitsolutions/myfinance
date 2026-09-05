@@ -709,7 +709,7 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                           child: const Icon(
                             Icons.add,
                             color: Colors.white,
-                            size: 18,
+                            size: 15,
                           ),
                         ),
                         const SizedBox(width: 8),

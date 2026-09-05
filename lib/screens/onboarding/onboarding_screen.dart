@@ -62,7 +62,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Future<void> _finish() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('seenOnboarding', true);
+    await prefs.setBool(AppConstants.sharedPrefKeyOnboarding, true);
     if (!mounted) return;
     context.go('/login');
   }
@@ -323,9 +323,7 @@ class OnboardingPage extends StatelessWidget {
                       ),
                       SizedBox(height: isCompact ? 28 : 56),
                       AnimatedSlide(
-                        offset: isActive
-                            ? Offset.zero
-                            : const Offset(0, 0.04),
+                        offset: isActive ? Offset.zero : const Offset(0, 0.04),
                         duration: const Duration(milliseconds: 280),
                         curve: Curves.easeOut,
                         child: AnimatedOpacity(

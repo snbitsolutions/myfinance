@@ -105,7 +105,7 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
         ref.invalidate(savingsProvider);
 
         if (!mounted) return;
-        router.go('/home');
+        router.go('/activity');
         return;
       }
 
@@ -124,7 +124,7 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
       ref.invalidate(savingsProvider);
 
       if (!mounted) return;
-      router.go('/home');
+      router.go('/activity');
     } on AppException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -201,17 +201,17 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 24),
                       Text(
                         _isRegisterMode
                             ? 'Create PIN'
                             : (_isSignInMode ? 'Enter PIN' : 'Update PIN'),
-                        style: theme.textTheme.displaySmall?.copyWith(
-                          fontWeight: FontWeight.bold,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
                         _isRegisterMode
                             ? 'Create a 4-digit PIN to secure your account'

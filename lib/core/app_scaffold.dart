@@ -25,9 +25,20 @@ class AppScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final canPop = context.canPop();
+    final currentLocation = GoRouter.of(
+      context,
+    ).routeInformationProvider.value.uri.path;
+
     Future<void> handleBackNavigation() async {
-      // Prefer popping the Navigator; if nothing to pop, go to tracked previous page.
       if (!context.mounted) return;
+
+      if (currentLocation.startsWith('/investments/') ||
+          currentLocation == '/investments') {
+        context.go('/home');
+        return;
+      }
+
+      // Prefer popping the Navigator; if nothing to pop, go to tracked previous page.
       if (context.canPop()) {
         context.pop();
       } else {
@@ -41,6 +52,12 @@ class AppScaffold extends StatelessWidget {
         if (didPop || !context.mounted) {
           return;
         }
+
+        if (currentLocation.startsWith('/investments/')) {
+          context.go('/home');
+          return;
+        }
+
         NavigationHistory.instance.goBack(context);
       },
       child: Scaffold(

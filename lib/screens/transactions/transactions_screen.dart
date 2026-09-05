@@ -156,20 +156,28 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Row(
                     children: [
-                      Expanded(
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withOpacitySafe(
+                            0.08,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                         child: Text(
                           dateKey,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.labelLarge?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.onSurface.withOpacitySafe(
-                              0.75,
-                            ),
+                            color: theme.colorScheme.primary,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const Spacer(),
                       Text(
                         '${dayTransactions.length} item${dayTransactions.length > 1 ? 's' : ''}',
                         style: theme.textTheme.labelSmall?.copyWith(
@@ -212,7 +220,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     );
 
     return AppScaffold(
-      title: isSavingsFiltered ? 'Savings Activity' : 'Transactions',
+      title: isSavingsFiltered ? 'Savings Activity' : 'Activity',
       actions: !isSavingsFiltered
           ? [
               IconButton(
@@ -225,14 +233,14 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
       child: isLoadingLive
           ? _buildLoadingState(theme)
           : liveTransactionsAsync.hasError && !isSavingsFiltered
-              ? _buildApiErrorState(
-                  theme,
-                  liveTransactionsAsync.error!,
-                  () => ref.invalidate(transactionsProvider),
-                )
-              : transactions.isEmpty
-                  ? _buildEmptyState(theme)
-                  : LayoutBuilder(
+          ? _buildApiErrorState(
+              theme,
+              liveTransactionsAsync.error!,
+              () => ref.invalidate(transactionsProvider),
+            )
+          : transactions.isEmpty
+          ? _buildEmptyState(theme)
+          : LayoutBuilder(
               builder: (context, constraints) {
                 final isTablet = constraints.maxWidth >= 900;
 
@@ -385,7 +393,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Net Balance',
+                                        'Activity Overview',
                                         style: theme.textTheme.bodySmall
                                             ?.copyWith(
                                               color: Colors.white.withValues(
@@ -405,7 +413,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                                               fontSize: 10,
                                             ),
                                       ),
-                                      const SizedBox(height: 6),
+                                      const SizedBox(height: 8),
                                       FittedBox(
                                         fit: BoxFit.scaleDown,
                                         alignment: Alignment.centerLeft,
@@ -429,46 +437,38 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(
-                                    Icons.account_balance_wallet,
+                                    Icons.receipt_long,
                                     color: Colors.white,
                                     size: 20,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.14),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.receipt_long,
-                                    color: Colors.white,
-                                    size: 12,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Flexible(
-                                    child: Text(
-                                      '${transactions.length} transactions in view',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                          ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _miniStatPill(
+                                    label: 'Income',
+                                    value:
+                                        'GH₵${totalIncome.toStringAsFixed(2)}',
+                                    background: Colors.green.withValues(
+                                      alpha: 0.18,
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _miniStatPill(
+                                    label: 'Expense',
+                                    value:
+                                        'GH₵${totalExpense.toStringAsFixed(2)}',
+                                    background: Colors.red.withValues(
+                                      alpha: 0.18,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -479,7 +479,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                       child: TextField(
                         controller: _searchController,
                         decoration: InputDecoration(
-                          hintText: 'Search transactions...',
+                          hintText: 'Search activity...',
                           hintStyle: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurface.withValues(
                               alpha: 0.45,
@@ -694,7 +694,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         'repayment' => TransactionType.repayment,
         _ => TransactionType.withdrawal,
       };
-      final amount = (txn['amount'] as num?)?.toDouble() ??
+      final amount =
+          (txn['amount'] as num?)?.toDouble() ??
           double.tryParse(txn['amount']?.toString() ?? '') ??
           0.0;
       final description =
@@ -867,8 +868,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     IconData icon,
     Color color,
   ) {
-    final gradientStart = color.withValues(alpha: 0.88);
-    final gradientEnd = color.withValues(alpha: 0.65);
+    final gradientStart = color.withValues(alpha: 0.9);
+    final gradientEnd = color.withValues(alpha: 0.7);
     return Container(
       width: 150,
       padding: const EdgeInsets.all(16),
@@ -938,6 +939,42 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     );
   }
 
+  Widget _miniStatPill({
+    required String label,
+    required String value,
+    required Color background,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFilterChip(ThemeData theme, String label) {
     final isSelected = _selectedFilter == label;
     return Padding(
@@ -979,18 +1016,23 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
 
     return InkWell(
       onTap: () => _showTransactionDetails(context, transaction),
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: theme.colorScheme.surface,
+        ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: getColor().withOpacitySafe(0.1),
+                color: getColor().withOpacitySafe(0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(getIcon(), color: getColor(), size: 24),
+              child: Icon(getIcon(), color: getColor(), size: 22),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1000,7 +1042,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                   Text(
                     transaction.title,
                     style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   if (transaction.description != null) ...[
@@ -1015,21 +1057,21 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                     ),
                   ],
                   if (transaction.category != null) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.secondaryContainer
-                            .withOpacitySafe(0.5),
+                        color: theme.colorScheme.primary.withOpacitySafe(0.09),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         transaction.category!,
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSecondaryContainer,
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w600,
                           fontSize: 10,
                         ),
                       ),
@@ -1038,6 +1080,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                 ],
               ),
             ),
+            const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -1058,7 +1101,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
                   DateFormat('HH:mm').format(transaction.date),
                   style: theme.textTheme.labelSmall?.copyWith(

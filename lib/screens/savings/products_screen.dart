@@ -25,7 +25,7 @@ class ProductsScreen extends StatelessWidget {
         icon: Icons.trending_up_rounded,
         accent: const Color(0xFF0C8B5A),
         tint: const Color(0xFFEAF5EE),
-        onTap: () => context.go('/investment'),
+        onTap: () => context.go('/investments'),
       ),
       _ProductCard(
         title: 'Loans',

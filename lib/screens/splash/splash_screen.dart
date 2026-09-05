@@ -4,9 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/color_ext.dart';
 import '../../core/constants/app_constants.dart';
-import '../../core/services/device_identity_service.dart';
-import '../../core/services/secure_auth_storage.dart';
-import '../../router/app_router.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -84,43 +81,16 @@ class _SplashScreenState extends State<SplashScreen>
       final prefs = await SharedPreferences.getInstance();
       final seenOnboarding =
           prefs.getBool(AppConstants.sharedPrefKeyOnboarding) ?? false;
-      final debugBypassAuth = AppRouter.isDebugAuthBypassEnabled(
-        savedPreferenceValue: prefs.getBool(
-          AppConstants.sharedPrefKeyDebugBypassAuth,
-        ),
-      );
-      final secureAuthStorage = SecureAuthStorage.instance;
-      final userToken = await secureAuthStorage.readAuthToken() ?? '';
-      var hasBoundSession = false;
-
-      if (userToken.isNotEmpty) {
-        final currentFingerprint = await DeviceIdentityService()
-            .getInstallationFingerprint();
-        hasBoundSession = await secureAuthStorage.hasSessionBoundToFingerprint(
-          currentFingerprint,
-        );
-
-        if (!hasBoundSession) {
-          await secureAuthStorage.clearAuthSecrets();
-          await prefs.remove(AppConstants.sharedPrefKeyUserId);
-          await prefs.remove(AppConstants.sharedPrefKeyUserEmail);
-        }
-      }
-
       if (!mounted) return;
 
-      if (debugBypassAuth) {
-        context.go('/home');
-      } else if (!seenOnboarding) {
-        context.go('/onboarding');
-      } else if (hasBoundSession) {
-        context.go('/home');
-      } else {
+      if (seenOnboarding) {
         context.go('/login');
+      } else {
+        context.go('/onboarding');
       }
     } catch (_) {
       if (!mounted) return;
-      context.go('/login');
+      context.go('/onboarding');
     }
   }
 

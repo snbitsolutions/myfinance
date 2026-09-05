@@ -39,6 +39,24 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
   String get _normalizedOtp => _otpController.text.trim();
 
+  String _maskedPhoneNumber() {
+    final digits = widget.phoneNumber.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) {
+      return 'your mobile number';
+    }
+    if (digits.length <= 4) {
+      return '••••';
+    }
+
+    final visibleStart = 2;
+    final visibleEnd = 2;
+    final hiddenCount = digits.length - visibleStart - visibleEnd;
+    final hidden = List.filled(hiddenCount > 0 ? hiddenCount : 0, '*').join();
+    final masked =
+        '${digits.substring(0, visibleStart)}$hidden${digits.substring(digits.length - visibleEnd)}';
+    return masked;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -233,7 +251,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 24),
                       Align(
                         alignment: Alignment.centerLeft,
                         child: IconButton(
@@ -250,23 +268,23 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       Text(
                         'Enter OTP',
-                        style: theme.textTheme.displaySmall?.copyWith(
-                          fontWeight: FontWeight.bold,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
-                        'A 4-digit code should be sent to ${widget.phoneNumber}',
+                        'A 4-digit code should be sent to ${_maskedPhoneNumber()}',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.white70,
                         ),
                       ),
-                      const SizedBox(height: 48),
+                      const SizedBox(height: 28),
                       // OTP Card
                       Container(
                         padding: const EdgeInsets.all(28),

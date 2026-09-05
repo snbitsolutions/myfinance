@@ -8,7 +8,6 @@ import 'package:adepa_teachers/core/constants/app_constants.dart';
 import 'package:adepa_teachers/core/services/device_identity_service.dart';
 import 'package:adepa_teachers/main.dart';
 import 'package:adepa_teachers/router/app_router.dart';
-import 'package:adepa_teachers/core/services/secure_auth_storage.dart';
 import 'package:adepa_teachers/screens/auth/account_number_screen.dart';
 import 'package:adepa_teachers/screens/auth/otp_screen.dart';
 import 'package:adepa_teachers/screens/auth/signup_screen.dart';
@@ -83,22 +82,27 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 50));
   }
 
-  testWidgets('starts unauthenticated users on onboarding from root', (
+  testWidgets('starts unauthenticated users on the login flow from root', (
     tester,
   ) async {
     await pumpAt(tester, '/');
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
 
-    expect(find.byType(OnboardingScreen), findsOneWidget);
-    expect(find.byType(LoginScreen), findsNothing);
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(OnboardingScreen), findsNothing);
     expect(find.byType(DashboardScreen), findsNothing);
   });
 
   testWidgets(
-    'redirects protected routes to onboarding when onboarding not seen',
+    'redirects protected routes to login when onboarding not seen',
     (tester) async {
       await pumpAt(tester, '/home');
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
 
-      expect(find.byType(OnboardingScreen), findsOneWidget);
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(OnboardingScreen), findsNothing);
       expect(find.byType(DashboardScreen), findsNothing);
     },
   );
@@ -117,12 +121,11 @@ void main() {
   );
 
   testWidgets(
-    'redirects auth routes to home when onboarding seen and session exists',
+    'keeps the auth entry screen visible even when a valid session exists',
     (tester) async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(AppConstants.sharedPrefKeyOnboarding, true);
 
-      // Seed a deterministic install ID so the fingerprint is predictable.
       await prefs.setString(
         AppConstants.sharedPrefKeyDeviceInstallId,
         'test-install-id',
@@ -134,13 +137,10 @@ void main() {
       secureStore[AppConstants.secureStorageKeySessionDeviceFingerprint] =
           fingerprint;
 
-      final token = await SecureAuthStorage.instance.readAuthToken();
-      expect(token, 'test-token');
-
       await pumpAt(tester, '/login');
 
-      expect(find.byType(DashboardScreen), findsOneWidget);
-      expect(find.byType(LoginScreen), findsNothing);
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(DashboardScreen), findsNothing);
     },
   );
 
@@ -156,7 +156,7 @@ void main() {
   });
 
   testWidgets(
-    'redirects the root route to home when debug auth bypass is enabled',
+    'keeps startup on login even when debug auth bypass is enabled',
     (tester) async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(AppConstants.sharedPrefKeyOnboarding, true);
@@ -171,12 +171,12 @@ void main() {
 
       await pumpAt(tester, '/?debugAuth=true');
 
-      expect(find.byType(DashboardScreen), findsOneWidget);
-      expect(find.byType(LoginScreen), findsNothing);
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(DashboardScreen), findsNothing);
     },
   );
 
-  testWidgets('allows protected routes when debug auth bypass is enabled', (
+  testWidgets('keeps protected routes on login even when debug auth bypass is enabled', (
     tester,
   ) async {
     final prefs = await SharedPreferences.getInstance();
@@ -187,8 +187,8 @@ void main() {
 
     await pumpAt(tester, '/home?debugAuth=true');
 
-    expect(find.byType(DashboardScreen), findsOneWidget);
-    expect(find.byType(LoginScreen), findsNothing);
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(DashboardScreen), findsNothing);
   });
 
   testWidgets(
