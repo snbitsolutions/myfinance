@@ -47,12 +47,31 @@ class PaymentHomeScreen extends ConsumerWidget {
               const SizedBox(height: 18),
               _PortfolioSummaryCard(),
               const SizedBox(height: 26),
-              Text(
-                'Product Categories',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1A2A22),
-                ),
+              Row(
+                children: [
+                  Text(
+                    'Product Categories',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1A2A22),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEAF5EE),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '4 items',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: const Color(0xFF0B8F57),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               _CategoryTile(
@@ -190,9 +209,15 @@ class _TopHeader extends StatelessWidget {
         const SizedBox(width: 10),
         Row(
           children: [
-            _HeaderButton(icon: Icons.search_rounded),
+            _HeaderButton(
+              icon: Icons.search_rounded,
+              onTap: () => context.go('/transactions'),
+            ),
             const SizedBox(width: 8),
-            _HeaderButton(icon: Icons.tune_rounded),
+            _HeaderButton(
+              icon: Icons.tune_rounded,
+              onTap: () => context.push('/profile'),
+            ),
           ],
         ),
       ],
@@ -247,20 +272,28 @@ String? _resolveProfileImageUrl(Map<String, dynamic> profile) {
 
 class _HeaderButton extends StatelessWidget {
   final IconData icon;
+  final VoidCallback? onTap;
 
-  const _HeaderButton({required this.icon});
+  const _HeaderButton({required this.icon, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 42,
-      height: 42,
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFDBE2DD)),
+        onTap: onTap,
+        child: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFDBE2DD)),
+          ),
+          child: Icon(icon, color: const Color(0xFF1E312A), size: 22),
+        ),
       ),
-      child: Icon(icon, color: const Color(0xFF1E312A), size: 22),
     );
   }
 }

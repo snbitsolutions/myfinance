@@ -255,16 +255,37 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  String _resolveAccountNumber({
+    required String phoneNumber,
+    required String accountNumber,
+  }) {
+    final normalisedAccount = accountNumber.replaceAll(RegExp(r'\D'), '');
+    if (normalisedAccount.length >= 5) {
+      return normalisedAccount;
+    }
+
+    final phoneDigits = phoneNumber.replaceAll(RegExp(r'\D'), '');
+    if (phoneDigits.length >= 5) {
+      return phoneDigits.substring(phoneDigits.length - 5);
+    }
+
+    return '00000';
+  }
+
   Future<void> sendLoginOtp({
     required String phoneNumber,
     required String accountNumber,
   }) async {
     try {
-      await authService.sendLoginOtp(
+      final resolvedAccountNumber = _resolveAccountNumber(
         phoneNumber: phoneNumber,
         accountNumber: accountNumber,
       );
-      AppLogger.info('Login OTP requested for account: $accountNumber');
+      await authService.sendLoginOtp(
+        phoneNumber: phoneNumber,
+        accountNumber: resolvedAccountNumber,
+      );
+      AppLogger.info('Login OTP requested for account: $resolvedAccountNumber');
     } on AppException catch (e) {
       AppLogger.error('Login OTP request failed', e);
       rethrow;
@@ -396,8 +417,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
         throw ValidationException(message: AppConstants.invalidOtpMessage);
       }
 
-      final response = await authService.verifyLoginOtp(
+      final resolvedAccountNumber = _resolveAccountNumber(
+        phoneNumber: phoneNumber,
         accountNumber: accountNumber,
+      );
+
+      final response = await authService.verifyLoginOtp(
+        accountNumber: resolvedAccountNumber,
         otp: otp,
       );
       final status = response['status'];
@@ -430,16 +456,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
         refreshToken: session?.refreshToken,
         deviceFingerprint: currentFingerprint,
       );
-      await prefs.setString(AppConstants.sharedPrefKeyUserId, accountNumber);
+      await prefs.setString(
+        AppConstants.sharedPrefKeyUserId,
+        resolvedAccountNumber,
+      );
       await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
 
       state = AuthState.authenticated(
-        userId: accountNumber,
+        userId: resolvedAccountNumber,
         userEmail: phoneNumber,
         authToken: storedAuthToken,
       );
 
-      AppLogger.info('User logged in via OTP: $accountNumber');
+      AppLogger.info('User logged in via OTP: $resolvedAccountNumber');
     } on AppException catch (e) {
       state = AuthState.error(e.message);
       AppLogger.error('OTP login failed', e);
@@ -543,6 +572,7 @@ Map<String, dynamic> _buildFallbackProfile({String? userId, String? phone}) {
     'branch': 'Primary Branch',
     'phone': resolvedPhone,
     'status': 'Active',
+    'avatar': '',
   };
 }
 

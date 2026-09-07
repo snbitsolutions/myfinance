@@ -70,13 +70,16 @@ class NavigationHistory {
 
     final path = current.split('?').first.split('#').first;
 
-    if (path == '/loan-detail' || path.startsWith('/loans/')) {
+    if (path == '/loan-detail' ||
+        path.startsWith('/loan-detail/') ||
+        path.startsWith('/loans/')) {
       return '/loans';
     }
 
     if (path == '/loan-status' ||
         path == '/apply-loan' ||
-        path == '/repayment') {
+        path == '/repayment' ||
+        path.startsWith('/repayment/')) {
       return '/loans';
     }
 

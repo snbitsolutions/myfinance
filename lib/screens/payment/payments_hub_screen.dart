@@ -26,7 +26,10 @@ class PaymentsHubScreen extends StatelessWidget {
                         context.go('/home');
                       }
                     },
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 22),
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 22,
+                    ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -36,6 +39,7 @@ class PaymentsHubScreen extends StatelessWidget {
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: const Color(0xFF1C1F1E),
+                        fontSize: 25,
                       ),
                     ),
                   ),
@@ -59,48 +63,51 @@ class PaymentsHubScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Security Banner
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEAF4EE),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFF0B8F57).withValues(alpha: 0.2),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF2E8B57), Color(0xFF0E8F87)],
                         ),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       child: Row(
                         children: [
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0B8F57).withValues(alpha: 0.1),
-                              shape: BoxShape.circle,
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Icon(
-                              Icons.shield_rounded,
-                              color: Color(0xFF0B8F57),
-                              size: 18,
+                              Icons.payments_rounded,
+                              color: Colors.white,
+                              size: 24,
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Make payments quickly and securely',
-                                  style: theme.textTheme.labelSmall?.copyWith(
+                                  'Go Cashless, Go Effortless',
+                                  style: theme.textTheme.labelLarge?.copyWith(
                                     fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF1C1F1E),
+                                    color: Colors.white,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Choose a category to get started',
+                                  'Pay your bills and top-up on the go anytime, anywhere.',
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     fontSize: 10,
-                                    color: const Color(0xFF5F6E66),
+                                    color: Colors.white.withValues(alpha: 0.9),
                                   ),
                                 ),
                               ],
@@ -228,59 +235,6 @@ class PaymentsHubScreen extends StatelessWidget {
                     const SizedBox(height: 16),
 
                     // Bottom promotional banner
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Color(0xFF2E8B57),
-                            Color(0xFF0E8F87),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.payments_rounded,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Go Cashless, Go Effortless',
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Pay your bills and top-up on the go anytime, anywhere.',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    fontSize: 10,
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -318,10 +272,7 @@ class _PaymentGridTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.grey[200]!,
-            width: 1,
-          ),
+          border: Border.all(color: Colors.grey[200]!, width: 1),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),

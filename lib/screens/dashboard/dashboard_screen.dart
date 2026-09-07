@@ -74,7 +74,6 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final viewData = _DashboardProfileViewData.fromProfile(widget.profile);
-    final firstName = viewData.accountName.trim().split(RegExp(r'\s+')).first;
 
     final quickActionsPanel = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,7 +184,10 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _TopHeader(firstName: firstName),
+                      _TopHeader(
+                        accountName: viewData.accountName,
+                        imageUrl: viewData.profileImageUrl,
+                      ),
                       const SizedBox(height: 10),
                       if (isTablet)
                         Row(
@@ -426,17 +428,47 @@ class _BackendDiagnosticsCard extends ConsumerWidget {
 }
 
 class _TopHeader extends StatelessWidget {
-  final String firstName;
+  final String accountName;
+  final String? imageUrl;
 
-  const _TopHeader({required this.firstName});
+  const _TopHeader({required this.accountName, this.imageUrl});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final notificationService = NotificationService.instance;
-    final initials = firstName.trim().isEmpty
+    final initials = accountName.trim().isEmpty
         ? 'U'
-        : firstName.trim()[0].toUpperCase();
+        : accountName
+              .trim()
+              .split(RegExp(r'\s+'))
+              .where((segment) => segment.isNotEmpty)
+              .take(2)
+              .map((segment) => segment[0].toUpperCase())
+              .join();
+    final displayName = accountName.trim().isEmpty
+        ? 'Member'
+        : accountName.trim();
+    final greetingName =
+        displayName
+            .split(RegExp(r'\s+'))
+            .where((segment) => segment.isNotEmpty)
+            .firstOrNull ??
+        displayName;
+
+    final avatar = imageUrl != null && imageUrl!.trim().isNotEmpty
+        ? ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: Image.network(
+              imageUrl!,
+              width: 46,
+              height: 46,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) =>
+                  _HeaderInitialsAvatar(initials: initials),
+            ),
+          )
+        : _HeaderInitialsAvatar(initials: initials);
 
     return Row(
       children: [
@@ -469,14 +501,8 @@ class _TopHeader extends StatelessWidget {
                   ),
                 ],
               ),
-              alignment: Alignment.center,
-              child: Text(
-                initials,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+              clipBehavior: Clip.antiAlias,
+              child: avatar,
             ),
           ),
         ),
@@ -486,7 +512,9 @@ class _TopHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Hi, $firstName',
+                'Hi, $greetingName',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.2,
@@ -524,73 +552,157 @@ class _TopHeader extends StatelessWidget {
             ],
           ),
         ),
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(999),
-            onTap: () {
-              if (!context.mounted) return;
-              context.push('/notifications');
-            },
-            child: FutureBuilder<int>(
-              future: notificationService.getUnreadCount(),
-              builder: (context, snapshot) {
-                final unreadCount = snapshot.data ?? 0;
+        Row(
+          children: [
+            _HeaderActionButton(
+              icon: Icons.search_rounded,
+              tooltip: 'Search',
+              onTap: () => context.push('/transactions'),
+            ),
+            const SizedBox(width: 8),
+            _HeaderActionButton(
+              icon: Icons.menu_rounded,
+              tooltip: 'Menu',
+              onTap: () => context.push('/profile'),
+            ),
+            const SizedBox(width: 8),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(999),
+                onTap: () {
+                  if (!context.mounted) return;
+                  context.push('/notifications');
+                },
+                child: FutureBuilder<int>(
+                  future: notificationService.getUnreadCount(),
+                  builder: (context, snapshot) {
+                    final unreadCount = snapshot.data ?? 0;
 
-                return Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.30),
-                    ),
-                  ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Icon(
-                        unreadCount > 0
-                            ? Icons.notifications_active_outlined
-                            : Icons.notifications_none,
-                        color: theme.colorScheme.onSurface,
-                        size: 20,
+                    return Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: theme.colorScheme.outline.withValues(
+                            alpha: 0.30,
+                          ),
+                        ),
                       ),
-                      if (unreadCount > 0)
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Container(
-                            constraints: const BoxConstraints(
-                              minWidth: 16,
-                              minHeight: 16,
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Center(
-                              child: Text(
-                                unreadCount > 9 ? '9+' : '$unreadCount',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: theme.colorScheme.onPrimary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 9,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Icon(
+                            unreadCount > 0
+                                ? Icons.notifications_active_outlined
+                                : Icons.notifications_none,
+                            color: theme.colorScheme.onSurface,
+                            size: 20,
+                          ),
+                          if (unreadCount > 0)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                constraints: const BoxConstraints(
+                                  minWidth: 16,
+                                  minHeight: 16,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    unreadCount > 9 ? '9+' : '$unreadCount',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.onPrimary,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 9,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              },
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ],
+    );
+  }
+}
+
+class _HeaderActionButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  const _HeaderActionButton({
+    required this.icon,
+    required this.tooltip,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: Tooltip(
+        message: tooltip,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.22),
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 20, color: theme.colorScheme.onSurface),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderInitialsAvatar extends StatelessWidget {
+  final String initials;
+
+  const _HeaderInitialsAvatar({required this.initials});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: 46,
+      height: 46,
+      color: theme.colorScheme.primary,
+      alignment: Alignment.center,
+      child: Text(
+        initials.isEmpty ? 'U' : initials,
+        style: theme.textTheme.titleMedium?.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 }
@@ -748,6 +860,7 @@ class _AccountInfoCard extends StatelessWidget {
                           ],
                         ),
                       ),
+                      const SizedBox(width: 10),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -781,7 +894,7 @@ class _AccountInfoCard extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: Colors.white.withValues(alpha: 0.18),
                       ),
@@ -824,16 +937,21 @@ class _AccountInfoCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 12),
                         Container(
-                          width: 40,
-                          height: 40,
+                          width: 42,
+                          height: 42,
+                          padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.white.withValues(alpha: 0.92),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.72),
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.account_balance_wallet_outlined,
-                            color: Colors.white,
-                            size: 18,
+                          child: ClipOval(
+                            child: Image.asset(
+                              'images/adepa_teachers_logo.png',
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                       ],
@@ -1176,6 +1294,7 @@ class _DashboardProfileViewData {
   final String accountNumber;
   final String accountStatus;
   final double availableBalance;
+  final String? profileImageUrl;
 
   const _DashboardProfileViewData({
     required this.accountName,
@@ -1183,11 +1302,12 @@ class _DashboardProfileViewData {
     required this.accountNumber,
     required this.accountStatus,
     required this.availableBalance,
+    required this.profileImageUrl,
   });
 
   factory _DashboardProfileViewData.fromProfile(Map<String, dynamic>? profile) {
     return _DashboardProfileViewData(
-      accountName: _readProfileString(profile, 'name', 'John Doe'),
+      accountName: _readProfileName(profile),
       branchName: _readProfileString(profile, 'branch', 'Accra Main'),
       accountNumber: _readProfileString(
         profile,
@@ -1196,6 +1316,7 @@ class _DashboardProfileViewData {
       ),
       accountStatus: _readProfileString(profile, 'status', 'Active'),
       availableBalance: _readProfileDouble(profile, 'balance', 0),
+      profileImageUrl: _readProfileImageUrl(profile),
     );
   }
 }
@@ -1348,6 +1469,59 @@ String _readProfileString(
     return value.trim();
   }
   return fallback;
+}
+
+String _readProfileName(Map<String, dynamic>? profile) {
+  final firstName = _readProfileString(profile, 'first_name', '');
+  final lastName = _readProfileString(profile, 'last_name', '');
+  if (firstName.isNotEmpty || lastName.isNotEmpty) {
+    final combined = [
+      firstName,
+      lastName,
+    ].where((segment) => segment.trim().isNotEmpty).join(' ').trim();
+    if (combined.isNotEmpty) return combined;
+  }
+
+  final preferredKeys = [
+    'name',
+    'full_name',
+    'fullName',
+    'account_name',
+    'accountName',
+  ];
+
+  for (final key in preferredKeys) {
+    final value = profile?[key];
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
+    }
+  }
+
+  return 'John Doe';
+}
+
+String? _readProfileImageUrl(Map<String, dynamic>? profile) {
+  const preferredKeys = [
+    'avatar',
+    'avatar_url',
+    'profile_image',
+    'profile_image_url',
+    'image_url',
+    'photo_url',
+    'picture',
+    'photo',
+    'profile_picture',
+    'profilePicture',
+  ];
+
+  for (final key in preferredKeys) {
+    final value = profile?[key];
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
+    }
+  }
+
+  return null;
 }
 
 double _readProfileDouble(
@@ -1577,7 +1751,7 @@ class _RecentTransactions extends ConsumerWidget {
             }
             final recent = txns.take(5).toList();
             return Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.only(top: 8, bottom: 10),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(22),
@@ -1601,10 +1775,19 @@ class _RecentTransactions extends ConsumerWidget {
                   indent: 64,
                   color: theme.colorScheme.outline.withValues(alpha: 0.16),
                 ),
-                itemBuilder: (_, i) => Padding(
+                itemBuilder: (_, i) => Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 10),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
+                    horizontal: 8,
                     vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: i.isEven
+                        ? theme.colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.25,
+                          )
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: _DashboardTransactionTile(txn: recent[i]),
                 ),
@@ -1651,8 +1834,11 @@ class _DashboardTransactionTile extends StatelessWidget {
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            color: isCredit ? const Color(0xFFEAF5EE) : const Color(0xFFF3F4F6),
+            color: isCredit
+                ? const Color(0xFFEAF5EE)
+                : theme.colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: accentColor.withValues(alpha: 0.12)),
           ),
           child: Icon(icon, size: 18, color: accentColor),
         ),
@@ -1697,6 +1883,7 @@ class _DashboardTransactionTile extends StatelessWidget {
               decoration: BoxDecoration(
                 color: badgeColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: badgeColor.withValues(alpha: 0.16)),
               ),
               child: Text(
                 status == 'pending' ? 'Pending' : 'Completed',

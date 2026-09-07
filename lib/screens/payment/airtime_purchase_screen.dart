@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 class AirtimePurchaseScreen extends StatefulWidget {
-  const AirtimePurchaseScreen({super.key});
+  const AirtimePurchaseScreen({super.key, this.isData = false});
+
+  final bool isData;
 
   @override
   State<AirtimePurchaseScreen> createState() => _AirtimePurchaseScreenState();
@@ -44,7 +46,9 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
   }
 
   double get _selectedAmount {
-    final parsed = double.tryParse(_amountController.text.replaceAll(',', '').trim());
+    final parsed = double.tryParse(
+      _amountController.text.replaceAll(',', '').trim(),
+    );
     return parsed ?? 0;
   }
 
@@ -63,6 +67,8 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
     }
   }
 
+  String get _serviceName => widget.isData ? 'Data' : 'Airtime';
+
   String _getCurrentStepTitle() {
     switch (_currentStep) {
       case 0:
@@ -80,7 +86,7 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
       case 6:
         return 'Receipt';
       default:
-        return 'Airtime';
+        return _serviceName;
     }
   }
 
@@ -179,15 +185,15 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
                           color: isActive
                               ? const Color(0xFF2E8B57)
                               : isComplete
-                                  ? const Color(0xFF0F8B5B)
-                                  : Colors.white,
+                              ? const Color(0xFF0F8B5B)
+                              : Colors.white,
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: isActive
                                 ? const Color(0xFF2E8B57)
                                 : isComplete
-                                    ? const Color(0xFF0F8B5B)
-                                    : const Color(0xFFE2E6E4),
+                                ? const Color(0xFF0F8B5B)
+                                : const Color(0xFFE2E6E4),
                           ),
                         ),
                         alignment: Alignment.center,
@@ -210,7 +216,9 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
                           color: isActive || isComplete
                               ? const Color(0xFF1E312A)
                               : Colors.grey[500],
-                          fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                          fontWeight: isActive
+                              ? FontWeight.w700
+                              : FontWeight.w500,
                         ),
                       ),
                     ],
@@ -240,9 +248,9 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
             children: [
               Text(
                 'Network',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -253,11 +261,14 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
                   return ChoiceChip(
                     label: Text(network),
                     selected: isSelected,
-                    onSelected: (_) => setState(() => _selectedNetwork = network),
+                    onSelected: (_) =>
+                        setState(() => _selectedNetwork = network),
                     selectedColor: const Color(0xFF2E8B57),
                     backgroundColor: Colors.white,
                     labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : const Color(0xFF1F2A25),
+                      color: isSelected
+                          ? Colors.white
+                          : const Color(0xFF1F2A25),
                       fontWeight: FontWeight.w700,
                     ),
                     side: BorderSide(
@@ -286,9 +297,15 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFF2E8B57), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFF2E8B57),
+                width: 1.5,
+              ),
             ),
-            prefixIcon: const Icon(Icons.phone_iphone_rounded, color: Color(0xFF2E8B57)),
+            prefixIcon: const Icon(
+              Icons.phone_iphone_rounded,
+              color: Color(0xFF2E8B57),
+            ),
           ),
         ),
         const SizedBox(height: 14),
@@ -296,9 +313,9 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
           width: double.infinity,
           child: Text(
             'Saved numbers',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
         ),
         const SizedBox(height: 8),
@@ -316,7 +333,10 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.person_outline_rounded, color: Color(0xFF2E8B57)),
+                  const Icon(
+                    Icons.person_outline_rounded,
+                    color: Color(0xFF2E8B57),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -342,10 +362,10 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'How much airtime do you want?',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+          'How much $_serviceName do you want?',
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 14),
         TextField(
@@ -363,7 +383,10 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFF2E8B57), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFF2E8B57),
+                width: 1.5,
+              ),
             ),
           ),
         ),
@@ -414,7 +437,10 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
           const SizedBox(height: 12),
           _ReviewRow(label: 'Phone number', value: _phoneController.text),
           const SizedBox(height: 12),
-          _ReviewRow(label: 'Amount', value: 'GH₵ ${amount.toStringAsFixed(2)}'),
+          _ReviewRow(
+            label: 'Amount',
+            value: 'GH₵ ${amount.toStringAsFixed(2)}',
+          ),
           const SizedBox(height: 12),
           _ReviewRow(label: 'Fee', value: 'GH₵ ${fee.toStringAsFixed(2)}'),
           const Divider(height: 24),
@@ -438,22 +464,26 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
             color: const Color(0xFFEAF5EE),
             borderRadius: BorderRadius.circular(20),
           ),
-          child: const Icon(Icons.lock_outline_rounded, size: 32, color: Color(0xFF2E8B57)),
+          child: const Icon(
+            Icons.lock_outline_rounded,
+            size: 32,
+            color: Color(0xFF2E8B57),
+          ),
         ),
         const SizedBox(height: 18),
         Text(
           'Enter your PIN',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
         Text(
-          'Please authorize this airtime purchase.',
+          'Please authorize this $_serviceName purchase.',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: const Color(0xFF5A625D),
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF5A625D)),
         ),
         const SizedBox(height: 18),
         TextField(
@@ -474,7 +504,10 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(18),
-              borderSide: const BorderSide(color: Color(0xFF2E8B57), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFF2E8B57),
+                width: 1.5,
+              ),
             ),
           ),
         ),
@@ -497,19 +530,19 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
           ),
           const SizedBox(height: 20),
           Text(
-            'Processing your airtime purchase...',
+            'Processing your $_serviceName purchase...',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           Text(
             'Please wait while we complete the transaction.',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: const Color(0xFF5A625D),
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF5A625D)),
           ),
         ],
       ),
@@ -533,30 +566,38 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
               color: const Color(0xFFEAF5EE),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.check_rounded, size: 42, color: Color(0xFF2E8B57)),
+            child: const Icon(
+              Icons.check_rounded,
+              size: 42,
+              color: Color(0xFF2E8B57),
+            ),
           ),
           const SizedBox(height: 18),
           Text(
-            'Airtime Purchase Successful!',
+            '$_serviceName Purchase Successful!',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 10),
           Text(
-            'Your airtime of GH₵ ${_selectedAmount.toStringAsFixed(2)} has been processed successfully.',
+            'Your $_serviceName of GH₵ ${_selectedAmount.toStringAsFixed(2)} has been processed successfully.',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: const Color(0xFF5A625D),
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF5A625D)),
           ),
           const SizedBox(height: 18),
           _InfoRow(label: 'Network', value: _selectedNetwork),
           const SizedBox(height: 8),
           _InfoRow(label: 'Phone', value: _phoneController.text),
           const SizedBox(height: 8),
-          _InfoRow(label: 'Reference', value: 'ADEPA-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}'),
+          _InfoRow(
+            label: 'Reference',
+            value:
+                'ADEPA-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
+          ),
         ],
       ),
     );
@@ -582,14 +623,17 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
                   color: const Color(0xFFEAF5EE),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF2E8B57)),
+                child: const Icon(
+                  Icons.receipt_long_rounded,
+                  color: Color(0xFF2E8B57),
+                ),
               ),
               const SizedBox(width: 12),
               Text(
-                'Airtime Receipt',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+                '$_serviceName Receipt',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
             ],
           ),
@@ -598,13 +642,20 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
           const SizedBox(height: 10),
           _InfoRow(label: 'Phone Number', value: _phoneController.text),
           const SizedBox(height: 10),
-          _InfoRow(label: 'Amount', value: 'GH₵ ${_selectedAmount.toStringAsFixed(2)}'),
+          _InfoRow(
+            label: 'Amount',
+            value: 'GH₵ ${_selectedAmount.toStringAsFixed(2)}',
+          ),
           const SizedBox(height: 10),
-          _InfoRow(label: 'Date', value: DateTime.now().toString().substring(0, 16)),
+          _InfoRow(
+            label: 'Date',
+            value: DateTime.now().toString().substring(0, 16),
+          ),
           const SizedBox(height: 10),
           _InfoRow(
             label: 'Reference',
-            value: 'ADEPA-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
+            value:
+                'ADEPA-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
           ),
           const SizedBox(height: 18),
           SizedBox(
@@ -617,7 +668,9 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
                 foregroundColor: const Color(0xFF2E8B57),
                 side: const BorderSide(color: Color(0xFF2E8B57)),
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ),
@@ -639,24 +692,6 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
     ];
 
     final isLastStep = _currentStep == 6;
-    final infoCards = [
-      _InfoPillCard(
-        icon: Icons.save_rounded,
-        title: 'Save time',
-        subtitle: 'Save your frequently used numbers for faster airtime purchases.',
-      ),
-      _InfoPillCard(
-        icon: Icons.warning_amber_rounded,
-        title: 'Important notes',
-        subtitle: 'Airtime is delivered instantly to the selected number.',
-      ),
-      _InfoPillCard(
-        icon: Icons.help_center_rounded,
-        title: 'Need help?',
-        subtitle: 'For any issues or failed transactions, contact our support team.',
-      ),
-    ];
-
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8F7),
       body: SafeArea(
@@ -669,17 +704,21 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
                 children: [
                   IconButton(
                     onPressed: _goBack,
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 22),
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 22,
+                    ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
                   Expanded(
                     child: Text(
-                      'Airtime Purchase',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF1C1F1E),
-                      ),
+                      '$_serviceName Purchase',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF1C1F1E),
+                          ),
                     ),
                   ),
                   Text(
@@ -694,27 +733,19 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
               const SizedBox(height: 16),
               _buildStepHeader(),
               Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: Container(
-                    key: ValueKey<int>(_currentStep),
-                    child: stepsContent[_currentStep],
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: SizedBox(
+                      key: ValueKey<int>(_currentStep),
+                      width: double.infinity,
+                      child: stepsContent[_currentStep],
+                    ),
                   ),
                 ),
               ),
-              if (_currentStep < 6) ...[
-                const SizedBox(height: 18),
-                Column(
-                  children: infoCards
-                      .map(
-                        (card) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: SizedBox(width: double.infinity, child: card),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ],
               const SizedBox(height: 18),
               if (_currentStep < 4 || _currentStep == 5)
                 SizedBox(
@@ -730,7 +761,11 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
                       ),
                     ),
                     child: Text(
-                      _currentStep == 5 ? 'View Receipt' : _currentStep == 3 ? 'Confirm Purchase' : 'Continue',
+                      _currentStep == 5
+                          ? 'View Receipt'
+                          : _currentStep == 3
+                          ? 'Confirm Purchase'
+                          : 'Continue',
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
@@ -748,7 +783,10 @@ class _AirtimePurchaseScreenState extends State<AirtimePurchaseScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w700)),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
             ],
@@ -777,9 +815,9 @@ class _ReviewRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: const Color(0xFF5A625D),
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF5A625D)),
         ),
         Text(
           value,
@@ -797,10 +835,7 @@ class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
 
-  const _InfoRow({
-    required this.label,
-    required this.value,
-  });
+  const _InfoRow({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -809,9 +844,9 @@ class _InfoRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: const Color(0xFF5A625D),
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF5A625D)),
         ),
         Flexible(
           child: Text(
@@ -824,74 +859,6 @@ class _InfoRow extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _InfoPillCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  const _InfoPillCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FBF9),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE1EAE3)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF153524).withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF5EE),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: const Color(0xFF2E8B57), size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1E2B26),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: const Color(0xFF5A625D),
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -9,17 +9,17 @@ class BillsPaymentScreen extends StatefulWidget {
 }
 
 class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
-  final List<String> _billers = [
-    'ECG',
-    'Ghana Water',
-    'DSTV',
-    'GOtv',
-    'NHIS',
-  ];
+  final List<String> _billers = ['ECG', 'GWCL', 'DSTV'];
 
   final List<_StepMeta> _steps = const [
-    _StepMeta(title: 'Select Biller', subtitle: 'Choose the bill you want to pay'),
-    _StepMeta(title: 'Enter Details', subtitle: 'Add your meter or account number'),
+    _StepMeta(
+      title: 'Select Biller',
+      subtitle: 'Choose the bill you want to pay',
+    ),
+    _StepMeta(
+      title: 'Enter Details',
+      subtitle: 'Add your meter or account number',
+    ),
     _StepMeta(title: 'Verify', subtitle: 'Confirm your customer details'),
     _StepMeta(title: 'Amount', subtitle: 'Enter the amount to pay'),
     _StepMeta(title: 'Review', subtitle: 'Check payment details'),
@@ -29,10 +29,12 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
 
   int _currentStep = 0;
   String _selectedBiller = 'ECG';
-  final TextEditingController _meterController =
-      TextEditingController(text: '1234567890');
-  final TextEditingController _amountController =
-      TextEditingController(text: '200');
+  final TextEditingController _meterController = TextEditingController(
+    text: '1234567890',
+  );
+  final TextEditingController _amountController = TextEditingController(
+    text: '200',
+  );
   final TextEditingController _pinController = TextEditingController();
 
   double get _amountValue => double.tryParse(_amountController.text) ?? 0;
@@ -45,18 +47,16 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
     return true;
   }
 
-  String _iconForBiller(String biller) {
+  String _logoForBiller(String biller) {
     switch (biller) {
       case 'ECG':
-        return '⚡';
-      case 'Ghana Water':
-        return '💧';
+        return 'images/ecg_logo.jpg';
+      case 'GWCL':
+        return 'images/gwcl_logo.png';
       case 'DSTV':
-        return '📺';
-      case 'GOtv':
-        return '📡';
+        return 'images/dstv_logo.webp';
       default:
-        return '🏥';
+        return 'images/ecg_logo.jpg';
     }
   }
 
@@ -106,7 +106,10 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
                 children: [
                   IconButton(
                     onPressed: _previousStep,
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 20,
+                    ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -125,7 +128,10 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
               const SizedBox(height: 12),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFEAF5EE),
                   borderRadius: BorderRadius.circular(16),
@@ -141,9 +147,12 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Center(
-                        child: Text(
-                          _iconForBiller(_selectedBiller),
-                          style: const TextStyle(fontSize: 20),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.asset(
+                            _logoForBiller(_selectedBiller),
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
                     ),
@@ -164,8 +173,8 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
                             _currentStep == 3
                                 ? 'Amount ready for payment'
                                 : _currentStep > 3
-                                    ? 'Review and confirm payment'
-                                    : 'Bill details in progress',
+                                ? 'Review and confirm payment'
+                                : 'Bill details in progress',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: const Color(0xFF5A625D),
                             ),
@@ -174,7 +183,10 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(999),
@@ -205,39 +217,23 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
                       border: Border.all(color: const Color(0xFFE8EFEA)),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0C291A).withValues(alpha: 0.04),
+                          color: const Color(
+                            0xFF0C291A,
+                          ).withValues(alpha: 0.04),
                           blurRadius: 18,
                           offset: const Offset(0, 8),
                         ),
                       ],
                     ),
-                    child: _buildStepContent(theme, currentTitle, currentSubtitle),
+                    child: _buildStepContent(
+                      theme,
+                      currentTitle,
+                      currentSubtitle,
+                    ),
                   ),
                 ),
               ),
               if (_currentStep < _steps.length - 1) ...[
-                const SizedBox(height: 18),
-                Column(
-                  children: [
-                    _InfoAssistCard(
-                      icon: Icons.flash_on_rounded,
-                      title: 'Save time',
-                      subtitle: 'Use preset amounts and saved billers for faster payments.',
-                    ),
-                    const SizedBox(height: 10),
-                    _InfoAssistCard(
-                      icon: Icons.info_outline_rounded,
-                      title: 'Important notes',
-                      subtitle: 'Payments are processed instantly once confirmed.',
-                    ),
-                    const SizedBox(height: 10),
-                    _InfoAssistCard(
-                      icon: Icons.help_center_rounded,
-                      title: 'Need help?',
-                      subtitle: 'Contact support if the biller or payment details are wrong.',
-                    ),
-                  ],
-                ),
               ],
               const SizedBox(height: 18),
               Row(
@@ -311,10 +307,7 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
           selectedBiller: _selectedBiller,
         );
       case 4:
-        return _ReviewPage(
-          biller: _selectedBiller,
-          amount: _amountValue,
-        );
+        return _ReviewPage(biller: _selectedBiller, amount: _amountValue);
       case 5:
         return _AuthorizationPage(
           pinController: _pinController,
@@ -325,7 +318,8 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
         return _SuccessPage(
           biller: _selectedBiller,
           amount: _amountValue,
-          reference: 'ADEPA-${DateTime.now().millisecondsSinceEpoch.toString().substring(5, 11)}',
+          reference:
+              'ADEPA-${DateTime.now().millisecondsSinceEpoch.toString().substring(5, 11)}',
         );
       default:
         return Column(
@@ -362,7 +356,9 @@ class _StepProgress extends StatelessWidget {
             margin: const EdgeInsets.symmetric(horizontal: 2),
             height: 6,
             decoration: BoxDecoration(
-              color: isActive ? const Color(0xFF2E8B57) : const Color(0xFFE4E9E6),
+              color: isActive
+                  ? const Color(0xFF2E8B57)
+                  : const Color(0xFFE4E9E6),
               borderRadius: BorderRadius.circular(999),
             ),
           ),
@@ -430,13 +426,18 @@ class _SelectBillerPage extends StatelessWidget {
                         width: 42,
                         height: 42,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2E8B57).withValues(alpha: 0.12),
+                          color: const Color(
+                            0xFF2E8B57,
+                          ).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Center(
-                          child: Text(
-                            _iconForBiller(biller),
-                            style: const TextStyle(fontSize: 22),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.asset(
+                              _logoForBiller(biller),
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                       ),
@@ -477,18 +478,16 @@ class _SelectBillerPage extends StatelessWidget {
     );
   }
 
-  String _iconForBiller(String biller) {
+  String _logoForBiller(String biller) {
     switch (biller) {
       case 'ECG':
-        return '⚡';
-      case 'Ghana Water':
-        return '💧';
+        return 'images/ecg_logo.jpg';
+      case 'GWCL':
+        return 'images/gwcl_logo.png';
       case 'DSTV':
-        return '📺';
-      case 'GOtv':
-        return '📡';
+        return 'images/dstv_logo.webp';
       default:
-        return '🏥';
+        return 'images/ecg_logo.jpg';
     }
   }
 
@@ -496,12 +495,10 @@ class _SelectBillerPage extends StatelessWidget {
     switch (biller) {
       case 'ECG':
         return 'Electricity Company of Ghana';
-      case 'Ghana Water':
-        return 'Water bill payment';
+      case 'GWCL':
+        return 'Ghana Water Company Limited';
       case 'DSTV':
         return 'Satellite TV subscription';
-      case 'GOtv':
-        return 'Cable TV subscription';
       default:
         return 'National Health Insurance';
     }
@@ -694,7 +691,10 @@ class _AmountPage extends StatelessWidget {
             return GestureDetector(
               onTap: () => amountController.text = value,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF5F7F5),
                   borderRadius: BorderRadius.circular(10),
@@ -745,7 +745,10 @@ class _ReviewPage extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Total', style: TextStyle(fontWeight: FontWeight.w700)),
+              const Text(
+                'Total',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
               Text(
                 'GH₵ ${total.toStringAsFixed(2)}',
                 style: const TextStyle(
@@ -877,7 +880,10 @@ class _SuccessPage extends StatelessWidget {
           child: Column(
             children: [
               _SummaryRow(label: 'Biller', value: biller),
-              _SummaryRow(label: 'Amount', value: 'GH₵ ${amount.toStringAsFixed(2)}'),
+              _SummaryRow(
+                label: 'Amount',
+                value: 'GH₵ ${amount.toStringAsFixed(2)}',
+              ),
               _SummaryRow(label: 'Reference', value: reference),
             ],
           ),
@@ -972,10 +978,7 @@ class _SummaryRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
-                color: Color(0xFF5A625D),
-                fontSize: 12,
-              ),
+              style: const TextStyle(color: Color(0xFF5A625D), fontSize: 12),
             ),
           ),
           const SizedBox(width: 12),

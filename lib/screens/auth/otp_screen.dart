@@ -10,7 +10,6 @@ import '../../core/exceptions/app_exceptions.dart';
 import '../../core/models/notification_models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/services/notification_service.dart';
-import '../../core/services/secure_auth_storage.dart';
 import '../../core/utils/error_handler.dart';
 
 class OtpScreen extends ConsumerStatefulWidget {
@@ -139,24 +138,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       ref.invalidate(savingsProvider);
       if (!mounted) return;
 
-      final pin = await SecureAuthStorage.instance.readPin() ?? '';
-      if (!mounted) return;
-      final hasSavedPin = pin.isNotEmpty;
-      if (hasSavedPin) {
-        context.go('/home');
-        return;
-      }
-
-      final destination = Uri(
-        path: '/set-pin',
-        queryParameters: {
-          'mode': 'signin',
-          'phoneNumber': widget.phoneNumber,
-          'accountNumber': widget.accountNumber,
-        },
-      );
-      if (!mounted) return;
-      context.go(destination.toString());
+      context.go('/home');
     } on AppException catch (e) {
       await NotificationService.instance.addNotification(
         AppNotification(

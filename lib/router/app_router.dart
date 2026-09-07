@@ -20,7 +20,7 @@ import '../screens/onboarding/onboarding_screen.dart';
 // Auth
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
-import '../screens/auth/account_number_screen.dart';
+import '../screens/auth/existing_member_enrollment_screen.dart';
 import '../screens/auth/otp_screen.dart';
 import '../screens/auth/set_pin_screen.dart';
 
@@ -38,7 +38,6 @@ import '../screens/notifications/notifications_screen.dart';
 import '../screens/payment/airtime_purchase_screen.dart';
 import '../screens/payment/bills_payment_screen.dart';
 import '../screens/payment/payment_failed_screen.dart';
-import '../screens/payment/payment_home_screen.dart';
 import '../screens/payment/payment_receipt_screen.dart';
 import '../screens/payment/payment_screen.dart';
 import '../screens/payment/payment_success_screen.dart';
@@ -49,6 +48,7 @@ import '../screens/profile/settings_screen.dart';
 import '../screens/savings/create_savings_screen.dart';
 import '../screens/savings/savings_deposit_screen.dart';
 import '../screens/savings/savings_detail_screen.dart';
+import '../screens/savings/products_screen.dart';
 import '../screens/savings/savings_model.dart';
 import '../screens/savings/savings_screen.dart';
 import '../screens/savings/savings_types_screen.dart';
@@ -105,7 +105,6 @@ class AppRouter {
     '/login',
     '/signup',
     '/existing-member-enrollment',
-    '/account-number',
     '/otp',
     '/set-pin',
   };
@@ -316,19 +315,10 @@ class AppRouter {
         ),
         GoRoute(
           path: '/existing-member-enrollment',
-          redirect: (context, state) {
+          builder: (context, state) {
             final memberType =
                 state.uri.queryParameters['memberType'] ?? 'existing';
-            return memberType == 'new' ? '/signup' : '/login';
-          },
-        ),
-        GoRoute(
-          path: '/account-number',
-          builder: (context, state) {
-            final extra = state.extra as Map<String, dynamic>?;
-            return AccountNumberScreen(
-              phoneNumber: extra?['phoneNumber'] as String? ?? '',
-            );
+            return ExistingMemberEnrollmentScreen(memberType: memberType);
           },
         ),
         GoRoute(
@@ -382,7 +372,9 @@ class AppRouter {
           builder: (context, state) {
             final query = state.uri.queryParameters;
             final type = query['type'];
-            final extra = state.extra as Map<String, dynamic>?;
+            final extra = state.extra is Map<String, dynamic>
+                ? state.extra! as Map<String, dynamic>
+                : null;
 
             // Route to supported payment flows.
             if (type == 'bills') {
@@ -390,6 +382,9 @@ class AppRouter {
             }
             if (type == 'airtime') {
               return const AirtimePurchaseScreen();
+            }
+            if (type == 'data') {
+              return const AirtimePurchaseScreen(isData: true);
             }
 
             return PaymentScreen(
@@ -652,7 +647,7 @@ class AppRouter {
           routes: [
             GoRoute(
               path: '/home',
-              builder: (context, state) => const PaymentHomeScreen(),
+              builder: (context, state) => const ProductsScreen(),
             ),
             GoRoute(
               path: '/savings',

@@ -13,14 +13,12 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-  String? _selectedMemberType;
-
   void _handleNewMemberSelection() {
-    context.go('/activity');
+    context.go('/existing-member-enrollment?memberType=new');
   }
 
   void _handleExistingMemberSelection() {
-    context.go('/login');
+    context.go('/existing-member-enrollment?memberType=existing');
   }
 
   Widget _buildSelectionCard({
@@ -52,7 +50,9 @@ class _SignupScreenState extends State<SignupScreen> {
           decoration: BoxDecoration(
             color: cardColor,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: borderColor),
+            border: Border.all(
+              color: borderColor,
+            ),
           ),
           child: Row(
             children: [
@@ -74,9 +74,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       title,
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: Colors.white,
-                        fontWeight: isPrimary
-                            ? FontWeight.w700
-                            : FontWeight.w600,
+                        fontWeight: isPrimary ? FontWeight.w700 : FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -89,11 +87,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ],
                 ),
               ),
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                color: Colors.white70,
-                size: 18,
-              ),
+              Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 18),
             ],
           ),
         ),
@@ -131,7 +125,9 @@ class _SignupScreenState extends State<SignupScreen> {
         Text(
           'Choose your account type',
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: Colors.white70,
+          ),
         ),
         if (widget.reason == 'not_registered') ...[
           const SizedBox(height: 16),
@@ -175,133 +171,9 @@ class _SignupScreenState extends State<SignupScreen> {
           onPressed: () => context.go('/login'),
           child: Text(
             'Already registered? Sign in',
-            style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
-          ),
-        ),
-        const SizedBox(height: 28),
-      ],
-    );
-  }
-
-  Widget _buildRegistrationContent(ThemeData theme, Color primary) {
-    return Column(
-      children: [
-        const SizedBox(height: 16),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: IconButton(
-            onPressed: () => setState(() => _selectedMemberType = null),
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'New member',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-            letterSpacing: -0.4,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          'Registration is temporarily unavailable. Explore the app activity view while the onboarding API is being finalized.',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
-        ),
-        if (widget.reason == 'not_registered') ...[
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacitySafe(0.14),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withOpacitySafe(0.30)),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: Colors.white70,
             ),
-            child: Text(
-              "We couldn't find your account. You can continue to the activity view for now.",
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-        const SizedBox(height: 24),
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: primary,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacitySafe(0.15),
-                blurRadius: 30,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                Icons.info_outline_rounded,
-                color: Colors.white,
-                size: 48,
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'Temporary onboarding pause',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'This onboarding path is currently disabled while the API is being finalized. Existing members can still sign in, and the app is showing the activity screen for now.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withOpacitySafe(0.85),
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: () => context.go('/activity'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: Text(
-                    'Open activity',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Center(
-                child: TextButton(
-                  onPressed: () => context.go('/login'),
-                  child: Text(
-                    'Back to sign in',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
         const SizedBox(height: 28),
@@ -312,12 +184,9 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
     final secondary = theme.colorScheme.secondary;
-
-    final body = _selectedMemberType == null
-        ? _buildSelectionContent(theme)
-        : _buildRegistrationContent(theme, primary);
+    final primary = theme.colorScheme.primary;
+    final body = _buildSelectionContent(theme);
 
     return Scaffold(
       backgroundColor: secondary,

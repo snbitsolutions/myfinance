@@ -28,25 +28,6 @@ class TransactionsScreen extends ConsumerStatefulWidget {
 class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   String _selectedFilter = 'All';
   String _selectedPeriod = 'This Month';
-  late TextEditingController _searchController;
-  String _searchQuery = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _searchController = TextEditingController();
-    _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text.toLowerCase();
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,15 +69,6 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         if (tx.type != TransactionType.withdrawal) return false;
       } else if (_selectedFilter == 'Repayment') {
         if (tx.type != TransactionType.repayment) return false;
-      }
-
-      // Filter by search query
-      if (_searchQuery.isNotEmpty) {
-        final matchesTitle = tx.title.toLowerCase().contains(_searchQuery);
-        final matchesDesc = (tx.description?.toLowerCase() ?? '').contains(
-          _searchQuery,
-        );
-        if (!matchesTitle && !matchesDesc) return false;
       }
 
       return true;
@@ -244,90 +216,6 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               builder: (context, constraints) {
                 final isTablet = constraints.maxWidth >= 900;
 
-                final summaryCards = isTablet
-                    ? Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        child: Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: [
-                            _buildSummaryCard(
-                              theme,
-                              'Income',
-                              totalIncome,
-                              Icons.arrow_downward,
-                              Colors.green,
-                            ),
-                            _buildSummaryCard(
-                              theme,
-                              'Expense',
-                              totalExpense,
-                              Icons.arrow_upward,
-                              Colors.red,
-                            ),
-                            _buildSummaryCard(
-                              theme,
-                              'Repayment',
-                              totalRepayment,
-                              Icons.credit_card,
-                              Colors.orange,
-                            ),
-                            _buildSummaryCard(
-                              theme,
-                              'Balance',
-                              netBalance,
-                              Icons.account_balance_wallet,
-                              theme.colorScheme.primary,
-                            ),
-                          ],
-                        ),
-                      )
-                    : SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        child: Row(
-                          children: [
-                            _buildSummaryCard(
-                              theme,
-                              'Income',
-                              totalIncome,
-                              Icons.arrow_downward,
-                              Colors.green,
-                            ),
-                            const SizedBox(width: 12),
-                            _buildSummaryCard(
-                              theme,
-                              'Expense',
-                              totalExpense,
-                              Icons.arrow_upward,
-                              Colors.red,
-                            ),
-                            const SizedBox(width: 12),
-                            _buildSummaryCard(
-                              theme,
-                              'Repayment',
-                              totalRepayment,
-                              Icons.credit_card,
-                              Colors.orange,
-                            ),
-                            const SizedBox(width: 12),
-                            _buildSummaryCard(
-                              theme,
-                              'Balance',
-                              netBalance,
-                              Icons.account_balance_wallet,
-                              theme.colorScheme.primary,
-                            ),
-                          ],
-                        ),
-                      );
-
                 final controlsPane = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -468,76 +356,23 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                                     ),
                                   ),
                                 ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _miniStatPill(
+                                    label: 'Repayment',
+                                    value:
+                                        'GH₵${totalRepayment.toStringAsFixed(2)}',
+                                    background: Colors.orange.withValues(
+                                      alpha: 0.18,
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                           ],
                         ),
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Search activity...',
-                          hintStyle: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.45,
-                            ),
-                          ),
-                          prefixIcon: Icon(
-                            Icons.search,
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.55,
-                            ),
-                            size: 20,
-                          ),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? GestureDetector(
-                                  onTap: () => _searchController.clear(),
-                                  child: Icon(
-                                    Icons.close_rounded,
-                                    color: theme.colorScheme.onSurface
-                                        .withValues(alpha: 0.55),
-                                    size: 18,
-                                  ),
-                                )
-                              : null,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: theme.colorScheme.outline.withValues(
-                                alpha: 0.25,
-                              ),
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: theme.colorScheme.outline.withValues(
-                                alpha: 0.25,
-                              ),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: theme.colorScheme.primary.withValues(
-                                alpha: 0.4,
-                              ),
-                              width: 1.5,
-                            ),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          filled: true,
-                          fillColor: theme.colorScheme.surface,
-                        ),
-                      ),
-                    ),
-                    summaryCards,
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: AppCard(
@@ -855,84 +690,6 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryCard(
-    ThemeData theme,
-    String label,
-    double amount,
-    IconData icon,
-    Color color,
-  ) {
-    final gradientStart = color.withValues(alpha: 0.9);
-    final gradientEnd = color.withValues(alpha: 0.7);
-    return Container(
-      width: 150,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [gradientStart, gradientEnd],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.25),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.28),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.22),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: Colors.white, size: 22),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'GH₵${amount.toStringAsFixed(2)}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  fontSize: 16,
-                  letterSpacing: 0.2,
-                ),
-              ),
-            ],
           ),
         ],
       ),

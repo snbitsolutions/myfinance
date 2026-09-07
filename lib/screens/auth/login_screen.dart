@@ -59,15 +59,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await ref
           .read(authProvider.notifier)
           .confirmPhoneNumber(phoneNumber: _normalizedPhoneNumber);
+
       final prefs = await SharedPreferences.getInstance();
+      final storedAccountNumber =
+          prefs.getString(AppConstants.sharedPrefKeyUserId)?.trim() ?? '';
+      final fallbackAccountNumber =
+          storedAccountNumber.isNotEmpty
+              ? storedAccountNumber
+              : _normalizedPhoneNumber.replaceAll(RegExp(r'\D'), '');
+
       await prefs.setString(
         AppConstants.sharedPrefKeyUserEmail,
         _normalizedPhoneNumber,
       );
+      await prefs.setString(
+        AppConstants.sharedPrefKeyUserId,
+        fallbackAccountNumber,
+      );
       if (!mounted) return;
       context.go(
-        '/account-number',
-        extra: {'phoneNumber': _normalizedPhoneNumber},
+        '/otp',
+        extra: {
+          'phoneNumber': _normalizedPhoneNumber,
+          'accountNumber': fallbackAccountNumber,
+        },
       );
     } on AppException catch (e) {
       if (!mounted) return;

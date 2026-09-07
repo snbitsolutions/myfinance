@@ -78,6 +78,28 @@ class BalanceCardShell extends StatelessWidget {
                 ),
               ),
             ),
+            Positioned(
+              top: 14,
+              right: 14,
+              child: Container(
+                width: 48,
+                height: 48,
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.72),
+                  ),
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    'images/adepa_teachers_logo.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
             Padding(padding: contentPadding, child: child),
           ],
         ),

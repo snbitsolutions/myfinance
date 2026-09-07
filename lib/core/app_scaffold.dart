@@ -32,9 +32,26 @@ class AppScaffold extends StatelessWidget {
     Future<void> handleBackNavigation() async {
       if (!context.mounted) return;
 
-      if (currentLocation.startsWith('/investments/') ||
-          currentLocation == '/investments') {
+      final isInvestmentRoute =
+          currentLocation.startsWith('/investments/') ||
+          currentLocation == '/investments';
+      final isLoanRoute =
+          currentLocation.startsWith('/loans/') ||
+          currentLocation == '/loans' ||
+          currentLocation == '/apply-loan' ||
+          currentLocation == '/loan-status' ||
+          currentLocation == '/loan-detail' ||
+          currentLocation.startsWith('/loan-detail/') ||
+          currentLocation == '/repayment' ||
+          currentLocation.startsWith('/repayment/');
+
+      if (isInvestmentRoute) {
         context.go('/home');
+        return;
+      }
+
+      if (isLoanRoute) {
+        context.go('/loans');
         return;
       }
 
@@ -53,8 +70,26 @@ class AppScaffold extends StatelessWidget {
           return;
         }
 
-        if (currentLocation.startsWith('/investments/')) {
+        final isInvestmentRoute =
+            currentLocation.startsWith('/investments/') ||
+            currentLocation == '/investments';
+        final isLoanRoute =
+            currentLocation.startsWith('/loans/') ||
+            currentLocation == '/loans' ||
+            currentLocation == '/apply-loan' ||
+            currentLocation == '/loan-status' ||
+            currentLocation == '/loan-detail' ||
+            currentLocation.startsWith('/loan-detail/') ||
+            currentLocation == '/repayment' ||
+            currentLocation.startsWith('/repayment/');
+
+        if (isInvestmentRoute) {
           context.go('/home');
+          return;
+        }
+
+        if (isLoanRoute) {
+          context.go('/loans');
           return;
         }
 
