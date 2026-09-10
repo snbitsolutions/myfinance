@@ -175,6 +175,7 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
 
     return AppScaffold(
       title: 'Repay Loan',
+      backRoute: '/loans',
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isTablet = constraints.maxWidth >= Responsive.medium;

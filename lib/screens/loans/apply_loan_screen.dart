@@ -81,6 +81,7 @@ class _ApplyLoanScreenState extends ConsumerState<ApplyLoanScreen> {
 
     return AppScaffold(
       title: 'Apply for Loan',
+      backRoute: '/loans',
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isTablet = constraints.maxWidth >= Responsive.medium;

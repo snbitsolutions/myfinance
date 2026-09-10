@@ -33,6 +33,7 @@ class LoanStatusScreen extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Application Status',
+      backRoute: '/loans',
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isTablet = constraints.maxWidth >= Responsive.medium;

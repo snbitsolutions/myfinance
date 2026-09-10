@@ -10,6 +10,7 @@ class AppScaffold extends StatelessWidget {
   final Widget? bottomNavigationBar;
   final Widget? floatingActionButton;
   final bool showBack;
+  final String? backRoute;
 
   const AppScaffold({
     super.key,
@@ -19,6 +20,7 @@ class AppScaffold extends StatelessWidget {
     this.bottomNavigationBar,
     this.floatingActionButton,
     this.showBack = true,
+    this.backRoute,
   });
 
   @override
@@ -29,6 +31,11 @@ class AppScaffold extends StatelessWidget {
 
     Future<void> handleBackNavigation() async {
       if (!context.mounted) return;
+
+      if (backRoute != null) {
+        context.go(backRoute!);
+        return;
+      }
 
       final isInvestmentRoute =
           currentLocation.startsWith('/investments/') ||
@@ -49,7 +56,7 @@ class AppScaffold extends StatelessWidget {
       }
 
       if (isLoanRoute) {
-        context.go(_loanBackDestination(currentLocation));
+        context.go(backRoute ?? _loanBackDestination(currentLocation));
         return;
       }
 
@@ -65,6 +72,11 @@ class AppScaffold extends StatelessWidget {
       canPop: canPop,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop || !context.mounted) {
+          return;
+        }
+
+        if (backRoute != null) {
+          context.go(backRoute!);
           return;
         }
 
@@ -87,7 +99,7 @@ class AppScaffold extends StatelessWidget {
         }
 
         if (isLoanRoute) {
-          context.go(_loanBackDestination(currentLocation));
+          context.go(backRoute ?? _loanBackDestination(currentLocation));
           return;
         }
 

@@ -68,6 +68,7 @@ class LoansScreen extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Loans',
+      backRoute: '/home',
       actions: [
         Stack(
           alignment: Alignment.center,
@@ -90,7 +91,7 @@ class LoansScreen extends ConsumerWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isTablet = constraints.maxWidth >= Responsive.medium;
-           
+
           // Determine which loans to display - use mock data on error or loading
           late final List<Map<String, dynamic>> loansToDisplay;
           if (apiLoansAsync.hasValue && apiLoansAsync.value!.isNotEmpty) {
@@ -106,10 +107,7 @@ class LoansScreen extends ConsumerWidget {
                 // API loans summary banner - handles loading and error states
                 _ApiLoansSummary(apiLoansAsync: apiLoansAsync, theme: theme),
                 // Always show hub view with either API data or mock data
-                _LoansHubView(
-                  theme: theme,
-                  apiLoans: loansToDisplay,
-                ),
+                _LoansHubView(theme: theme, apiLoans: loansToDisplay),
               ],
             ),
           );
@@ -221,7 +219,9 @@ class _ApiLoansSummary extends StatelessWidget {
                   Text(
                     'Total outstanding: GH₵${totalOutstanding.toStringAsFixed(2)}',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                      color: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.65,
+                      ),
                     ),
                   ),
                 ],
@@ -667,11 +667,7 @@ class _LoanFeatureTile extends StatelessWidget {
         ),
         if (onTap != null) ...[
           const SizedBox(width: 8),
-          Icon(
-            Icons.arrow_forward_rounded,
-            color: color,
-            size: 18,
-          ),
+          Icon(Icons.arrow_forward_rounded, color: color, size: 18),
         ],
       ],
     );
@@ -744,341 +740,343 @@ class _LoanStatCard extends StatelessWidget {
 }
 
 class _LoansHubView extends StatefulWidget {
- final ThemeData theme;
- final List<Map<String, dynamic>> apiLoans;
+  final ThemeData theme;
+  final List<Map<String, dynamic>> apiLoans;
 
- const _LoansHubView({
-   required this.theme,
-   required this.apiLoans,
- });
+  const _LoansHubView({required this.theme, required this.apiLoans});
 
- @override
- State<_LoansHubView> createState() => _LoansHubViewState();
+  @override
+  State<_LoansHubView> createState() => _LoansHubViewState();
 }
 
 class _LoansHubViewState extends State<_LoansHubView> {
- int _selectedQuickAction = 0;
+  int _selectedQuickAction = 0;
 
- @override
- Widget build(BuildContext context) {
-   final loans = widget.apiLoans;
-   final theme = widget.theme;
+  @override
+  Widget build(BuildContext context) {
+    final loans = widget.apiLoans;
+    final theme = widget.theme;
 
-   // Calculate totals
-   final totalOutstanding = loans.fold<double>(0.0, (sum, l) {
-     final v = l['outstanding_balance'] ?? l['balance'] ?? l['amount'] ?? 0;
-     return sum + (v is num ? v.toDouble() : 0.0);
-   });
+    // Calculate totals
+    final totalOutstanding = loans.fold<double>(0.0, (sum, l) {
+      final v = l['outstanding_balance'] ?? l['balance'] ?? l['amount'] ?? 0;
+      return sum + (v is num ? v.toDouble() : 0.0);
+    });
 
-   final upcomingPayments = loans
-       .where((l) => (l['next_payment_due'] as String?).toString().isNotEmpty)
-       .toList();
+    final upcomingPayments = loans
+        .where((l) => (l['next_payment_due'] as String?).toString().isNotEmpty)
+        .toList();
 
-   return Column(
-     children: [
-       const SizedBox(height: 12),
-       // Total Outstanding Summary Card
-       BalanceCardShell(
-         gradientColors: const [Color(0xFF2E8B57), Color(0xFF3DA66B)],
-         shadowColor: const Color(0x332E8B57),
-         contentPadding: const EdgeInsets.all(16),
-         child: Column(
-           crossAxisAlignment: CrossAxisAlignment.start,
-           children: [
-             Row(
-               children: [
-                 Expanded(
-                   child: Column(
-                     crossAxisAlignment: CrossAxisAlignment.start,
-                     children: [
-                       Row(
-                         children: [
-                           Text(
-                             'Total Outstanding',
-                             style: theme.textTheme.bodySmall?.copyWith(
-                               color: Colors.white.withValues(alpha: 0.85),
-                             ),
-                           ),
-                           const SizedBox(width: 4),
-                           Icon(
-                             Icons.visibility_outlined,
-                             size: 16,
-                             color: Colors.white.withValues(alpha: 0.85),
-                           ),
-                         ],
-                       ),
-                       const SizedBox(height: 4),
-                       Text(
-                         'GH₵${totalOutstanding.toStringAsFixed(2)}',
-                         style: theme.textTheme.headlineSmall?.copyWith(
-                           color: Colors.white,
-                           fontWeight: FontWeight.w800,
-                         ),
-                       ),
-                       const SizedBox(height: 4),
-                       Text(
-                         'Across ${loans.length} active loan${loans.length == 1 ? '' : 's'}',
-                         style: theme.textTheme.bodySmall?.copyWith(
-                           color: Colors.white.withValues(alpha: 0.8),
-                         ),
-                       ),
-                     ],
-                   ),
-                 ),
-                 FilledButton.icon(
-                   onPressed: () => context.go('/apply-loan'),
-                   icon: const Icon(Icons.add),
-                   label: const Text('Apply for\nNew Loan'),
-                   style: FilledButton.styleFrom(
-                     backgroundColor: Colors.white,
-                     foregroundColor: const Color(0xFF2E8B57),
-                     padding: const EdgeInsets.symmetric(
-                       horizontal: 12,
-                       vertical: 10,
-                     ),
-                   ),
-                 ),
-               ],
-             ),
-           ],
-         ),
-       ),
-       const SizedBox(height: 16),
+    return Column(
+      children: [
+        const SizedBox(height: 12),
+        // Total Outstanding Summary Card
+        BalanceCardShell(
+          gradientColors: const [Color(0xFF2E8B57), Color(0xFF3DA66B)],
+          shadowColor: const Color(0x332E8B57),
+          contentPadding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Total Outstanding',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.85),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.visibility_outlined,
+                              size: 16,
+                              color: Colors.white.withValues(alpha: 0.85),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'GH₵${totalOutstanding.toStringAsFixed(2)}',
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Across ${loans.length} active loan${loans.length == 1 ? '' : 's'}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  FilledButton.icon(
+                    onPressed: () => context.go('/apply-loan'),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Apply for\nNew Loan'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF2E8B57),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
 
-       // Quick Action Tabs
-       AppCard(
-         margin: EdgeInsets.zero,
-         child: Column(
-           children: [
-             SingleChildScrollView(
-               scrollDirection: Axis.horizontal,
-               child: Padding(
-                 padding: const EdgeInsets.all(12),
-                 child: Row(
-                   children: [
-                     _QuickActionTab(
-                       icon: Icons.pie_chart_rounded,
-                       label: 'Loan Overview',
-                       isSelected: _selectedQuickAction == 0,
-                       onTap: () => setState(() => _selectedQuickAction = 0),
-                     ),
-                     const SizedBox(width: 8),
-                     _QuickActionTab(
-                       icon: Icons.calendar_month_outlined,
-                       label: 'Repayment Schedule',
-                       isSelected: _selectedQuickAction == 1,
-                       onTap: () => setState(() => _selectedQuickAction = 1),
-                     ),
-                     const SizedBox(width: 8),
-                     _QuickActionTab(
-                       icon: Icons.receipt_outlined,
-                       label: 'Loan Statement',
-                       isSelected: _selectedQuickAction == 2,
-                       onTap: () => setState(() => _selectedQuickAction = 2),
-                     ),
-                     const SizedBox(width: 8),
-                     _QuickActionTab(
-                       icon: Icons.calculate_outlined,
-                       label: 'Loan Calculator',
-                       isSelected: _selectedQuickAction == 3,
-                       onTap: () => setState(() => _selectedQuickAction = 3),
-                     ),
-                   ],
-                 ),
-               ),
-             ),
-           ],
-         ),
-       ),
-       const SizedBox(height: 16),
+        // Quick Action Tabs
+        AppCard(
+          margin: EdgeInsets.zero,
+          child: Column(
+            children: [
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      _QuickActionTab(
+                        icon: Icons.pie_chart_rounded,
+                        label: 'Loan Overview',
+                        isSelected: _selectedQuickAction == 0,
+                        onTap: () => setState(() => _selectedQuickAction = 0),
+                      ),
+                      const SizedBox(width: 8),
+                      _QuickActionTab(
+                        icon: Icons.calendar_month_outlined,
+                        label: 'Repayment Schedule',
+                        isSelected: _selectedQuickAction == 1,
+                        onTap: () => setState(() => _selectedQuickAction = 1),
+                      ),
+                      const SizedBox(width: 8),
+                      _QuickActionTab(
+                        icon: Icons.receipt_outlined,
+                        label: 'Loan Statement',
+                        isSelected: _selectedQuickAction == 2,
+                        onTap: () => setState(() => _selectedQuickAction = 2),
+                      ),
+                      const SizedBox(width: 8),
+                      _QuickActionTab(
+                        icon: Icons.calculate_outlined,
+                        label: 'Loan Calculator',
+                        isSelected: _selectedQuickAction == 3,
+                        onTap: () => setState(() => _selectedQuickAction = 3),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
 
-       // My Active Loans Section
-       Row(
-         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-         children: [
-           Text(
-             'My Active Loans (${loans.length})',
-             style: theme.textTheme.titleMedium?.copyWith(
-               fontWeight: FontWeight.w700,
-             ),
-           ),
-           TextButton(
-             onPressed: () {},
-             child: Row(
-               children: [
-                 Text(
-                   'View Closed Loans',
-                   style: theme.textTheme.labelMedium?.copyWith(
-                     color: theme.colorScheme.primary,
-                     fontWeight: FontWeight.w600,
-                   ),
-                 ),
-                 const SizedBox(width: 4),
-                 Icon(
-                   Icons.arrow_forward_rounded,
-                   size: 16,
-                   color: theme.colorScheme.primary,
-                 ),
-               ],
-             ),
-           ),
-         ],
-       ),
-       const SizedBox(height: 12),
-       ...loans.map((loan) => _LoanCard(
-             loan: loan,
-             theme: theme,
-             onViewDetails: () => context.go('/loans/${loan['loan_id'] ?? 'unknown'}'),
-           )),
-       const SizedBox(height: 16),
+        // My Active Loans Section
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'My Active Loans (${loans.length})',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            TextButton(
+              onPressed: () {},
+              child: Row(
+                children: [
+                  Text(
+                    'View Closed Loans',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 16,
+                    color: theme.colorScheme.primary,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...loans.map(
+          (loan) => _LoanCard(
+            loan: loan,
+            theme: theme,
+            onViewDetails: () =>
+                context.go('/loans/${loan['loan_id'] ?? 'unknown'}'),
+          ),
+        ),
+        const SizedBox(height: 16),
 
-       // Loan Overview Chart
-       AppCard(
-         child: Column(
-           crossAxisAlignment: CrossAxisAlignment.start,
-           children: [
-             Text(
-               'Loan Overview',
-               style: theme.textTheme.titleMedium?.copyWith(
-                 fontWeight: FontWeight.w700,
-               ),
-             ),
-             const SizedBox(height: 16),
-             SizedBox(
-               height: 200,
-               child: _LoanDonutChart(loans: loans, theme: theme),
-             ),
-             const SizedBox(height: 16),
-             ..._buildLoanLegend(loans, theme),
-           ],
-         ),
-       ),
-       const SizedBox(height: 16),
+        // Loan Overview Chart
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Loan Overview',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 200,
+                child: _LoanDonutChart(loans: loans, theme: theme),
+              ),
+              const SizedBox(height: 16),
+              ..._buildLoanLegend(loans, theme),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
 
-       // Upcoming Payments Section
-       if (upcomingPayments.isNotEmpty) ...[
-         Row(
-           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-           children: [
-             Text(
-               'Upcoming Payments',
-               style: theme.textTheme.titleMedium?.copyWith(
-                 fontWeight: FontWeight.w700,
-               ),
-             ),
-             TextButton(
-               onPressed: () {},
-               child: Row(
-                 children: [
-                   Text(
-                     'View Schedule',
-                     style: theme.textTheme.labelMedium?.copyWith(
-                       color: theme.colorScheme.primary,
-                       fontWeight: FontWeight.w600,
-                     ),
-                   ),
-                   const SizedBox(width: 4),
-                   Icon(
-                     Icons.arrow_forward_rounded,
-                     size: 16,
-                     color: theme.colorScheme.primary,
-                   ),
-                 ],
-               ),
-             ),
-           ],
-         ),
-         const SizedBox(height: 12),
-         ...upcomingPayments.take(2).map((payment) => _UpcomingPaymentCard(
-               payment: payment,
-               theme: theme,
-             )),
-         const SizedBox(height: 16),
-       ],
+        // Upcoming Payments Section
+        if (upcomingPayments.isNotEmpty) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Upcoming Payments',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              TextButton(
+                onPressed: () {},
+                child: Row(
+                  children: [
+                    Text(
+                      'View Schedule',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 16,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...upcomingPayments
+              .take(2)
+              .map(
+                (payment) =>
+                    _UpcomingPaymentCard(payment: payment, theme: theme),
+              ),
+          const SizedBox(height: 16),
+        ],
 
-       // Information Banner
-       Container(
-         padding: const EdgeInsets.all(12),
-         decoration: BoxDecoration(
-           color: theme.colorScheme.primary.withValues(alpha: 0.08),
-           borderRadius: BorderRadius.circular(12),
-           border: Border.all(
-             color: theme.colorScheme.primary.withValues(alpha: 0.16),
-           ),
-         ),
-         child: Row(
-           crossAxisAlignment: CrossAxisAlignment.start,
-           children: [
-             Icon(
-               Icons.info_outlined,
-               size: 18,
-               color: theme.colorScheme.primary,
-             ),
-             const SizedBox(width: 10),
-             Expanded(
-               child: Text(
-                 'Keep up with your repayments to avoid penalties and improve your credit score.',
-                 style: theme.textTheme.bodySmall?.copyWith(
-                   color: theme.colorScheme.primary,
-                 ),
-               ),
-             ),
-           ],
-         ),
-       ),
-     ],
-   );
- }
+        // Information Banner
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: theme.colorScheme.primary.withValues(alpha: 0.16),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outlined,
+                size: 18,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Keep up with your repayments to avoid penalties and improve your credit score.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
- List<Widget> _buildLoanLegend(
-   List<Map<String, dynamic>> loans,
-   ThemeData theme,
- ) {
-   final colors = [
-     const Color(0xFF2E8B57),
-     const Color(0xFF7CB342),
-     const Color(0xFF9CCC65),
-     const Color(0xFFFDD835),
-   ];
+  List<Widget> _buildLoanLegend(
+    List<Map<String, dynamic>> loans,
+    ThemeData theme,
+  ) {
+    final colors = [
+      const Color(0xFF2E8B57),
+      const Color(0xFF7CB342),
+      const Color(0xFF9CCC65),
+      const Color(0xFFFDD835),
+    ];
 
-   return loans.asMap().entries.map((entry) {
-     final index = entry.key;
-     final loan = entry.value;
-     final loanName = loan['loan_type'] ?? 'Loan ${index + 1}';
-     final amount = loan['outstanding_balance'] ?? loan['balance'] ?? 0;
+    return loans.asMap().entries.map((entry) {
+      final index = entry.key;
+      final loan = entry.value;
+      final loanName = loan['loan_type'] ?? 'Loan ${index + 1}';
+      final amount = loan['outstanding_balance'] ?? loan['balance'] ?? 0;
 
-     return Padding(
-       padding: const EdgeInsets.symmetric(vertical: 6),
-       child: Row(
-         children: [
-           Container(
-             width: 10,
-             height: 10,
-             decoration: BoxDecoration(
-               color: colors[index % colors.length],
-               borderRadius: BorderRadius.circular(2),
-             ),
-           ),
-           const SizedBox(width: 8),
-           Expanded(
-             child: Text(
-               loanName,
-               style: theme.textTheme.bodySmall?.copyWith(
-                 fontWeight: FontWeight.w500,
-               ),
-             ),
-           ),
-           Text(
-             'GH₵${(amount is num ? amount.toDouble() : 0.0).toStringAsFixed(2)}',
-             style: theme.textTheme.bodySmall?.copyWith(
-               fontWeight: FontWeight.w600,
-             ),
-           ),
-         ],
-       ),
-     );
-   }).toList();
- }
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: colors[index % colors.length],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                loanName,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            Text(
+              'GH₵${(amount is num ? amount.toDouble() : 0.0).toStringAsFixed(2)}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }).toList();
+  }
 }
 
 class _QuickActionTab extends StatelessWidget {
@@ -1169,8 +1167,8 @@ class _LoanCard extends StatelessWidget {
     final statusColor = status == 'ACTIVE'
         ? const Color(0xFF4CAF50)
         : status == 'PENDING'
-            ? const Color(0xFFFFA500)
-            : const Color(0xFFD32F2F);
+        ? const Color(0xFFFFA500)
+        : const Color(0xFFD32F2F);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -1209,16 +1207,19 @@ class _LoanCard extends StatelessWidget {
                       Text(
                         description,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.6),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
@@ -1243,8 +1244,9 @@ class _LoanCard extends StatelessWidget {
                       Text(
                         'Outstanding Balance',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.6),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -1265,8 +1267,9 @@ class _LoanCard extends StatelessWidget {
                       Text(
                         'Next Payment Due',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.6),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -1280,8 +1283,9 @@ class _LoanCard extends StatelessWidget {
                       Text(
                         '$daysUntilDue days',
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.5),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.5,
+                          ),
                         ),
                       ),
                     ],
@@ -1290,9 +1294,7 @@ class _LoanCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            Divider(
-              color: theme.colorScheme.outline.withValues(alpha: 0.2),
-            ),
+            Divider(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -1303,16 +1305,18 @@ class _LoanCard extends StatelessWidget {
                       Text(
                         'Loan ID: $loanId',
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.6),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Disbursed: $disburseDate',
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.6),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
                         ),
                       ),
                     ],
@@ -1321,9 +1325,7 @@ class _LoanCard extends StatelessWidget {
                 OutlinedButton(
                   onPressed: onViewDetails,
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                      color: theme.colorScheme.primary,
-                    ),
+                    side: BorderSide(color: theme.colorScheme.primary),
                   ),
                   child: Row(
                     children: [
@@ -1356,19 +1358,13 @@ class _LoanDonutChart extends StatelessWidget {
   final List<Map<String, dynamic>> loans;
   final ThemeData theme;
 
-  const _LoanDonutChart({
-    required this.loans,
-    required this.theme,
-  });
+  const _LoanDonutChart({required this.loans, required this.theme});
 
   @override
   Widget build(BuildContext context) {
     if (loans.isEmpty) {
       return Center(
-        child: Text(
-          'No loans to display',
-          style: theme.textTheme.bodySmall,
-        ),
+        child: Text('No loans to display', style: theme.textTheme.bodySmall),
       );
     }
 
@@ -1379,10 +1375,7 @@ class _LoanDonutChart extends StatelessWidget {
 
     if (total == 0) {
       return Center(
-        child: Text(
-          'No outstanding balance',
-          style: theme.textTheme.bodySmall,
-        ),
+        child: Text('No outstanding balance', style: theme.textTheme.bodySmall),
       );
     }
 
@@ -1394,11 +1387,7 @@ class _LoanDonutChart extends StatelessWidget {
     ];
 
     return CustomPaint(
-      painter: _DonutChartPainter(
-        loans: loans,
-        colors: colors,
-        total: total,
-      ),
+      painter: _DonutChartPainter(loans: loans, colors: colors, total: total),
       size: Size.infinite,
     );
   }
@@ -1453,10 +1442,7 @@ class _UpcomingPaymentCard extends StatelessWidget {
   final Map<String, dynamic> payment;
   final ThemeData theme;
 
-  const _UpcomingPaymentCard({
-    required this.payment,
-    required this.theme,
-  });
+  const _UpcomingPaymentCard({required this.payment, required this.theme});
 
   @override
   Widget build(BuildContext context) {
@@ -1498,8 +1484,7 @@ class _UpcomingPaymentCard extends StatelessWidget {
                   Text(
                     dueDate,
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurface
-                          .withValues(alpha: 0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                 ],

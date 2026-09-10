@@ -7,10 +7,7 @@ import '../../core/app_scaffold.dart';
 class LoanDetailScreen extends StatefulWidget {
   final String? loanId;
 
-  const LoanDetailScreen({
-    this.loanId,
-    super.key,
-  });
+  const LoanDetailScreen({this.loanId, super.key});
 
   @override
   State<LoanDetailScreen> createState() => _LoanDetailScreenState();
@@ -77,6 +74,7 @@ class _LoanDetailScreenState extends State<LoanDetailScreen> {
 
     return AppScaffold(
       title: 'Loan Details',
+      backRoute: '/loans',
       actions: [
         Stack(
           alignment: Alignment.center,
@@ -135,7 +133,8 @@ class _LoanDetailScreenState extends State<LoanDetailScreen> {
             _PaymentHistory(
               paymentHistory: paymentHistory,
               theme: theme,
-              onViewAll: () => context.go('/loan-payment-history/${loanData['loan_id']}'),
+              onViewAll: () =>
+                  context.go('/loan-payment-history/${loanData['loan_id']}'),
             ),
             const SizedBox(height: 24),
           ],
@@ -149,10 +148,7 @@ class _LoanHeroCard extends StatelessWidget {
   final Map<String, dynamic> loanData;
   final ThemeData theme;
 
-  const _LoanHeroCard({
-    required this.loanData,
-    required this.theme,
-  });
+  const _LoanHeroCard({required this.loanData, required this.theme});
 
   @override
   Widget build(BuildContext context) {
@@ -160,10 +156,7 @@ class _LoanHeroCard extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            const Color(0xFF2E8B57),
-            const Color(0xFF1E5A3F),
-          ],
+          colors: [const Color(0xFF2E8B57), const Color(0xFF1E5A3F)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -222,7 +215,10 @@ class _LoanHeroCard extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20),
@@ -404,17 +400,15 @@ class _ActionButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.2),
+            ),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                color: theme.colorScheme.primary,
-                size: 28,
-              ),
+              Icon(icon, color: theme.colorScheme.primary, size: 28),
               const SizedBox(height: 6),
               Text(
                 label,
@@ -435,22 +429,51 @@ class _LoanSummary extends StatelessWidget {
   final Map<String, dynamic> loanData;
   final ThemeData theme;
 
-  const _LoanSummary({
-    required this.loanData,
-    required this.theme,
-  });
+  const _LoanSummary({required this.loanData, required this.theme});
 
   @override
   Widget build(BuildContext context) {
     final summaryItems = [
-      ('Loan Amount', 'GH₵ ${(loanData['loan_amount'] ?? 0).toStringAsFixed(2)}', Icons.money_outlined),
-      ('Total Interest', 'GH₵ ${(loanData['total_interest'] ?? 0).toStringAsFixed(2)}', Icons.percent_outlined),
-      ('Interest Rate (Reducing)', '${loanData['interest_rate'] ?? '0%'}', Icons.trending_up_outlined),
-      ('Total Payable', 'GH₵ ${(loanData['total_payable'] ?? 0).toStringAsFixed(2)}', Icons.account_balance_wallet_outlined),
-      ('Loan Tenure', '${loanData['loan_tenure'] ?? '0 months'}', Icons.calendar_month_outlined),
-      ('Amount Disbursed', 'GH₵ ${(loanData['amount_disbursed'] ?? 0).toStringAsFixed(2)}', Icons.payment_outlined),
-      ('Disbursed On', loanData['disbursement_date'] ?? '', Icons.today_outlined),
-      ('Maturity Date', loanData['maturity_date'] ?? '', Icons.event_note_outlined),
+      (
+        'Loan Amount',
+        'GH₵ ${(loanData['loan_amount'] ?? 0).toStringAsFixed(2)}',
+        Icons.money_outlined,
+      ),
+      (
+        'Total Interest',
+        'GH₵ ${(loanData['total_interest'] ?? 0).toStringAsFixed(2)}',
+        Icons.percent_outlined,
+      ),
+      (
+        'Interest Rate (Reducing)',
+        '${loanData['interest_rate'] ?? '0%'}',
+        Icons.trending_up_outlined,
+      ),
+      (
+        'Total Payable',
+        'GH₵ ${(loanData['total_payable'] ?? 0).toStringAsFixed(2)}',
+        Icons.account_balance_wallet_outlined,
+      ),
+      (
+        'Loan Tenure',
+        '${loanData['loan_tenure'] ?? '0 months'}',
+        Icons.calendar_month_outlined,
+      ),
+      (
+        'Amount Disbursed',
+        'GH₵ ${(loanData['amount_disbursed'] ?? 0).toStringAsFixed(2)}',
+        Icons.payment_outlined,
+      ),
+      (
+        'Disbursed On',
+        loanData['disbursement_date'] ?? '',
+        Icons.today_outlined,
+      ),
+      (
+        'Maturity Date',
+        loanData['maturity_date'] ?? '',
+        Icons.event_note_outlined,
+      ),
     ];
 
     return Column(
@@ -474,11 +497,7 @@ class _LoanSummary extends StatelessWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    item.$3,
-                    color: theme.colorScheme.primary,
-                    size: 24,
-                  ),
+                  Icon(item.$3, color: theme.colorScheme.primary, size: 24),
                   const SizedBox(height: 8),
                   Text(
                     item.$1,
@@ -494,7 +513,7 @@ class _LoanSummary extends StatelessWidget {
                     ),
                   ),
                 ],
-             );
+              );
             }).toList(),
           ),
         ),
@@ -507,10 +526,7 @@ class _RepaymentProgress extends StatelessWidget {
   final Map<String, dynamic> loanData;
   final ThemeData theme;
 
-  const _RepaymentProgress({
-    required this.loanData,
-    required this.theme,
-  });
+  const _RepaymentProgress({required this.loanData, required this.theme});
 
   @override
   Widget build(BuildContext context) {
@@ -548,8 +564,8 @@ class _RepaymentProgress extends StatelessWidget {
                           child: CircularProgressIndicator(
                             value: percentage / 100,
                             strokeWidth: 8,
-                            backgroundColor:
-                                theme.colorScheme.onSurface.withValues(alpha: 0.1),
+                            backgroundColor: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.1),
                             valueColor: AlwaysStoppedAnimation<Color>(
                               theme.colorScheme.primary,
                             ),
@@ -613,7 +629,9 @@ class _RepaymentProgress extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: percentage / 100,
                   minHeight: 12,
-                  backgroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.1),
+                  backgroundColor: theme.colorScheme.onSurface.withValues(
+                    alpha: 0.1,
+                  ),
                   valueColor: AlwaysStoppedAnimation<Color>(
                     theme.colorScheme.primary,
                   ),
@@ -687,10 +705,7 @@ class _LoanDetailsSection extends StatelessWidget {
   final Map<String, dynamic> loanData;
   final ThemeData theme;
 
-  const _LoanDetailsSection({
-    required this.loanData,
-    required this.theme,
-  });
+  const _LoanDetailsSection({required this.loanData, required this.theme});
 
   @override
   Widget build(BuildContext context) {
@@ -726,7 +741,9 @@ class _LoanDetailsSection extends StatelessWidget {
                       Text(
                         item.$1,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
                         ),
                       ),
                       Text(
@@ -742,8 +759,9 @@ class _LoanDetailsSection extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: Divider(
                         height: 1,
-                        color:
-                            theme.colorScheme.onSurface.withValues(alpha: 0.1),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.1,
+                        ),
                       ),
                     ),
                 ],
@@ -813,8 +831,9 @@ class _PaymentHistory extends StatelessWidget {
                               height: 40,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: theme.colorScheme.primary
-                                    .withValues(alpha: 0.1),
+                                color: theme.colorScheme.primary.withValues(
+                                  alpha: 0.1,
+                                ),
                               ),
                               child: Center(
                                 child: Icon(
@@ -869,8 +888,9 @@ class _PaymentHistory extends StatelessWidget {
                             Icon(
                               Icons.arrow_forward_ios_rounded,
                               size: 16,
-                              color: theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.3),
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.3,
+                              ),
                             ),
                           ],
                         ),
@@ -880,8 +900,7 @@ class _PaymentHistory extends StatelessWidget {
                   if (index < paymentHistory.length - 1)
                     Divider(
                       height: 1,
-                      color:
-                          theme.colorScheme.onSurface.withValues(alpha: 0.1),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.1),
                     ),
                 ],
               );
