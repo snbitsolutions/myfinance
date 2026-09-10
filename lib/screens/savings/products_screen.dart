@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/balance_card_shell.dart';
 import '../../core/providers/app_providers.dart';
 
 class ProductsScreen extends ConsumerWidget {
@@ -16,12 +17,13 @@ class ProductsScreen extends ConsumerWidget {
       orElse: () => const <String, dynamic>{},
     );
 
-    final accountName = (profile['name'] ??
-            profile['account_name'] ??
-            profile['first_name'] ??
-            'Your account')
-        .toString()
-        .trim();
+    final accountName =
+        (profile['name'] ??
+                profile['account_name'] ??
+                profile['first_name'] ??
+                'Your account')
+            .toString()
+            .trim();
     final resolvedName = accountName.isNotEmpty ? accountName : 'Your account';
     final imageUrl = _resolveProfileImageUrl(profile)?.trim();
     final initials = resolvedName
@@ -89,7 +91,9 @@ class ProductsScreen extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0E5A3E).withValues(alpha: 0.18),
+                          color: const Color(
+                            0xFF0E5A3E,
+                          ).withValues(alpha: 0.18),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -167,87 +171,86 @@ class ProductsScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Stack(
                   children: [
-                    Row(
+                    const Positioned(
+                      top: -8,
+                      right: -4,
+                      child: AdepaLogoBadge(size: 112),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            'Portfolio Overview',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.visibility_off_rounded, size: 12, color: Colors.white),
-                              const SizedBox(width: 5),
-                              Text(
-                                'Hide',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Total balance',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.8),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'GH₵ 229,250.00',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF9FD6B8).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.trending_up_rounded, color: Color(0xFF9FD6B8), size: 13),
-                              const SizedBox(width: 4),
-                              Text(
-                                '+ 12.4%',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: const Color(0xFF9FD6B8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Portfolio Overview',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: Colors.white,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            ],
+                            ),
+                            const SizedBox(width: 58),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'Total balance',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.8),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(height: 6),
                         Text(
-                          'vs last month',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.72),
+                          'GH₵ 229,250.00',
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.8,
                           ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(
+                                  0xFF9FD6B8,
+                                ).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.trending_up_rounded,
+                                    color: Color(0xFF9FD6B8),
+                                    size: 13,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '+ 12.4%',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: const Color(0xFF9FD6B8),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'vs last month',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.72),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -266,7 +269,10 @@ class ProductsScreen extends ConsumerWidget {
                   ),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFEAF5EE),
                       borderRadius: BorderRadius.circular(999),
@@ -315,7 +321,11 @@ class _NotificationButton extends StatelessWidget {
           child: Stack(
             alignment: Alignment.center,
             children: [
-              const Icon(Icons.notifications_none_rounded, color: Color(0xFF1E312A), size: 22),
+              const Icon(
+                Icons.notifications_none_rounded,
+                color: Color(0xFF1E312A),
+                size: 22,
+              ),
               if (count > 0)
                 Positioned(
                   top: 7,
@@ -330,7 +340,11 @@ class _NotificationButton extends StatelessWidget {
                     child: Center(
                       child: Text(
                         count > 9 ? '9+' : '$count',
-                        style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
@@ -396,54 +410,70 @@ class _ProductCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: const Color(0xFFE5EAE6)),
         ),
-        child: Row(
+        child: Stack(
+          clipBehavior: Clip.hardEdge,
           children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: tint,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Icon(icon, color: accent, size: 26),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF1B2A24),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF6A7A72),
-                    ),
-                  ),
-                ],
+            Positioned(
+              top: 8,
+              right: 8,
+              bottom: 8,
+              child: IgnorePointer(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: AdepaLogoBadge(size: 92, color: accent, opacity: 0.24),
+                ),
               ),
             ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            Row(
               children: [
-                Text(
-                  amount,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: accent,
-                    fontWeight: FontWeight.w800,
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: tint,
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Icon(icon, color: accent, size: 26),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF1B2A24),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF6A7A72),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 6),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Color(0xFF1B2A24),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      amount,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: accent,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: Color(0xFF1B2A24),
+                    ),
+                  ],
                 ),
               ],
             ),

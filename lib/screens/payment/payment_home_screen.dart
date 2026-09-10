@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/balance_card_shell.dart';
 import '../../core/providers/app_providers.dart';
 
 class PaymentHomeScreen extends ConsumerWidget {
@@ -351,6 +352,11 @@ class _PortfolioSummaryCard extends StatelessWidget {
               ),
             ),
           ),
+          const Positioned(
+            top: -8,
+            right: -4,
+            child: AdepaLogoBadge(size: 112),
+          ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -365,6 +371,7 @@ class _PortfolioSummaryCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 112),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                     decoration: BoxDecoration(

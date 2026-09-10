@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_scaffold.dart';
+import '../../core/balance_card_shell.dart';
 
 class SharesScreen extends StatefulWidget {
   const SharesScreen({super.key});
@@ -201,8 +202,8 @@ class _SharesScreenState extends State<SharesScreen> {
                             ),
                           ],
                         ),
-                      ],
-                    ),
+                    ],
+                  ),
                   ],
                 ),
               ),
@@ -318,9 +319,16 @@ class _SharesScreenState extends State<SharesScreen> {
                     ),
                   ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Stack(
                   children: [
+                    const Positioned(
+                      top: -8,
+                      right: -4,
+                      child: AdepaLogoBadge(size: 108),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -369,6 +377,8 @@ class _SharesScreenState extends State<SharesScreen> {
                             theme: theme,
                           ),
                         ),
+                      ],
+                    ),
                       ],
                     ),
                   ],

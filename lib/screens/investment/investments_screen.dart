@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
+import '../../core/balance_card_shell.dart';
 
 class InvestmentsScreen extends StatefulWidget {
   const InvestmentsScreen({super.key});
@@ -117,83 +118,93 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                     ),
                   ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Stack(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    const Positioned(
+                      top: 0,
+                      right: 0,
+                      child: AdepaLogoBadge(size: 92),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(
-                                Icons.account_balance,
-                                color: Colors.white,
-                                size: 22,
-                              ),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.18),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.account_balance,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Portfolio Value',
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.8),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 46),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          'GH₵ ${totalBalance.toStringAsFixed(2).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',')}',
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.trending_up,
+                              color: Colors.greenAccent,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 6),
                             Text(
-                              'Portfolio Value',
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.8),
+                              '+ 8.6% vs last month',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: Colors.greenAccent,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
                         ),
-                        Icon(Icons.visibility, color: Colors.white, size: 18),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    Text(
-                      'GH₵ ${totalBalance.toStringAsFixed(2).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',')}',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.trending_up,
-                          color: Colors.greenAccent,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '+ 8.6% vs last month',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: Colors.greenAccent,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _PortfolioMetric(
-                            label: 'YTD Return',
-                            value: 'GH₵ ${totalEarnings.toStringAsFixed(2)}',
-                            accent: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _PortfolioMetric(
-                            label: 'Active Plans',
-                            value: '${myInvestments.length}',
-                            accent: Colors.white,
-                          ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _PortfolioMetric(
+                                label: 'YTD Return',
+                                value:
+                                    'GH₵ ${totalEarnings.toStringAsFixed(2)}',
+                                accent: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _PortfolioMetric(
+                                label: 'Active Plans',
+                                value: '${myInvestments.length}',
+                                accent: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

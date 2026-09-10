@@ -63,10 +63,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final prefs = await SharedPreferences.getInstance();
       final storedAccountNumber =
           prefs.getString(AppConstants.sharedPrefKeyUserId)?.trim() ?? '';
-      final fallbackAccountNumber =
-          storedAccountNumber.isNotEmpty
-              ? storedAccountNumber
-              : _normalizedPhoneNumber.replaceAll(RegExp(r'\D'), '');
+      final fallbackAccountNumber = storedAccountNumber.isNotEmpty
+          ? storedAccountNumber
+          : _normalizedPhoneNumber.replaceAll(RegExp(r'\D'), '');
 
       await prefs.setString(
         AppConstants.sharedPrefKeyUserEmail,
@@ -168,6 +167,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const SizedBox(height: 40),
+                        Container(
+                          width: double.infinity,
+                          constraints: const BoxConstraints(maxWidth: 320),
+                          height: 142,
+                          child: Image.asset(
+                            'images/adepa_teachers_logo.png',
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
                         Text(
                           'Welcome back',
                           style: theme.textTheme.displaySmall?.copyWith(

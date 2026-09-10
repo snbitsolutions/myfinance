@@ -25,9 +25,7 @@ class AppScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final canPop = context.canPop();
-    final currentLocation = GoRouter.of(
-      context,
-    ).routeInformationProvider.value.uri.path;
+    final currentLocation = GoRouterState.of(context).uri.path;
 
     Future<void> handleBackNavigation() async {
       if (!context.mounted) return;
@@ -51,7 +49,7 @@ class AppScaffold extends StatelessWidget {
       }
 
       if (isLoanRoute) {
-        context.go('/loans');
+        context.go(_loanBackDestination(currentLocation));
         return;
       }
 
@@ -89,7 +87,7 @@ class AppScaffold extends StatelessWidget {
         }
 
         if (isLoanRoute) {
-          context.go('/loans');
+          context.go(_loanBackDestination(currentLocation));
           return;
         }
 
@@ -122,4 +120,8 @@ class AppScaffold extends StatelessWidget {
       ),
     );
   }
+}
+
+String _loanBackDestination(String currentLocation) {
+  return currentLocation == '/loans' ? '/home' : '/loans';
 }

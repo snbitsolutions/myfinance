@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/balance_card_shell.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/services/notification_service.dart';
 
@@ -791,6 +792,11 @@ class _AccountInfoCard extends StatelessWidget {
                   ),
                 ),
               ),
+            ),
+            const Positioned(
+              top: 8,
+              right: 8,
+              child: AdepaLogoBadge(size: 104),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),

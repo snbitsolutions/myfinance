@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
+import '../../core/balance_card_shell.dart';
 import 'investment_state_provider.dart';
 
 String _formatActivityDate(DateTime d) {
@@ -53,7 +54,9 @@ class InvestmentActivityScreen extends ConsumerWidget {
                       'Start an investment plan to see your timeline here.',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.7,
+                        ),
                       ),
                     ),
                   ],
@@ -83,30 +86,40 @@ class InvestmentActivityScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Stack(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      const Positioned(
+                        top: -8,
+                        right: -4,
+                        child: AdepaLogoBadge(size: 108),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Portfolio Overview',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.trending_up_rounded,
-                              color: Colors.white,
-                              size: 18,
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Portfolio Overview',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: 108),
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.trending_up_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -210,10 +223,11 @@ class InvestmentActivityScreen extends ConsumerWidget {
                                     const SizedBox(width: 6),
                                     Text(
                                       _formatActivityDate(entry.startedAt),
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: theme.colorScheme.onSurface
-                                            .withValues(alpha: 0.7),
-                                      ),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: theme.colorScheme.onSurface
+                                                .withValues(alpha: 0.7),
+                                          ),
                                     ),
                                   ],
                                 ),
@@ -227,14 +241,17 @@ class InvestmentActivityScreen extends ConsumerWidget {
                                       ),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFFEAF4EE),
-                                        borderRadius: BorderRadius.circular(999),
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
                                       ),
                                       child: Text(
                                         'Ref: ${entry.reference}',
-                                        style: theme.textTheme.labelSmall?.copyWith(
-                                          color: const Color(0xFF0E5A3E),
-                                          fontWeight: FontWeight.w700,
-                                        ),
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
+                                              color: const Color(0xFF0E5A3E),
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -245,18 +262,21 @@ class InvestmentActivityScreen extends ConsumerWidget {
                                       ),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFFE5F7ED),
-                                        borderRadius: BorderRadius.circular(999),
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
                                       ),
                                       child: Text(
                                         entry.planName.contains('Growth')
                                             ? 'Growth'
                                             : entry.planName.contains('Premium')
-                                                ? 'Premium'
-                                                : 'Starter',
-                                        style: theme.textTheme.labelSmall?.copyWith(
-                                          color: const Color(0xFF0E5A3E),
-                                          fontWeight: FontWeight.w700,
-                                        ),
+                                            ? 'Premium'
+                                            : 'Starter',
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
+                                              color: const Color(0xFF0E5A3E),
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                       ),
                                     ),
                                   ],
