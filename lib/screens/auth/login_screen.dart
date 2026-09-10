@@ -67,6 +67,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ? storedAccountNumber
           : _normalizedPhoneNumber.replaceAll(RegExp(r'\D'), '');
 
+      await ref
+          .read(authProvider.notifier)
+          .sendLoginOtp(
+            phoneNumber: _normalizedPhoneNumber,
+            accountNumber: fallbackAccountNumber,
+          );
+
       await prefs.setString(
         AppConstants.sharedPrefKeyUserEmail,
         _normalizedPhoneNumber,
