@@ -69,25 +69,6 @@ class LoansScreen extends ConsumerWidget {
     return AppScaffold(
       title: 'Loans',
       backRoute: '/home',
-      actions: [
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.error,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isTablet = constraints.maxWidth >= Responsive.medium;

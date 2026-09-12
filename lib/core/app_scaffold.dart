@@ -28,9 +28,16 @@ class AppScaffold extends StatelessWidget {
     final theme = Theme.of(context);
     final canPop = context.canPop();
     final currentLocation = GoRouterState.of(context).uri.path;
+    final isNestedLoanRoute =
+        currentLocation.startsWith('/loans/') && currentLocation != '/loans';
 
     Future<void> handleBackNavigation() async {
       if (!context.mounted) return;
+
+      if (isNestedLoanRoute && context.canPop()) {
+        context.pop();
+        return;
+      }
 
       if (backRoute != null) {
         context.go(backRoute!);
@@ -75,6 +82,11 @@ class AppScaffold extends StatelessWidget {
           return;
         }
 
+        if (isNestedLoanRoute && context.canPop()) {
+          context.pop();
+          return;
+        }
+
         if (backRoute != null) {
           context.go(backRoute!);
           return;
@@ -107,9 +119,16 @@ class AppScaffold extends StatelessWidget {
       },
       child: Scaffold(
         appBar: AppBar(
+          leadingWidth: showBack ? 56 : null,
           leading: showBack
               ? IconButton(
+                  constraints: const BoxConstraints.tightFor(
+                    width: 56,
+                    height: 56,
+                  ),
+                  padding: EdgeInsets.zero,
                   icon: const Icon(Icons.arrow_back),
+                  tooltip: 'Back',
                   onPressed: handleBackNavigation,
                 )
               : null,

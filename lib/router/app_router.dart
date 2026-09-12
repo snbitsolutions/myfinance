@@ -240,8 +240,22 @@ class AppRouter {
     });
   }
 
+  // TEMPORARY DEV BYPASS: When true, the login/auth flow is skipped entirely
+  // so the app opens straight to /home. Set back to `false` to restore the
+  // normal login requirement.
+  static const bool _temporarilyBypassLoginForDev = true;
+
   static Future<String?> _computeRedirect(GoRouterState state) async {
     final path = state.uri.path;
+
+    if (_temporarilyBypassLoginForDev) {
+      if (path == '/' ||
+          path == '/onboarding' ||
+          _isInRouteSet(path, _authRoutes)) {
+        return '/home';
+      }
+      return null;
+    }
 
     final prefs = await SharedPreferences.getInstance();
     final seenOnboarding =

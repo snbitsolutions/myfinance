@@ -682,7 +682,10 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                         context.go('/home');
                       }
                     },
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 22),
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 22,
+                    ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -732,27 +735,15 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Color(0xFF0D6B4D),
-                            Color(0xFF2D8E66),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(22),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF0D6B4D).withValues(alpha: 0.25),
-                            blurRadius: 18,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
+                    BalanceCardShell(
+                      gradientColors: const [
+                        Color(0xFF0D6B4D),
+                        Color(0xFF2D8E66),
+                      ],
+                      shadowColor: const Color(
+                        0xFF0D6B4D,
+                      ).withValues(alpha: 0.25),
+                      contentPadding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -904,26 +895,37 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                                         color: accent.withValues(alpha: 0.12),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      child: Icon(item.type.icon, color: accent, size: 22),
+                                      child: Icon(
+                                        item.type.icon,
+                                        color: accent,
+                                        size: 22,
+                                      ),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             item.title,
-                                            style: theme.textTheme.titleLarge?.copyWith(
-                                              fontWeight: FontWeight.w800,
-                                              color: const Color(0xFF1D2B26),
-                                            ),
+                                            style: theme.textTheme.titleLarge
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w800,
+                                                  color: const Color(
+                                                    0xFF1D2B26,
+                                                  ),
+                                                ),
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
                                             item.type.description,
-                                            style: theme.textTheme.bodyMedium?.copyWith(
-                                              color: const Color(0xFF6B7A74),
-                                            ),
+                                            style: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                                  color: const Color(
+                                                    0xFF6B7A74,
+                                                  ),
+                                                ),
                                           ),
                                           const SizedBox(height: 8),
                                           Container(
@@ -933,7 +935,8 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                                             ),
                                             decoration: BoxDecoration(
                                               color: const Color(0xFFE8F8F0),
-                                              borderRadius: BorderRadius.circular(8),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                             ),
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
@@ -946,10 +949,16 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                                                 const SizedBox(width: 6),
                                                 Text(
                                                   masked,
-                                                  style: theme.textTheme.bodySmall?.copyWith(
-                                                    fontWeight: FontWeight.w700,
-                                                    color: const Color(0xFF1A8F5A),
-                                                  ),
+                                                  style: theme
+                                                      .textTheme
+                                                      .bodySmall
+                                                      ?.copyWith(
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: const Color(
+                                                          0xFF1A8F5A,
+                                                        ),
+                                                      ),
                                                 ),
                                               ],
                                             ),
@@ -959,29 +968,35 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                                     ),
                                     const SizedBox(width: 12),
                                     Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
                                       children: [
                                         Text(
                                           'GH₵${item.balance.toStringAsFixed(2)}',
-                                          style: theme.textTheme.titleLarge?.copyWith(
-                                            color: const Color(0xFF1A8F5A),
-                                            fontWeight: FontWeight.w800,
-                                          ),
+                                          style: theme.textTheme.titleLarge
+                                              ?.copyWith(
+                                                color: const Color(0xFF1A8F5A),
+                                                fontWeight: FontWeight.w800,
+                                              ),
                                         ),
                                         const SizedBox(height: 6),
                                         Text(
                                           'Available Balance',
-                                          style: theme.textTheme.bodySmall?.copyWith(
-                                            color: const Color(0xFF6B7A74),
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                                color: const Color(0xFF6B7A74),
+                                                fontWeight: FontWeight.w600,
+                                              ),
                                         ),
                                       ],
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 14),
-                                const Divider(height: 1, color: Color(0xFFE3EAE6)),
+                                const Divider(
+                                  height: 1,
+                                  color: Color(0xFFE3EAE6),
+                                ),
                                 const SizedBox(height: 12),
                                 Row(
                                   children: [
@@ -991,7 +1006,9 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                                         icon: Icons.arrow_downward,
                                         label: 'Deposit',
                                         color: const Color(0xFF1A8F5A),
-                                        onTap: () => context.go('/savings/${item.id}/deposit'),
+                                        onTap: () => context.go(
+                                          '/savings/${item.id}/deposit',
+                                        ),
                                       ),
                                     ),
                                     Expanded(
@@ -1000,7 +1017,9 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                                         icon: Icons.arrow_upward,
                                         label: 'Withdraw',
                                         color: const Color(0xFF1A8F5A),
-                                        onTap: () => context.go('/savings/${item.id}/withdraw'),
+                                        onTap: () => context.go(
+                                          '/savings/${item.id}/withdraw',
+                                        ),
                                       ),
                                     ),
                                     Expanded(
@@ -1009,7 +1028,9 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                                         icon: Icons.swap_horiz_rounded,
                                         label: 'Transfer',
                                         color: const Color(0xFF1A8F5A),
-                                        onTap: () => context.go('/savings/${item.id}/transfer'),
+                                        onTap: () => context.go(
+                                          '/savings/${item.id}/transfer',
+                                        ),
                                       ),
                                     ),
                                     Expanded(
@@ -1018,7 +1039,9 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                                         icon: Icons.description_outlined,
                                         label: 'Statement',
                                         color: const Color(0xFF1A8F5A),
-                                        onTap: () => context.go('/savings/${item.id}/statement'),
+                                        onTap: () => context.go(
+                                          '/savings/${item.id}/statement',
+                                        ),
                                       ),
                                     ),
                                     Expanded(
@@ -1027,7 +1050,9 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                                         icon: Icons.more_horiz,
                                         label: 'More',
                                         color: const Color(0xFF1A8F5A),
-                                        onTap: () => context.go('/savings/${item.id}/edit'),
+                                        onTap: () => context.go(
+                                          '/savings/${item.id}/edit',
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -1316,7 +1341,10 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                         onTap: _showCreateSavingsTypePicker,
                         child: Row(
                           children: [
-                            const Icon(Icons.add_circle_outline, color: Colors.white),
+                            const Icon(
+                              Icons.add_circle_outline,
+                              color: Colors.white,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               'Open New Savings',
@@ -1351,7 +1379,11 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.trending_up, color: Colors.green[300], size: 14),
+                            Icon(
+                              Icons.trending_up,
+                              color: Colors.green[300],
+                              size: 14,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               '↑ 8.4% vs last month',
@@ -1406,8 +1438,13 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             CircleAvatar(
-                              backgroundColor: Colors.white.withValues(alpha: 0.06),
-                              child: const Icon(Icons.account_balance_wallet, color: Colors.white),
+                              backgroundColor: Colors.white.withValues(
+                                alpha: 0.06,
+                              ),
+                              child: const Icon(
+                                Icons.account_balance_wallet,
+                                color: Colors.white,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             Text(
@@ -1432,8 +1469,13 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             CircleAvatar(
-                              backgroundColor: Colors.white.withValues(alpha: 0.06),
-                              child: const Icon(Icons.download_rounded, color: Colors.white),
+                              backgroundColor: Colors.white.withValues(
+                                alpha: 0.06,
+                              ),
+                              child: const Icon(
+                                Icons.download_rounded,
+                                color: Colors.white,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             Text(
@@ -1458,8 +1500,13 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             CircleAvatar(
-                              backgroundColor: Colors.white.withValues(alpha: 0.06),
-                              child: const Icon(Icons.swap_horiz, color: Colors.white),
+                              backgroundColor: Colors.white.withValues(
+                                alpha: 0.06,
+                              ),
+                              child: const Icon(
+                                Icons.swap_horiz,
+                                color: Colors.white,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             Text(
@@ -1484,8 +1531,8 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                 ],
               ),
             ),
-         ),
-         const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 16),
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
@@ -1840,12 +1887,21 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
-        border: Border(
-          left: BorderSide(color: accentColor.withOpacitySafe(0.14), width: 6),
-          top: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.06)),
-          right: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.06)),
-          bottom: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.06)),
-        ),
+          border: Border(
+            left: BorderSide(
+              color: accentColor.withOpacitySafe(0.14),
+              width: 6,
+            ),
+            top: BorderSide(
+              color: theme.colorScheme.outline.withValues(alpha: 0.06),
+            ),
+            right: BorderSide(
+              color: theme.colorScheme.outline.withValues(alpha: 0.06),
+            ),
+            bottom: BorderSide(
+              color: theme.colorScheme.outline.withValues(alpha: 0.06),
+            ),
+          ),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -1879,14 +1935,18 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                         Text(
                           s.type.description,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacitySafe(0.7),
+                            color: theme.colorScheme.onSurface.withOpacitySafe(
+                              0.7,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 6),
                         Text(
                           masked,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                            color: theme.colorScheme.onSurface.withOpacitySafe(
+                              0.6,
+                            ),
                           ),
                         ),
                       ],
@@ -2032,7 +2092,9 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                     Navigator.of(ctx).pop();
                     // placeholder - implement close flow later
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Close account coming soon')),
+                      const SnackBar(
+                        content: Text('Close account coming soon'),
+                      ),
                     );
                   },
                 ),
