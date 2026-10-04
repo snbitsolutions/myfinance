@@ -1,0 +1,9 @@
+unit: activity-and-notifications
+bindings:
+  - type: route-declaration
+    name: "Routes /transactions, /activity, /notifications"
+    source_loc: "lib/router/app_router.dart:509"
+    target: "Activity and notification screens"
+    must_appear_in_target: true
+    notes: "These pages are reached through the authenticated shell."
+runtime_config: []

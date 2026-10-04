@@ -1,0 +1,33 @@
+unit: authentication
+side_effects:
+  - source_loc: "lib/core/providers/app_providers.dart:519"
+    effect: "Sends login OTP through the mobile API."
+    must_preserve: true
+  - source_loc: "lib/core/providers/app_providers.dart:760"
+    effect: "Stores the authenticated token, device fingerprint, account ID, and phone number."
+    must_preserve: true
+  - source_loc: "lib/screens/auth/otp_screen.dart:113"
+    effect: "Creates a security notification and invalidates authenticated data providers after OTP verification."
+    must_preserve: true
+branches:
+  - source_loc: "lib/screens/auth/otp_screen.dart:143"
+    condition: "OTP flow originated from registration."
+    behavior: "Routes to PIN setup; ordinary login routes directly to /home."
+    must_preserve: true
+  - source_loc: "lib/screens/auth/login_screen.dart:100"
+    condition: "Login error indicates an unregistered account."
+    behavior: "Routes to signup with reason=not_registered."
+    must_preserve: true
+error_paths:
+  - source_loc: "lib/screens/auth/otp_screen.dart:126"
+    trigger: "OTP verification returns AppException or unexpected error."
+    outcome: "Adds a security notification and shows a retryable SnackBar."
+    contract: "No authenticated navigation on verification failure."
+    must_preserve: true
+concurrency:
+  model: async
+  tx_boundary:
+    source_loc: "lib/core/providers/app_providers.dart:699"
+    scope: "OTP verification, session persistence, and AuthState transition."
+    isolation: "not specified"
+    must_preserve: true

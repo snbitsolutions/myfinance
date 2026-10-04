@@ -1,0 +1,23 @@
+unit: investments-and-shares
+side_effects:
+  - source_loc: "lib/screens/shares/buy_shares_screen.dart:1"
+    effect: "Submits share purchase requests and displays review/statement outcomes."
+    must_preserve: true
+branches:
+  - source_loc: "lib/router/app_router.dart:833"
+    condition: "Investment/share route includes a product or holding ID."
+    behavior: "Loads the corresponding detail screen."
+    must_preserve: true
+error_paths:
+  - source_loc: "lib/core/providers/app_providers.dart:1166"
+    trigger: "PIN is absent for investment data access."
+    outcome: "Raises a validation error requiring a new authenticated session."
+    contract: "Investment API is not called without the required credential."
+    must_preserve: true
+concurrency:
+  model: async
+  tx_boundary:
+    source_loc: "lib/core/providers/app_providers.dart:1154"
+    scope: "Shares/investments provider fetches and mutation flows."
+    isolation: "not specified"
+    must_preserve: true

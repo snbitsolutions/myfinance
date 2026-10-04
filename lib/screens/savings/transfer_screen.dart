@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
 import '../../core/color_ext.dart';
 import '../../core/modern_input.dart';
+import '../../core/providers/app_providers.dart';
 
 // ─── Internal account model ───────────────────────────────────────────────────
 
@@ -26,41 +27,6 @@ class _InternalAccount {
   });
 }
 
-const List<_InternalAccount> _internalAccounts = [
-  _InternalAccount(
-    id: 'member',
-    name: 'Member Savings',
-    typeLabel: 'Savings',
-    icon: Icons.savings_rounded,
-    color: Color(0xFF2E8B57),
-    balance: 1250.00,
-  ),
-  _InternalAccount(
-    id: 'current',
-    name: 'Current Account',
-    typeLabel: 'Current',
-    icon: Icons.account_balance_wallet_rounded,
-    color: Color(0xFF1976D2),
-    balance: 8400.00,
-  ),
-  _InternalAccount(
-    id: 'kiddy',
-    name: 'Kiddy Savings',
-    typeLabel: 'Savings',
-    icon: Icons.child_care_rounded,
-    color: Color(0xFFE64A19),
-    balance: 320.00,
-  ),
-  _InternalAccount(
-    id: 'fixed',
-    name: 'Fixed Deposit',
-    typeLabel: 'Fixed',
-    icon: Icons.lock_clock_rounded,
-    color: Color(0xFF6A1B9A),
-    balance: 5000.00,
-  ),
-];
-
 const List<int> _quickTransferAmounts = [50, 100, 200, 500];
 
 /// Types of transfer destinations supported by the transfer flow.
@@ -68,14 +34,14 @@ enum TransferDestination { internal, member, bank, mobile }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class TransferScreen extends StatefulWidget {
+class TransferScreen extends ConsumerStatefulWidget {
   const TransferScreen({super.key});
 
   @override
-  State<TransferScreen> createState() => _TransferScreenState();
+  ConsumerState<TransferScreen> createState() => _TransferScreenState();
 }
 
-class _TransferScreenState extends State<TransferScreen> {
+class _TransferScreenState extends ConsumerState<TransferScreen> {
   String? _fromAccountId;
   String? _toAccountId;
   final _amountController = TextEditingController();
@@ -89,9 +55,6 @@ class _TransferScreenState extends State<TransferScreen> {
   final TextEditingController _bankNameController = TextEditingController();
   final TextEditingController _mobileNumberController = TextEditingController();
 
-  // Resolved / verified recipient info (mocked)
-  String? _resolvedRecipientName;
-  bool _recipientVerified = false;
 
   @override
   void dispose() {
@@ -101,6 +64,62 @@ class _TransferScreenState extends State<TransferScreen> {
     _bankNameController.dispose();
     _mobileNumberController.dispose();
     super.dispose();
+  }
+
+  List<_InternalAccount> get _internalAccounts {
+    final savings = ref.watch(savingsProvider).valueOrNull ?? const [];
+    final shares = ref.watch(sharesProvider).valueOrNull ?? const [];
+    final accounts = <_InternalAccount>[];
+
+    void addAccounts(
+      List<Map<String, dynamic>> items,
+      String typeLabel,
+      IconData icon,
+      Color color,
+    ) {
+      for (final item in items) {
+        final id =
+            (item['id'] ?? item['product_id'] ?? item['savings_id'] ?? '')
+                .toString()
+                .trim();
+        if (id.isEmpty) continue;
+        final name =
+            (item['pro_name'] ??
+                    item['name'] ??
+                    item['product_name'] ??
+                    typeLabel)
+                .toString()
+                .trim();
+        final rawBalance = item['balance'] ?? item['current_balance'] ?? 0;
+        final balance = rawBalance is num
+            ? rawBalance.toDouble()
+            : double.tryParse(rawBalance.toString().replaceAll(',', '')) ?? 0;
+        accounts.add(
+          _InternalAccount(
+            id: id,
+            name: name,
+            typeLabel: typeLabel,
+            icon: icon,
+            color: color,
+            balance: balance,
+          ),
+        );
+      }
+    }
+
+    addAccounts(
+      savings,
+      'Savings',
+      Icons.savings_rounded,
+      const Color(0xFF2E8B57),
+    );
+    addAccounts(
+      shares,
+      'Shares',
+      Icons.pie_chart_rounded,
+      const Color(0xFF1976D2),
+    );
+    return accounts;
   }
 
   _InternalAccount? _findAccountById(String? id) {
@@ -117,40 +136,7 @@ class _TransferScreenState extends State<TransferScreen> {
 
   double get _amount => double.tryParse(_amountController.text) ?? 0;
 
-  double get _feeRate {
-    switch (_destination) {
-      case TransferDestination.internal:
-        return 0.005; // 0.5%
-      case TransferDestination.member:
-        return 0.002; // 0.2%
-      case TransferDestination.bank:
-        return 0.01; // 1%
-      case TransferDestination.mobile:
-        return 0.008; // 0.8%
-    }
-  }
-
-  bool get _canSubmit {
-    // amount must be valid
-    if (_amount <= 0) return false;
-
-    // always require a from account
-    final from = _fromAccount;
-    if (from == null) return false;
-
-    // for internal transfers both from and to accounts must be selected
-    if (_destination == TransferDestination.internal) {
-      if (_toAccountId == null) return false;
-      if (_fromAccountId == _toAccountId) return false;
-      if (_amount > from.balance) return false;
-      return true;
-    }
-
-    // for external destinations ensure recipient is verified and balance suffices
-    if (!_recipientVerified) return false;
-    if (_amount > from.balance) return false;
-    return true;
-  }
+  bool get _canSubmit => false;
 
   void _setQuickAmount(double amount) {
     setState(() => _amountController.text = amount.toStringAsFixed(2));
@@ -159,35 +145,13 @@ class _TransferScreenState extends State<TransferScreen> {
   Future<void> _onConfirmTransferPressed() async {
     FocusManager.instance.primaryFocus?.unfocus();
     if (!_canSubmit) return;
-
-    // Mock processing and navigate to success screen with basic details
-    final extra = <String, dynamic>{
-      'amount': _amount,
-      'title': 'Transfer Successful',
-      'message': 'Your transfer has been processed successfully.',
-      'primaryActionRoute': '/home',
-      'account': _fromAccount?.name ?? '',
-      'paymentMethod': _destination == TransferDestination.bank
-          ? 'Bank'
-          : _destination == TransferDestination.mobile
-              ? 'Mobile Money'
-              : _destination == TransferDestination.member
-                  ? 'Member'
-                  : 'Internal',
-      'processedAt': DateTime.now().toIso8601String(),
-      'reference': 'TXN${DateTime.now().millisecondsSinceEpoch}',
-    };
-
-    // Navigate to the existing payment success screen which can display the summary
-    context.go('/payment-success', extra: extra);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isTablet = MediaQuery.sizeOf(context).width >= 900;
-    final fee = _amount * _feeRate;
-    final totalDebit = _amount + fee;
+    final totalDebit = _amount;
     const gap = SizedBox(height: 12);
     final accent = theme.colorScheme.primary;
 
@@ -254,41 +218,38 @@ class _TransferScreenState extends State<TransferScreen> {
                             children: [
                               ChoiceChip(
                                 label: const Text('Internal'),
-                                selected: _destination == TransferDestination.internal,
+                                selected:
+                                    _destination ==
+                                    TransferDestination.internal,
                                 onSelected: (v) => setState(() {
                                   _destination = TransferDestination.internal;
-                                  _recipientVerified = false;
-                                  _resolvedRecipientName = null;
                                   _toAccountId = null;
                                 }),
                               ),
                               ChoiceChip(
                                 label: const Text('Member'),
-                                selected: _destination == TransferDestination.member,
+                                selected:
+                                    _destination == TransferDestination.member,
                                 onSelected: (v) => setState(() {
                                   _destination = TransferDestination.member;
-                                  _recipientVerified = false;
-                                  _resolvedRecipientName = null;
                                   _toAccountId = null;
                                 }),
                               ),
                               ChoiceChip(
                                 label: const Text('Bank'),
-                                selected: _destination == TransferDestination.bank,
+                                selected:
+                                    _destination == TransferDestination.bank,
                                 onSelected: (v) => setState(() {
                                   _destination = TransferDestination.bank;
-                                  _recipientVerified = false;
-                                  _resolvedRecipientName = null;
                                   _toAccountId = null;
                                 }),
                               ),
                               ChoiceChip(
                                 label: const Text('Mobile Money'),
-                                selected: _destination == TransferDestination.mobile,
+                                selected:
+                                    _destination == TransferDestination.mobile,
                                 onSelected: (v) => setState(() {
                                   _destination = TransferDestination.mobile;
-                                  _recipientVerified = false;
-                                  _resolvedRecipientName = null;
                                   _toAccountId = null;
                                 }),
                               ),
@@ -302,32 +263,34 @@ class _TransferScreenState extends State<TransferScreen> {
                     // From Account
                     if (_destination == TransferDestination.internal)
                       AppCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _SectionHeader(
-                            title: 'From Account',
-                            subtitle: 'Select the account to debit',
-                            icon: Icons.arrow_upward_rounded,
-                            theme: theme,
-                            accentColor: accent,
-                          ),
-                          const SizedBox(height: 12),
-                          ..._internalAccounts.map(
-                            (acc) => _AccountTile(
-                              account: acc,
-                              selected: _fromAccountId == acc.id,
-                              disabled: _toAccountId == acc.id,
-                              onTap: () => setState(() {
-                                _fromAccountId = acc.id;
-                                if (_toAccountId == acc.id) _toAccountId = null;
-                              }),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _SectionHeader(
+                              title: 'From Account',
+                              subtitle: 'Select the account to debit',
+                              icon: Icons.arrow_upward_rounded,
                               theme: theme,
+                              accentColor: accent,
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 12),
+                            ..._internalAccounts.map(
+                              (acc) => _AccountTile(
+                                account: acc,
+                                selected: _fromAccountId == acc.id,
+                                disabled: _toAccountId == acc.id,
+                                onTap: () => setState(() {
+                                  _fromAccountId = acc.id;
+                                  if (_toAccountId == acc.id) {
+                                    _toAccountId = null;
+                                  }
+                                }),
+                                theme: theme,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
 
                     // Arrow divider
                     Center(
@@ -354,34 +317,34 @@ class _TransferScreenState extends State<TransferScreen> {
                     // To Account
                     if (_destination == TransferDestination.internal)
                       AppCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _SectionHeader(
-                            title: 'To Account',
-                            subtitle: 'Select the account to credit',
-                            icon: Icons.arrow_downward_rounded,
-                            theme: theme,
-                            accentColor: accent,
-                          ),
-                          const SizedBox(height: 12),
-                          ..._internalAccounts.map(
-                            (acc) => _AccountTile(
-                              account: acc,
-                              selected: _toAccountId == acc.id,
-                              disabled: _fromAccountId == acc.id,
-                              onTap: () => setState(() {
-                                _toAccountId = acc.id;
-                                if (_fromAccountId == acc.id) {
-                                  _fromAccountId = null;
-                                }
-                              }),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _SectionHeader(
+                              title: 'To Account',
+                              subtitle: 'Select the account to credit',
+                              icon: Icons.arrow_downward_rounded,
                               theme: theme,
+                              accentColor: accent,
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 12),
+                            ..._internalAccounts.map(
+                              (acc) => _AccountTile(
+                                account: acc,
+                                selected: _toAccountId == acc.id,
+                                disabled: _fromAccountId == acc.id,
+                                onTap: () => setState(() {
+                                  _toAccountId = acc.id;
+                                  if (_fromAccountId == acc.id) {
+                                    _fromAccountId = null;
+                                  }
+                                }),
+                                theme: theme,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
 
                     gap,
 
@@ -403,79 +366,47 @@ class _TransferScreenState extends State<TransferScreen> {
                                 label: 'Member ID or Phone',
                                 controller: _memberIdController,
                                 hintText: 'e.g. 00483921 or 0241234567',
-                                onChanged: (_) => setState(() { _recipientVerified = false; }),
                               ),
                               const SizedBox(height: 8),
-                              FilledButton(
-                                onPressed: _memberIdController.text.trim().isEmpty
-                                    ? null
-                                    : () => setState(() {
-                                          // Mock verification - treat input as found
-                                          _resolvedRecipientName = 'Recipient: ${_memberIdController.text.trim()}';
-                                          _recipientVerified = true;
-                                        }),
-                                child: const Text('Find Member'),
+                              const Text(
+                                'Member lookup is unavailable until recipient verification is connected to the backend.',
                               ),
-                            ] else if (_destination == TransferDestination.bank) ...[
+                            ] else if (_destination ==
+                                TransferDestination.bank) ...[
                               ModernInput(
                                 label: 'Bank Name',
                                 controller: _bankNameController,
                                 hintText: 'e.g. GCB Bank',
-                                onChanged: (_) => setState(() { _recipientVerified = false; }),
                               ),
                               const SizedBox(height: 8),
                               ModernInput(
                                 label: 'Account Number',
                                 controller: _bankAccountController,
                                 hintText: 'e.g. 1234567890',
-                                onChanged: (_) => setState(() { _recipientVerified = false; }),
                               ),
                               const SizedBox(height: 8),
-                              FilledButton(
-                                onPressed: (_bankNameController.text.trim().isEmpty || _bankAccountController.text.trim().isEmpty)
-                                    ? null
-                                    : () => setState(() {
-                                          _resolvedRecipientName = '${_bankNameController.text.trim()} • ${_bankAccountController.text.trim()}';
-                                          _recipientVerified = true;
-                                        }),
-                                child: const Text('Verify Bank Account'),
+                              const Text(
+                                'Bank account verification is unavailable because no recipient lookup API is connected.',
                               ),
-                            ] else if (_destination == TransferDestination.mobile) ...[
+                            ] else if (_destination ==
+                                TransferDestination.mobile) ...[
                               ModernInput(
                                 label: 'Mobile Number',
                                 controller: _mobileNumberController,
                                 hintText: 'e.g. 0241234567',
-                                onChanged: (_) => setState(() { _recipientVerified = false; }),
                               ),
                               const SizedBox(height: 8),
-                              FilledButton(
-                                onPressed: _mobileNumberController.text.trim().isEmpty
-                                    ? null
-                                    : () => setState(() {
-                                          _resolvedRecipientName = 'Mobile: ${_mobileNumberController.text.trim()}';
-                                          _recipientVerified = true;
-                                        }),
-                                child: const Text('Verify Number'),
+                              const Text(
+                                'Mobile money recipient verification is unavailable because no lookup API is connected.',
                               ),
                             ],
-                            if (_recipientVerified && _resolvedRecipientName != null) ...[
-                              const SizedBox(height: 12),
-                              Container(
-                                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primary.withOpacitySafe(0.06),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.check_circle, color: Colors.green),
-                                    const SizedBox(width: 10),
-                                    Expanded(child: Text(_resolvedRecipientName!)),
-                                    TextButton(onPressed: () => setState(() { _recipientVerified = false; }), child: const Text('Edit')),
-                                  ],
-                                ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Recipient lookup is unavailable. External transfers cannot be submitted until the backend supports verification and processing.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.error,
                               ),
-                            ],
+                            ),
                           ],
                         ),
                       ),
@@ -567,7 +498,7 @@ class _TransferScreenState extends State<TransferScreen> {
                         ),
                       ),
                       gap,
-                      _FeeSummary(amount: _amount, theme: theme, feeRate: _feeRate),
+                      _FeeSummary(amount: _amount, theme: theme),
                       const SizedBox(height: 18),
                       _ConfirmButton(
                         canSubmit: _canSubmit,
@@ -620,7 +551,7 @@ class _TransferScreenState extends State<TransferScreen> {
                           Expanded(
                             child: Column(
                               children: [
-                                _FeeSummary(amount: _amount, theme: theme, feeRate: _feeRate),
+                                _FeeSummary(amount: _amount, theme: theme),
                                 const SizedBox(height: 18),
                                 _ConfirmButton(
                                   canSubmit: _canSubmit,
@@ -706,6 +637,7 @@ class _AccountTile extends StatelessWidget {
                   Text(
                     account.name,
                     style: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: disabled
                           ? theme.colorScheme.onSurface.withOpacitySafe(0.35)
@@ -924,7 +856,7 @@ class _PageIntro extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Move funds between your MyFinance accounts instantly.',
+                'Move funds between your Adepa Teachers accounts instantly.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: Colors.white.withValues(alpha: 0.9),
                 ),
@@ -940,41 +872,28 @@ class _PageIntro extends StatelessWidget {
 class _FeeSummary extends StatelessWidget {
   final double amount;
   final ThemeData theme;
-  final double? feeRate;
-  const _FeeSummary({required this.amount, required this.theme, this.feeRate});
+  const _FeeSummary({required this.amount, required this.theme});
   @override
   Widget build(BuildContext context) {
     if (amount <= 0) return const SizedBox.shrink();
-    final fee = amount * (feeRate ?? 0.005);
-    final total = amount + fee;
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SectionHeader(
-            title: 'Fee Summary',
-            subtitle: 'Review fees before confirming',
+            title: 'Transfer Amount',
+            subtitle: 'Fees and transfer limits are not available',
             icon: Icons.receipt_long_rounded,
             theme: theme,
           ),
           const SizedBox(height: 12),
-          _fr('Transfer Amount', 'GH₵ ${amount.toStringAsFixed(2)}', theme),
+          _fr('Amount', 'GH₵ ${amount.toStringAsFixed(2)}', theme),
           const SizedBox(height: 8),
-          _fr(
-            'Internal Fee (0.5%)',
-            'GH₵ ${fee.toStringAsFixed(2)}',
-            theme,
-            isSubtle: true,
-          ),
-          Divider(
-            height: 20,
-            color: theme.colorScheme.outline.withOpacitySafe(0.15),
-          ),
-          _fr(
-            'Total Debit',
-            'GH₵ ${total.toStringAsFixed(2)}',
-            theme,
-            isBold: true,
+          Text(
+            'Transfers are unavailable because the backend contract does not accept the selected accounts and amount. Fees and limits are also unconfirmed.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.outline,
+            ),
           ),
         ],
       ),

@@ -1,0 +1,7 @@
+unit: activity-and-notifications
+commit: false
+candidate_splits:
+  - id: "lib/core/services/notification_service.dart:1"
+    drivers: [data_ownership_split, reuse_split]
+    rationale: "Notification persistence and transaction retrieval have different storage, API, and lifecycle contracts."
+    source_slice: {file: lib/core/services/notification_service.dart, lines: [1, 1]}

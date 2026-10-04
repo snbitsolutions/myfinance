@@ -16,6 +16,7 @@ class PaymentSuccessScreen extends StatelessWidget {
   final String? account;
   final String? paymentMethod;
   final double? newBalance;
+  final bool isPending;
 
   const PaymentSuccessScreen({
     super.key,
@@ -31,32 +32,35 @@ class PaymentSuccessScreen extends StatelessWidget {
     this.account,
     this.paymentMethod,
     this.newBalance,
+    this.isPending = false,
   });
 
   String _formatAmount() {
-    final value = amount ?? 1000;
-    return 'GH₵${value.toStringAsFixed(2)}';
+    final value = amount;
+    return value == null ? 'Unavailable' : 'GH₵${value.toStringAsFixed(2)}';
   }
 
   String _formatReference() {
     if (reference != null && reference!.trim().isNotEmpty) {
       return reference!.trim();
     }
-    return 'ADEPA-${DateTime.now().millisecondsSinceEpoch}';
+    return 'Unavailable';
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final resolvedTitle =
-        (title != null && title!.trim().isNotEmpty) ? title! : 'Deposit Successful!';
-    final resolvedMessage =
-        (message != null && message!.trim().isNotEmpty)
-            ? message!
-            : 'Your deposit has been credited to your account.';
+    final resolvedTitle = (title != null && title!.trim().isNotEmpty)
+        ? title!
+        : (isPending ? 'Deposit Pending' : 'Deposit Status');
+    final resolvedMessage = (message != null && message!.trim().isNotEmpty)
+        ? message!
+        : (isPending
+              ? 'Your request is awaiting provider confirmation.'
+              : 'The provider reported that the request completed.');
     final resolvedAccount = account ?? 'Member Savings';
     final resolvedPaymentMethod = paymentMethod ?? 'Mobile Money';
-    final resolvedNewBalance = newBalance ?? 46000;
+    final resolvedNewBalance = newBalance;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -65,7 +69,12 @@ class PaymentSuccessScreen extends StatelessWidget {
           // Dark green header at the very top
           Container(
             width: double.infinity,
-            padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 16, 20, 24),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              MediaQuery.of(context).padding.top + 16,
+              20,
+              24,
+            ),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [Color(0xFF075D21), Color(0xFF08752B)],
@@ -77,7 +86,10 @@ class PaymentSuccessScreen extends StatelessWidget {
               children: [
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.arrow_back, color: Colors.white),
+                  child: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 const Text(
@@ -111,13 +123,21 @@ class PaymentSuccessScreen extends StatelessWidget {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: theme.colorScheme.primary.withOpacitySafe(0.3),
+                              color: theme.colorScheme.primary.withOpacitySafe(
+                                0.3,
+                              ),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.check_rounded, size: 56, color: Colors.white),
+                        child: Icon(
+                          isPending
+                              ? Icons.hourglass_top_rounded
+                              : Icons.check_rounded,
+                          size: 56,
+                          color: Colors.white,
+                        ),
                       ),
                     ],
                   ),
@@ -151,7 +171,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Amount Deposited',
+                    'Amount entered',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
                     ),
@@ -162,9 +182,21 @@ class PaymentSuccessScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _TransactionDetailRow('Account', resolvedAccount, theme),
-                        _TransactionDetailRow('Method', resolvedPaymentMethod, theme),
-                        _TransactionDetailRow('Reference', _formatReference(), theme),
+                        _TransactionDetailRow(
+                          'Account',
+                          resolvedAccount,
+                          theme,
+                        ),
+                        _TransactionDetailRow(
+                          'Method',
+                          resolvedPaymentMethod,
+                          theme,
+                        ),
+                        _TransactionDetailRow(
+                          'Reference',
+                          _formatReference(),
+                          theme,
+                        ),
                         _TransactionDetailRow('Date', _formatDateTime(), theme),
                       ],
                     ),
@@ -175,22 +207,33 @@ class PaymentSuccessScreen extends StatelessWidget {
                     backgroundColor: const Color(0xFFF0F8EF),
                     child: Row(
                       children: [
-                        Icon(Icons.trending_up_rounded, color: theme.colorScheme.primary, size: 24),
+                        Icon(
+                          Icons.trending_up_rounded,
+                          color: theme.colorScheme.primary,
+                          size: 24,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'New Available Balance',
+                                isPending
+                                    ? 'Balance will update after confirmation'
+                                    : 'Balance',
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacitySafe(0.6),
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'GH₵${resolvedNewBalance.toStringAsFixed(2)}',
-                                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+                                isPending || resolvedNewBalance == null
+                                    ? 'Balance unavailable'
+                                    : 'GH₵${resolvedNewBalance.toStringAsFixed(2)}',
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ],
                           ),
@@ -205,7 +248,8 @@ class PaymentSuccessScreen extends StatelessWidget {
                     height: 50,
                     child: FilledButton(
                       onPressed: () {
-                        if (primaryActionRoute != null && primaryActionRoute!.trim().isNotEmpty) {
+                        if (primaryActionRoute != null &&
+                            primaryActionRoute!.trim().isNotEmpty) {
                           context.go(primaryActionRoute!);
                         } else {
                           context.go('/savings');
@@ -213,20 +257,36 @@ class PaymentSuccessScreen extends StatelessWidget {
                       },
                       style: FilledButton.styleFrom(
                         backgroundColor: theme.colorScheme.primary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: Text(primaryActionLabel ?? 'Done'),
                     ),
                   ),
-                  if (secondaryActionRoute != null && secondaryActionRoute!.trim().isNotEmpty) ...[
+                  if (secondaryActionRoute != null &&
+                      secondaryActionRoute!.trim().isNotEmpty) ...[
                     const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
                       height: 50,
                       child: OutlinedButton(
-                        onPressed: () => context.go(secondaryActionRoute!),
+                        onPressed: () => context.push(
+                          secondaryActionRoute!,
+                          extra: {
+                            'amount': amount,
+                            'processedAt': processedAt?.toIso8601String(),
+                            'reference': reference,
+                            'account': account,
+                            'paymentMethod': paymentMethod,
+                            'newBalance': newBalance,
+                            'isPending': isPending,
+                          },
+                        ),
                         style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         child: Text(secondaryActionLabel ?? 'View Receipt'),
                       ),
@@ -242,8 +302,22 @@ class PaymentSuccessScreen extends StatelessWidget {
   }
 
   String _formatDateTime() {
-    final date = processedAt ?? DateTime.now();
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final date = processedAt;
+    if (date == null) return 'Unavailable';
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
     final meridiem = date.hour >= 12 ? 'PM' : 'AM';
     return '${date.day} ${months[date.month - 1]} ${date.year} • $hour:${date.minute.toString().padLeft(2, '0')} $meridiem';
@@ -287,8 +361,7 @@ class _TransactionDetailRow extends StatelessWidget {
   final String value;
   final ThemeData theme;
 
-  const _TransactionDetailRow(this.label, this.value, this.theme)
-      : icon = '';
+  const _TransactionDetailRow(this.label, this.value, this.theme) : icon = '';
 
   @override
   Widget build(BuildContext context) {
@@ -321,7 +394,9 @@ class _TransactionDetailRow extends StatelessWidget {
                 ),
                 Text(
                   value,
-                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),

@@ -7,6 +7,8 @@ import '../exceptions/app_exceptions.dart';
 import '../models/auth_session.dart';
 import '../models/auth_state.dart';
 import '../repositories/notification_repository.dart';
+import '../../screens/savings/savings_model.dart';
+import '../../screens/savings/savings_storage.dart';
 import '../services/api_service.dart';
 import '../services/device_identity_service.dart';
 import '../services/http_client.dart';
@@ -15,6 +17,88 @@ import '../services/notification_service.dart';
 import '../services/secure_auth_storage.dart';
 import '../utils/logger.dart';
 import '../../router/app_router.dart';
+
+String _firstNonEmpty(Iterable<dynamic> values) {
+  for (final value in values) {
+    final text = value?.toString().trim() ?? '';
+    if (text.isNotEmpty) return text;
+  }
+  return '';
+}
+
+String _findAccountNumber(dynamic value) {
+  const keys = {
+    'account_number',
+    'accountnumber',
+    'acc_number',
+    'account_no',
+    'account',
+    'member_id',
+    'memberid',
+    'member_no',
+    'member_number',
+    'customer_id',
+    'customer_number',
+    'user_id',
+    'userid',
+  };
+
+  if (value is Map) {
+    for (final entry in value.entries) {
+      if (keys.contains(entry.key.toString().trim().toLowerCase())) {
+        final candidate = entry.value?.toString().trim() ?? '';
+        if (candidate.isNotEmpty) return candidate;
+      }
+    }
+    for (final nested in value.values) {
+      final candidate = _findAccountNumber(nested);
+      if (candidate.isNotEmpty) return candidate;
+    }
+  } else if (value is Iterable) {
+    for (final nested in value) {
+      final candidate = _findAccountNumber(nested);
+      if (candidate.isNotEmpty) return candidate;
+    }
+  }
+
+  return '';
+}
+
+String _findMemberName(dynamic value) {
+  const keys = {
+    'name',
+    'full_name',
+    'fullname',
+    'account_name',
+    'accountname',
+    'member_name',
+    'membername',
+    'customer_name',
+    'customername',
+    'display_name',
+    'displayname',
+  };
+
+  if (value is Map) {
+    for (final entry in value.entries) {
+      if (keys.contains(entry.key.toString().trim().toLowerCase())) {
+        final candidate = entry.value?.toString().trim() ?? '';
+        if (candidate.isNotEmpty) return candidate;
+      }
+    }
+    for (final nested in value.values) {
+      final candidate = _findMemberName(nested);
+      if (candidate.isNotEmpty) return candidate;
+    }
+  } else if (value is Iterable) {
+    for (final nested in value) {
+      final candidate = _findMemberName(nested);
+      if (candidate.isNotEmpty) return candidate;
+    }
+  }
+
+  return '';
+}
 
 // Core infrastructure providers
 final httpClientProvider = Provider<HttpClient>((ref) {
@@ -48,6 +132,14 @@ final savingsServiceProvider = Provider<SavingsService>((ref) {
   return SavingsService();
 });
 
+final investmentServiceProvider = Provider<InvestmentService>((ref) {
+  return InvestmentService();
+});
+
+final sharesServiceProvider = Provider<SharesService>((ref) {
+  return SharesService();
+});
+
 final transactionServiceProvider = Provider<TransactionService>((ref) {
   return TransactionService();
 });
@@ -59,6 +151,28 @@ final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
 final paymentServiceProvider = Provider<PaymentService>((ref) {
   return PaymentService();
 });
+
+final productCatalogServiceProvider = Provider<ProductCatalogService>((ref) {
+  return ProductCatalogService();
+});
+
+final savingsProductsCatalogProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) {
+      return ref
+          .watch(productCatalogServiceProvider)
+          .getProducts(endpoint: ApiEndpoints.getSavingsProducts);
+    });
+
+final localSavingsGoalsProvider = FutureProvider<List<Savings>>((ref) async {
+  return SavingsStorage.loadGoals();
+});
+
+final sharesProductsCatalogProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) {
+      return ref
+          .watch(productCatalogServiceProvider)
+          .getProducts(endpoint: ApiEndpoints.getSharesProducts);
+    });
 
 final deviceIdentityServiceProvider = Provider<DeviceIdentityService>((ref) {
   return DeviceIdentityService();
@@ -77,6 +191,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final UserService userService;
   final DeviceIdentityService deviceIdentityService;
   SharedPreferences? _prefs;
+  String? _lastRegisteredAccountNumber;
+
+  String? get lastRegisteredAccountNumber => _lastRegisteredAccountNumber;
 
   AuthNotifier({
     required this.authService,
@@ -172,20 +289,35 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Login user
-  Future<void> login({required String email, required String password}) async {
+  Future<void> login({
+    required String phoneNumber,
+    required String password,
+  }) async {
     state = AuthState.loading();
 
     try {
-      final deviceContext = await deviceIdentityService.getSecurityPayload(
-        action: 'login',
-      );
       final response = await authService.login(
-        email: email,
+        phoneNumber: phoneNumber,
         password: password,
-        deviceContext: deviceContext,
       );
 
       final session = AuthSession.fromResponse(response);
+      final status = response['status'];
+      final isSuccess =
+          status == 0 ||
+          status == '0' ||
+          AuthSession.isSuccessStatus(status) ||
+          AuthSession.isSuccessStatus(response['success']) ||
+          session != null;
+
+      if (!isSuccess) {
+        throw AuthException(
+          message:
+              response['message']?.toString() ??
+              'Invalid phone number or password.',
+        );
+      }
+
       if (session == null) {
         throw AuthException(
           message:
@@ -201,7 +333,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final userId =
           (data['user_id'] as String?) ??
           (data['account_number'] as String?) ??
-          'unknown-user';
+          phoneNumber;
       final prefs = await _getPrefs();
       final currentFingerprint = await deviceIdentityService
           .getInstallationFingerprint();
@@ -213,11 +345,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
 
       await prefs.setString(AppConstants.sharedPrefKeyUserId, userId);
-      await prefs.setString(AppConstants.sharedPrefKeyUserEmail, email);
+      await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
 
       state = AuthState.authenticated(
         userId: userId,
-        userEmail: email,
+        userEmail: phoneNumber,
         authToken: token,
       );
 
@@ -229,10 +361,143 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> confirmPhoneNumber({required String phoneNumber}) async {
+  Future<void> loginWithPhonePin({
+    required String phoneNumber,
+    required String pin,
+  }) async {
+    state = AuthState.loading();
+
     try {
-      await authService.confirmPhoneNumber(phoneNumber: phoneNumber);
+      final response = await authService.loginWithPhonePin(
+        phoneNumber: phoneNumber,
+        pin: pin,
+      );
+      final session = AuthSession.fromResponse(response);
+      final status = response['status'];
+      final isSuccess =
+          status == 0 ||
+          status == '0' ||
+          AuthSession.isSuccessStatus(status) ||
+          AuthSession.isSuccessStatus(response['success']) ||
+          AuthSession.isSuccessStatus(response['is_success']) ||
+          session != null;
+
+      if (!isSuccess) {
+        throw AuthException(
+          message:
+              response['message']?.toString() ??
+              AppConstants.invalidCredentialsMessage,
+        );
+      }
+
+      final accountNumber = _findAccountNumber(response);
+      final userId = accountNumber.isNotEmpty ? accountNumber : phoneNumber;
+      final token =
+          session?.accessToken ??
+          'phone-pin-session-${DateTime.now().millisecondsSinceEpoch}';
+      final prefs = await _getPrefs();
+      final fingerprint = await deviceIdentityService
+          .getInstallationFingerprint();
+
+      await SecureAuthStorage.instance.storeSession(
+        authToken: token,
+        refreshToken: session?.refreshToken,
+        deviceFingerprint: fingerprint,
+      );
+      await SecureAuthStorage.instance.storePin(pin);
+      await prefs.setString(AppConstants.sharedPrefKeyUserId, userId);
+      await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
+
+      state = AuthState.authenticated(
+        userId: userId,
+        userEmail: phoneNumber,
+        authToken: token,
+      );
+      AppLogger.info('User logged in with phone and PIN');
+    } on AppException catch (e) {
+      state = AuthState.error(e.message);
+      AppLogger.error('Phone and PIN login failed', e);
+      rethrow;
+    }
+  }
+
+  Future<bool> restoreStoredSessionAfterBiometric() async {
+    final prefs = await _getPrefs();
+    final token = await SecureAuthStorage.instance.readAuthToken();
+    final userId = prefs.getString(AppConstants.sharedPrefKeyUserId);
+    final userEmail = prefs.getString(AppConstants.sharedPrefKeyUserEmail);
+    if (token == null || token.isEmpty || userId == null || userEmail == null) {
+      return false;
+    }
+
+    final fingerprint = await deviceIdentityService
+        .getInstallationFingerprint();
+    if (!await SecureAuthStorage.instance.hasSessionBoundToFingerprint(
+      fingerprint,
+    )) {
+      return false;
+    }
+
+    state = AuthState.authenticated(
+      userId: userId,
+      userEmail: userEmail,
+      authToken: token,
+    );
+    return true;
+  }
+
+  Future<String> preparePhonePinLogin({
+    required String phoneNumber,
+    required String pin,
+  }) async {
+    try {
+      final response = await authService.loginWithPhonePin(
+        phoneNumber: phoneNumber,
+        pin: pin,
+      );
+      final status = response['status'];
+      final accountNumber = _findAccountNumber(response).trim();
+      final isSuccess =
+          AuthSession.isSuccessStatus(status) ||
+          AuthSession.isSuccessStatus(response['success']) ||
+          AuthSession.isSuccessStatus(response['is_success']);
+
+      if (!isSuccess || accountNumber.isEmpty) {
+        throw AuthException(
+          message:
+              response['message']?.toString() ??
+              'We could not verify your phone number and PIN.',
+        );
+      }
+
+      final prefs = await _getPrefs();
+      await prefs.setString(AppConstants.sharedPrefKeyUserId, accountNumber);
+      await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
+      final memberName = _findMemberName(response);
+      if (memberName.isNotEmpty) {
+        await prefs.setString(AppConstants.sharedPrefKeyUserName, memberName);
+      }
+
+      await sendLoginOtp(
+        phoneNumber: phoneNumber,
+        accountNumber: accountNumber,
+      );
+      return accountNumber;
+    } on AppException catch (e) {
+      AppLogger.error('Phone and PIN login preparation failed', e);
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> confirmPhoneNumber({
+    required String phoneNumber,
+  }) async {
+    try {
+      final response = await authService.confirmPhoneNumber(
+        phoneNumber: phoneNumber,
+      );
       AppLogger.info('Phone number confirmed: $phoneNumber');
+      return response;
     } on AppException catch (e) {
       AppLogger.error('Phone confirmation failed', e);
       rethrow;
@@ -332,6 +597,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await SecureAuthStorage.instance.storePin(pin);
       await prefs.setString(AppConstants.sharedPrefKeyUserId, accountNumber);
       await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
+      final memberName = _findMemberName(response);
+      if (memberName.isNotEmpty) {
+        await prefs.setString(AppConstants.sharedPrefKeyUserName, memberName);
+      }
 
       state = AuthState.authenticated(
         userId: accountNumber,
@@ -389,19 +658,59 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Set PIN
   Future<void> setPin({required String userId, required String pin}) async {
     try {
-      final deviceContext = await deviceIdentityService.getSecurityPayload(
-        action: 'set_pin',
-      );
-      await authService.setPin(
-        userId: userId,
-        pin: pin,
-        deviceContext: deviceContext,
-      );
+      final response = await authService.setPin(userId: userId, pin: pin);
+      final status = response['status'];
+      final isSuccess =
+          AuthSession.isSuccessStatus(status) ||
+          AuthSession.isSuccessStatus(response['success']) ||
+          AuthSession.isSuccessStatus(response['is_success']);
+      if (!isSuccess) {
+        throw AuthException(
+          message:
+              response['message']?.toString() ??
+              'We could not set your PIN. Please try again.',
+        );
+      }
+
+      await SecureAuthStorage.instance.storePin(pin);
       AppLogger.info('PIN set successfully for user: $userId');
     } on AppException catch (e) {
       AppLogger.error('Set PIN failed', e);
       rethrow;
     }
+  }
+
+  Future<void> changePin({
+    required String currentPin,
+    required String newPin,
+  }) async {
+    final prefs = await _getPrefs();
+    final accountNumber =
+        prefs.getString(AppConstants.sharedPrefKeyUserId)?.trim() ?? '';
+    if (accountNumber.isEmpty) {
+      throw AuthException(
+        message: 'Your account session is incomplete. Please sign in again.',
+      );
+    }
+
+    final response = await authService.changePin(
+      accountNumber: accountNumber,
+      currentPin: currentPin,
+      newPin: newPin,
+    );
+    final succeeded =
+        AuthSession.isSuccessStatus(response['status']) ||
+        AuthSession.isSuccessStatus(response['success']) ||
+        AuthSession.isSuccessStatus(response['is_success']);
+    if (!succeeded) {
+      throw AuthException(
+        message:
+            response['message']?.toString() ??
+            'We could not change your PIN. Please try again.',
+      );
+    }
+
+    await SecureAuthStorage.instance.storePin(newPin);
   }
 
   /// Login using the SMS OTP sent by [confirmAccountNumber]. PIN verification
@@ -412,22 +721,37 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String otp,
   }) async {
     state = AuthState.loading();
+
     try {
       if (!RegExp(r'^\d{4}$').hasMatch(otp.trim())) {
         throw ValidationException(message: AppConstants.invalidOtpMessage);
       }
 
-      final resolvedAccountNumber = _resolveAccountNumber(
+      final prefs = await _getPrefs();
+      final storedAccountNumber =
+          prefs.getString(AppConstants.sharedPrefKeyUserId)?.trim() ?? '';
+      final effectiveAccountNumber = accountNumber.trim().isNotEmpty
+          ? accountNumber.trim()
+          : (storedAccountNumber.isNotEmpty
+                ? storedAccountNumber
+                : (_lastRegisteredAccountNumber ?? ''));
+
+      // The phone-only flow may not know the full account number yet. Use the
+      // member identifier only to verify the OTP; the successful response must
+      // provide the full account number for customer-data requests.
+      final otpAccountIdentifier = _resolveAccountNumber(
         phoneNumber: phoneNumber,
-        accountNumber: accountNumber,
+        accountNumber: effectiveAccountNumber,
       );
 
       final response = await authService.verifyLoginOtp(
-        accountNumber: resolvedAccountNumber,
+        accountNumber: otpAccountIdentifier,
         otp: otp,
       );
+
       final status = response['status'];
       final message = response['message'] as String?;
+
       final isSuccess =
           // The published Verify OTP example uses status 0 for a confirmed
           // OTP, unlike the other auth endpoints.
@@ -444,7 +768,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       final session = AuthSession.fromResponse(response);
-      final prefs = await _getPrefs();
+
+      var accountForSession = _firstNonEmpty([
+        _findAccountNumber(response),
+        effectiveAccountNumber,
+      ]).replaceAll(RegExp(r'\D'), '');
+
+      Map<String, dynamic>? phoneConfirmation;
+      if (accountForSession.length < 6) {
+        phoneConfirmation = await authService.confirmPhoneNumber(
+          phoneNumber: phoneNumber,
+        );
+        accountForSession = _findAccountNumber(
+          phoneConfirmation,
+        ).replaceAll(RegExp(r'\D'), '');
+      }
+
+      if (accountForSession.length < 6) {
+        throw AuthException(
+          message:
+              'OTP verified, but the account number was not available in this '
+              'session. Please start registration again.',
+        );
+      }
+
       final currentFingerprint = await deviceIdentityService
           .getInstallationFingerprint();
       final storedAuthToken =
@@ -458,17 +805,33 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       await prefs.setString(
         AppConstants.sharedPrefKeyUserId,
-        resolvedAccountNumber,
+        accountForSession,
       );
       await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
+      final memberName = _firstNonEmpty([
+        _findMemberName(response),
+        _findMemberName(phoneConfirmation),
+      ]);
+      if (memberName.isNotEmpty) {
+        await prefs.setString(AppConstants.sharedPrefKeyUserName, memberName);
+      }
 
       state = AuthState.authenticated(
-        userId: resolvedAccountNumber,
+        userId: accountForSession,
         userEmail: phoneNumber,
         authToken: storedAuthToken,
       );
 
-      AppLogger.info('User logged in via OTP: $resolvedAccountNumber');
+      AppLogger.info(
+        'User logged in via OTP using FULL account number length '
+        '${accountForSession.length}',
+      );
+
+      AppLogger.info(
+        'Full account number preserved: '
+        '${accountForSession.substring(0, 3)}******'
+        '${accountForSession.substring(accountForSession.length - 3)}',
+      );
     } on AppException catch (e) {
       state = AuthState.error(e.message);
       AppLogger.error('OTP login failed', e);
@@ -476,18 +839,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Register a new member (account number + PIN). No session is created —
-  /// the backend must approve the registration before the user can log in.
+  /// Enroll an existing member for mobile banking. The backend sends the
+  /// verification code after accepting the member and device details.
   Future<String> submitRegistration({
     required String accountNumber,
-    required String pin,
-    String? phoneNumber,
+    required String phoneNumber,
+    required String birthDate,
+    required String imeiNumber,
+    required String phoneMake,
   }) async {
     try {
       final response = await authService.register(
         accountNumber: accountNumber,
         phoneNumber: phoneNumber,
-        pin: pin,
+        birthDate: birthDate,
+        imeiNumber: imeiNumber,
+        phoneMake: phoneMake,
       );
 
       final status = response['status'];
@@ -505,12 +872,103 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
       }
 
+      // The register response confirms enrollment but does not include an OTP.
+      // Request the SMS code explicitly before opening the verification screen.
+      await authService.sendLoginOtp(
+        phoneNumber: phoneNumber,
+        accountNumber: accountNumber,
+      );
+
       AppLogger.info('Registration submitted for: $accountNumber');
       return message.isNotEmpty ? message : 'Registration submitted!';
     } on AppException catch (e) {
       AppLogger.error('Registration failed', e);
       rethrow;
     }
+  }
+
+  Future<String> submitNewMemberRegistration({
+    required String fullName,
+    required String ghanaCard,
+    required String phoneNumber,
+    required String birthDate,
+    required String gender,
+    required String address,
+    required String email,
+    required int savingsProduct,
+    required int sharesProduct,
+    required String password,
+    required String transactionPin,
+    required String imeiNumber,
+    required String phoneMake,
+  }) async {
+    final response = await authService.createMember(
+      fullName: fullName,
+      ghanaCard: ghanaCard,
+      phoneNumber: phoneNumber,
+      birthDate: birthDate,
+      gender: gender,
+      address: address,
+      email: email,
+      savingsProduct: savingsProduct,
+      sharesProduct: sharesProduct,
+      password: password,
+      transactionPin: transactionPin,
+      imeiNumber: imeiNumber,
+      phoneMake: phoneMake,
+    );
+    final status = response['status'];
+    final message = response['message'] as String? ?? '';
+    final responseData = response['data'] is Map
+        ? Map<String, dynamic>.from(response['data'] as Map)
+        : const <String, dynamic>{};
+    final successStatus = responseData['status'];
+    final success =
+        status == 0 ||
+        status == '0' ||
+        AuthSession.isSuccessStatus(status) ||
+        (status == null && response['_http_success'] == true) ||
+        AuthSession.isSuccessStatus(response['success']) ||
+        AuthSession.isSuccessStatus(response['is_success']) ||
+        successStatus == 0 ||
+        successStatus == '0' ||
+        AuthSession.isSuccessStatus(successStatus) ||
+        AuthSession.isSuccessStatus(responseData['success']) ||
+        AuthSession.isSuccessStatus(responseData['is_success']);
+    if (!success) {
+      throw AuthException(
+        message: message.isNotEmpty
+            ? message
+            : 'New member registration failed. Please try again.',
+      );
+    }
+    final generatedAccountNumber = _findAccountNumber(response).trim();
+    _lastRegisteredAccountNumber = generatedAccountNumber.isEmpty
+        ? null
+        : generatedAccountNumber;
+
+    final prefs = await _getPrefs();
+    if (generatedAccountNumber.isNotEmpty) {
+      await prefs.setString(
+        AppConstants.sharedPrefKeyUserId,
+        generatedAccountNumber,
+      );
+    } else {
+      // Some successful registrations return the account number only after
+      // OTP verification. Keep the phone-based flow moving until then.
+      await prefs.remove(AppConstants.sharedPrefKeyUserId);
+    }
+    await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
+    await prefs.setString(AppConstants.sharedPrefKeyUserName, fullName);
+
+    // Creating a new member does not reliably trigger the mobile OTP
+    // endpoint. Request it explicitly before showing the OTP screen.
+    await authService.sendLoginOtp(
+      phoneNumber: phoneNumber,
+      accountNumber: generatedAccountNumber,
+    );
+
+    return message.isNotEmpty ? message : 'Registration successful.';
   }
 
   /// Logout user
@@ -538,6 +996,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await SecureAuthStorage.instance.clearAuthSecrets();
     await resolvedPrefs.remove(AppConstants.sharedPrefKeyUserId);
     await resolvedPrefs.remove(AppConstants.sharedPrefKeyUserEmail);
+    await resolvedPrefs.remove(AppConstants.sharedPrefKeyUserName);
     await resolvedPrefs.remove(AppConstants.sharedPrefKeyUserToken);
     await resolvedPrefs.remove(AppConstants.sharedPrefKeyUserRefreshToken);
   }
@@ -560,132 +1019,120 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   );
 });
 
-Map<String, dynamic> _buildFallbackProfile({String? userId, String? phone}) {
-  final resolvedUserId = userId ?? 'demo-user';
-  final resolvedPhone = phone ?? '233200000000';
-
-  return {
-    'user_id': resolvedUserId,
-    'name': 'Member $resolvedUserId',
-    'account_number': resolvedUserId,
-    'balance': 0.0,
-    'branch': 'Primary Branch',
-    'phone': resolvedPhone,
-    'status': 'Active',
-    'avatar': '',
-  };
-}
-
-// ignore: unused_element
-Map<String, dynamic> _buildFallbackProfileForAuth(AuthState auth) =>
-    _buildFallbackProfile(
-      userId: auth.userId ?? 'member',
-      phone: auth.userEmail,
-    );
-
-List<Map<String, dynamic>> _buildFallbackTransactionsForAuth(AuthState auth) {
-  final account = auth.userId ?? 'member';
-  final phone = auth.userEmail ?? 'N/A';
-
-  return [
-    {
-      'transaction_id': 'otp-account-sync',
-      'type': 'credit',
-      'amount': 0.0,
-      'description': 'Account synced for $account',
-      'date': DateTime.now().toIso8601String(),
-      'status': 'success',
-      'balance': 0.0,
-    },
-    {
-      'transaction_id': 'otp-phone-sync',
-      'type': 'debit',
-      'amount': 0.0,
-      'description': 'Phone linked: $phone',
-      'date': DateTime.now().toIso8601String(),
-      'status': 'success',
-      'balance': 0.0,
-    },
-  ];
-}
-
-bool _shouldUseLocalDemoData(AuthState auth) {
-  // Temporary local/dev fallback for testing. Flip this off once the real
-  // authentication/API flow is ready to be restored.
-  // Temporarily disable backend API calls by default so the app can render with
-  // local/mock data while the UI is being refined.
-  const useLocalDemoData = bool.fromEnvironment(
-    'USE_LOCAL_DEMO_DATA',
-    defaultValue: true,
-  );
-  return useLocalDemoData;
-}
-
 // User profile provider
 final userProfileProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final auth = ref.watch(authProvider);
-  final userService = ref.watch(userServiceProvider);
+  final authService = ref.watch(authServiceProvider);
+  final savingsService = ref.watch(savingsServiceProvider);
 
-  if (_shouldUseLocalDemoData(auth)) {
-    return _buildFallbackProfile();
-  }
+  final phone = (auth.userEmail ?? '').trim();
+  final account = (auth.userId ?? '').trim();
+  final prefs = await SharedPreferences.getInstance();
+  final storedName = prefs
+      .getString(AppConstants.sharedPrefKeyUserName)
+      ?.trim();
 
-  final phone = auth.userEmail ?? '';
-  final account = auth.userId ?? '';
-  final pin = await SecureAuthStorage.instance.readPin() ?? '';
-
-  if (pin.isEmpty) {
+  if (phone.isEmpty || account.isEmpty) {
     throw ValidationException(
       message:
-          'Your account PIN is missing. Please complete sign-in and set your PIN before loading account data.',
+          'Your account session is incomplete. Please sign in again before loading customer data.',
     );
   }
 
+  var memberName = storedName ?? '';
+  if (memberName.isEmpty) {
+    try {
+      final phoneConfirmation = await authService.confirmPhoneNumber(
+        phoneNumber: phone,
+      );
+      memberName = _findMemberName(phoneConfirmation);
+      if (memberName.isNotEmpty) {
+        await prefs.setString(AppConstants.sharedPrefKeyUserName, memberName);
+      }
+    } on AppException catch (error) {
+      AppLogger.warning(
+        'Account name unavailable from phone confirmation',
+        error,
+      );
+    }
+  }
+
+  final pin = await SecureAuthStorage.instance.readPin() ?? '';
+  List<Map<String, dynamic>> savings = const [];
+  var savingsDataAvailable = true;
   try {
-    final response = await userService.getUserProfile(
+    final savingsResponse = await savingsService.getSavingsList(
       phoneNumber: phone,
       accountNumber: account,
       pin: pin,
     );
-    final data = response['data'];
-    if (data is Map) {
-      return Map<String, dynamic>.from(data);
-    }
-
-    throw GenericException(
-      message: 'The backend returned an empty profile payload.',
-    );
-  } on AppException {
-    rethrow;
+    savings = savingsResponse['data'] is List
+        ? (savingsResponse['data'] as List)
+              .whereType<Map<String, dynamic>>()
+              .toList()
+        : const [];
+  } on AppException catch (error) {
+    AppLogger.warning('Savings data unavailable while loading profile', error);
+    savingsDataAvailable = false;
   }
+  final balance = savings.fold<double>(
+    0,
+    (total, item) =>
+        total + _readAmount(item['balance'] ?? item['current_balance']),
+  );
+  final savingsBalancesAvailable =
+      savingsDataAvailable &&
+      savings.every(
+        (item) => item['balance'] != null || item['current_balance'] != null,
+      );
+
+  return {
+    'user_id': account,
+    'name': memberName.isNotEmpty ? memberName : 'Account holder',
+    'account_number': account,
+    'balance': savingsBalancesAvailable ? balance : null,
+    'savings': savingsDataAvailable ? savings.toList() : null,
+    'branch': null,
+    'phone': phone,
+    'status': null,
+    'kyc_status': null,
+  };
+});
+
+double _readAmount(dynamic value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString().replaceAll(',', '') ?? '') ?? 0;
+}
+
+final memberCredentialsProvider = Provider<Map<String, String>>((ref) {
+  final auth = ref.watch(authProvider);
+  final profile = ref.watch(userProfileProvider).valueOrNull;
+  final phone = _firstNonEmpty([
+    profile?['phone'],
+    profile?['phone_number'],
+    profile?['mobile'],
+    auth.userEmail,
+  ]);
+
+  // Customer-data endpoints require the full account number.
+  // Never substitute the five-digit member ID here.
+  final account = _firstNonEmpty([
+    profile?['account_number'],
+    profile?['accountNumber'],
+    auth.userId,
+  ]);
+
+  return {'phone': phone, 'account': account};
 });
 
 // Loans list provider
 final loansProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final auth = ref.watch(authProvider);
+  final credentials = ref.watch(memberCredentialsProvider);
   final loanService = ref.watch(loanServiceProvider);
 
-  if (_shouldUseLocalDemoData(auth)) {
-    return [
-      {
-        'loan_id': 'demo-loan-1',
-        'amount': 1500.0,
-        'status': 'Approved',
-        'purpose': 'Emergency fund',
-      },
-    ];
-  }
-
   final pin = await SecureAuthStorage.instance.readPin() ?? '';
-  final phone = auth.userEmail ?? '';
-  final account = auth.userId ?? '';
-
-  if (pin.isEmpty) {
-    throw ValidationException(
-      message:
-          'Your account PIN is missing. Please complete sign-in and set your PIN before loading loans.',
-    );
-  }
+  final phone = credentials['phone']!;
+  final account = credentials['account']!;
 
   try {
     final response = await loanService.getLoansList(
@@ -706,30 +1153,12 @@ final loansProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 
 // Savings list provider
 final savingsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final auth = ref.watch(authProvider);
+  final credentials = ref.watch(memberCredentialsProvider);
   final savingsService = ref.watch(savingsServiceProvider);
 
-  if (_shouldUseLocalDemoData(auth)) {
-    return [
-      {
-        'savings_id': 'demo-savings-1',
-        'name': 'Emergency Fund',
-        'target_amount': 5000.0,
-        'current_amount': 2350.0,
-      },
-    ];
-  }
-
   final pin = await SecureAuthStorage.instance.readPin() ?? '';
-  final phone = auth.userEmail ?? '';
-  final account = auth.userId ?? '';
-
-  if (pin.isEmpty) {
-    throw ValidationException(
-      message:
-          'Your account PIN is missing. Please complete sign-in and set your PIN before loading savings.',
-    );
-  }
+  final phone = credentials['phone']!;
+  final account = credentials['account']!;
 
   try {
     final response = await savingsService.getSavingsList(
@@ -739,7 +1168,38 @@ final savingsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
     );
     final data = response['data'];
     if (data is List) {
-      return data.whereType<Map<String, dynamic>>().toList();
+      final accounts = data.whereType<Map<String, dynamic>>().toList();
+      return Future.wait(
+        accounts.map((accountData) async {
+          final productId =
+              (accountData['savings_id'] ??
+                      accountData['product_id'] ??
+                      accountData['id'])
+                  ?.toString()
+                  .trim();
+          if (productId == null || productId.isEmpty) {
+            return accountData;
+          }
+
+          try {
+            final balanceResponse = await savingsService.getSavingsBalance(
+              productId: productId,
+            );
+            return {
+              ...accountData,
+              'balance': balanceResponse['balance'],
+              'balance_source': 'getSavingsBalance',
+            };
+          } on AppException catch (error) {
+            AppLogger.warning(
+              'Exact savings balance unavailable for product $productId; '
+              'keeping the list balance.',
+              error,
+            );
+            return accountData;
+          }
+        }),
+      );
     }
 
     return [];
@@ -748,53 +1208,82 @@ final savingsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   }
 });
 
-List<Map<String, dynamic>> _buildFallbackTransactions() {
-  return [
-    {
-      'transaction_id': 'demo-1',
-      'type': 'credit',
-      'amount': 1250.0,
-      'description': 'Salary deposit',
-      'date': '2026-08-09',
-    },
-    {
-      'transaction_id': 'demo-2',
-      'type': 'debit',
-      'amount': 320.5,
-      'description': 'Groceries',
-      'date': '2026-08-08',
-    },
-    {
-      'transaction_id': 'demo-3',
-      'type': 'repayment',
-      'amount': 150.0,
-      'description': 'Loan repayment',
-      'date': '2026-08-07',
-    },
-  ];
-}
+final sharesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final credentials = ref.watch(memberCredentialsProvider);
+  final pin = await SecureAuthStorage.instance.readPin() ?? '';
+  final phone = credentials['phone']!;
+  final account = credentials['account']!;
+  final response = await ref
+      .watch(sharesServiceProvider)
+      .getShares(phoneNumber: phone, accountNumber: account, pin: pin);
+  final data = response['data'];
+  return data is List ? data.whereType<Map<String, dynamic>>().toList() : [];
+});
+
+final investmentsApiProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
+  final credentials = ref.watch(memberCredentialsProvider);
+  final pin = await SecureAuthStorage.instance.readPin() ?? '';
+  if (pin.isEmpty) {
+    throw ValidationException(
+      message: 'Your account PIN is missing. Please sign in again.',
+    );
+  }
+  final response = await ref
+      .watch(investmentServiceProvider)
+      .getInvestments(
+        phoneNumber: credentials['phone']!,
+        accountNumber: credentials['account']!,
+        pin: pin,
+      );
+  final data = response['data'];
+  return data is List ? data.whereType<Map<String, dynamic>>().toList() : [];
+});
+
+/// Loads the selected savings account for mutation flows without using demo data.
+final withdrawalAccountProvider =
+    FutureProvider.family<Map<String, dynamic>, String>((ref, savingsId) async {
+      final credentials = ref.watch(memberCredentialsProvider);
+      final phone = credentials['phone']?.trim() ?? '';
+      final account = credentials['account']?.trim() ?? '';
+      if (phone.isEmpty || account.isEmpty) {
+        throw ValidationException(
+          message: 'Your account details are missing. Please sign in again.',
+        );
+      }
+
+      final response = await ref
+          .watch(savingsServiceProvider)
+          .getSavingsList(phoneNumber: phone, accountNumber: account, pin: '');
+      final data = response['data'];
+      final accounts = data is List
+          ? data.whereType<Map<String, dynamic>>()
+          : const <Map<String, dynamic>>[];
+      if (savingsId.isEmpty && accounts.isNotEmpty) {
+        return accounts.first;
+      }
+      return accounts.firstWhere(
+        (account) =>
+            (account['savings_id'] ?? account['id'] ?? account['product_id'])
+                .toString() ==
+            savingsId,
+        orElse: () => throw ValidationException(
+          message: 'The selected savings account could not be found.',
+        ),
+      );
+    });
 
 // Transactions provider
 final transactionsProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
-  final auth = ref.watch(authProvider);
+  final credentials = ref.watch(memberCredentialsProvider);
   final transactionService = ref.watch(transactionServiceProvider);
 
-  if (_shouldUseLocalDemoData(auth)) {
-    return _buildFallbackTransactions();
-  }
-
   final pin = await SecureAuthStorage.instance.readPin() ?? '';
-  final phone = auth.userEmail ?? '';
-  final account = auth.userId ?? '';
-
-  if (pin.isEmpty) {
-    throw ValidationException(
-      message:
-          'Your account PIN is missing. Please complete sign-in and set your PIN before loading transactions.',
-    );
-  }
+  final phone = credentials['phone']!;
+  final account = credentials['account']!;
 
   try {
     final response = await transactionService.getTransactions(
@@ -808,7 +1297,7 @@ final transactionsProvider = FutureProvider<List<Map<String, dynamic>>>((
       return normalized;
     }
 
-    return _buildFallbackTransactionsForAuth(auth);
+    return [];
   } on AppException {
     rethrow;
   }
@@ -825,6 +1314,25 @@ Future<Map<String, String>> _runBackendProbe({
   } catch (e) {
     return {'status': 'error', 'message': e.toString()};
   }
+}
+
+Future<Map<String, String>> _runCountProbe({
+  required Future<List<Map<String, dynamic>>> Function() action,
+}) async {
+  try {
+    final records = await action();
+    return {'status': 'ok', 'message': 'Returned ${records.length} record(s)'};
+  } on AppException catch (e) {
+    return {'status': 'error', 'message': e.message};
+  } catch (e) {
+    return {'status': 'error', 'message': e.toString()};
+  }
+}
+
+String _maskDiagnosticValue(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length <= 4) return '****';
+  return '${trimmed.substring(0, 2)}••••${trimmed.substring(trimmed.length - 2)}';
 }
 
 final backendDiagnosticsProvider =
@@ -850,14 +1358,16 @@ final backendDiagnosticsProvider =
         };
       }
 
-      final phone = auth.userEmail!;
-      final account = auth.userId!;
+      final credentials = ref.watch(memberCredentialsProvider);
+      final phone = credentials['phone']!;
+      final account = credentials['account']!;
       final pin = await SecureAuthStorage.instance.readPin() ?? '';
 
       final userService = ref.watch(userServiceProvider);
       final loanService = ref.watch(loanServiceProvider);
       final savingsService = ref.watch(savingsServiceProvider);
       final transactionService = ref.watch(transactionServiceProvider);
+      final sharesService = ref.watch(sharesServiceProvider);
 
       final profileResult = await _runBackendProbe(
         action: () async {
@@ -899,10 +1409,30 @@ final backendDiagnosticsProvider =
         },
       );
 
+      final sharesResult = await _runCountProbe(
+        action: () async {
+          final response = await sharesService.getShares(
+            phoneNumber: phone,
+            accountNumber: account,
+            pin: pin,
+          );
+          final data = response['data'];
+          return data is List
+              ? data.whereType<Map<String, dynamic>>().toList()
+              : <Map<String, dynamic>>[];
+        },
+      );
+
       return {
+        'identity': {
+          'status': 'info',
+          'message':
+              'Account ${_maskDiagnosticValue(account)}, phone ${_maskDiagnosticValue(phone)}',
+        },
         'profile': profileResult,
         'loans': loansResult,
         'savings': savingsResult,
+        'shares': sharesResult,
         'transactions': transactionsResult,
       };
     });
@@ -923,20 +1453,14 @@ final debugRegistrationProbeProvider = FutureProvider<Map<String, String>>((
     return {'status': 'error', 'message': 'Not authenticated'};
   }
 
-  final pin = await SecureAuthStorage.instance.readPin() ?? '';
-  if (pin.isEmpty) {
-    return {
-      'status': 'error',
-      'message': 'No PIN saved. Set PIN first to run registration probe.',
-    };
-  }
-
   try {
     final authService = ref.watch(authServiceProvider);
     final response = await authService.register(
       accountNumber: auth.userId!,
       phoneNumber: auth.userEmail!,
-      pin: pin,
+      birthDate: '',
+      imeiNumber: '0',
+      phoneMake: 'Flutter mobile app',
     );
 
     final status = response['status'];

@@ -1,6 +1,6 @@
 # ADEPA TEACHERS
 
-A personal finance management Flutter mobile app featuring loan applications, savings tracking, and payment processing.
+A Flutter personal-finance app for Adepa members. The app uses documented ATCCU mobile API contracts where available and explicitly reports unsupported operations instead of displaying fabricated financial data.
 
 ## Features
 
@@ -27,18 +27,37 @@ A personal finance management Flutter mobile app featuring loan applications, sa
 
 ### 👤 Profile & Settings
 
-- User profile management
-- KYC verification
+- Account details
+- KYC form validation and submission attempt
 - Security settings
 - Notification preferences
+
+### 🔐 Authentication
+
+- Onboarding and protected routes
+- New-member and existing-member registration
+- OTP verification and resend
+- Device-bound sessions
+- Secure PIN creation and storage
+
+### 📊 Shares & Investments
+
+- Live portfolio balances from the documented customer API
+- Loading, error, and unavailable states
+- Share and investment detail screens that only display returned data
+
+Share purchases, share sales, dividend history, portfolio statements, investment
+details, and investment actions are currently unavailable because no documented
+backend contracts exist for those operations. The UI does not simulate success
+for these actions.
 
 ## Tech Stack
 
 - **Framework**: Flutter
-- **State Management**: Riverpod (foundation ready)
+- **State Management**: Riverpod
 - **Navigation**: GoRouter
-- **Storage**: SharedPreferences
-- **Architecture**: Provider pattern with service layer
+- **Storage**: SharedPreferences and secure storage
+- **Architecture**: Riverpod providers with an API service layer
 
 ## Getting Started
 
@@ -53,10 +72,10 @@ A personal finance management Flutter mobile app featuring loan applications, sa
 
 ```bash
 # Clone the repository
-git clone https://github.com/snbitsolutions/adepa_teachers.git
+git clone https://github.com/snbitsolutions/myfinance.git
 
 # Navigate to project directory
-cd adepa_teachers
+cd myfinance
 
 # Install dependencies
 flutter pub get
@@ -128,12 +147,28 @@ lib/
 - Error handling system
 - Logging utilities
 
-### 🚧 Phase 2: Backend Integration (Next)
+### ✅ Phase 2: Backend Integration (In Progress)
 
-- API integration
-- Hive database implementation
-- Real-time data synchronization
-- Token management
+- Authentication, registration, OTP, and secure PIN flows
+- Live loans, savings, shares, and transaction retrieval where documented
+- Backend-gated loan and savings submissions
+- Payment processing with transaction-reference validation
+- Honest unavailable states for undocumented operations
+- API response normalization and contract regression tests
+
+### 🔎 Current Backend Limitations
+
+The available documentation does not define endpoints for profile updates,
+KYC persistence, loan application/details, savings-goal creation, recipient
+lookup, investments, share buy/sell, dividends, portfolio statements, or
+receipt downloads. These flows remain visible only where useful, but they
+cannot complete until the corresponding backend contracts are provided.
+
+The app keeps these screens available for future integration. It disables
+unsupported submissions and shows unavailable terms instead of inventing loan
+rates, savings returns, transfer fees, recipient matches, or application
+statuses. Loan repayment also waits for a backend loan record rather than using
+a locally saved draft.
 
 ### 📋 Future Enhancements
 
@@ -142,7 +177,7 @@ lib/
 - Dark mode
 - Budget tracker
 - Financial insights and analytics
-- Investment tracking
+- Investment tracking when a documented API is available
 
 ## Contributing
 
@@ -157,7 +192,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 **SNBitSolutions**
 
 - GitHub: [@snbitsolutions](https://github.com/snbitsolutions)
-- Project Link: [https://github.com/snbitsolutions/adepa_teachers](https://github.com/snbitsolutions/adepa_teachers)
+- Project Link: [https://github.com/snbitsolutions/myfinance](https://github.com/snbitsolutions/myfinance)
 
 ## Acknowledgments
 

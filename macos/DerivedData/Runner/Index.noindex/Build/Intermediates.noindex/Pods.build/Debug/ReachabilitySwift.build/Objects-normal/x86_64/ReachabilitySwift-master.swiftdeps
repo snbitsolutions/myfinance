@@ -1,0 +1,6 @@
+version: "Apple Swift version 6.0 (swiftlang-6.0.0.9.10 clang-1600.0.26.2)"
+options: "cdb6075955914c5c35abb7594263c0847e17f262eb4d66fd7b13fec8347701e8"
+build_start_time: [1789486838, 440390000]
+build_end_time: [1789486868, 704638000]
+inputs:
+  "/Users/apple/Desktop/myfinance/macos/Pods/ReachabilitySwift/Sources/Reachability.swift": [1787758900, 956075271]

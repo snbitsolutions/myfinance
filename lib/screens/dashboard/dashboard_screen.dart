@@ -1,10 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/constants/app_constants.dart';
 import '../../core/balance_card_shell.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/services/notification_service.dart';
@@ -235,10 +233,8 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
                         const SizedBox(height: 16),
                         quickActionsPanel,
                       ],
-                      if (kDebugMode && AppConstants.disableApiAuthInDebug) ...[
-                        const SizedBox(height: 16),
-                        const _BackendDiagnosticsCard(),
-                      ],
+                      const SizedBox(height: 16),
+                      const _BackendDiagnosticsCard(),
                       const SizedBox(height: 20),
                       const _RecentTransactions(),
                     ],
@@ -390,7 +386,14 @@ class _BackendDiagnosticsCard extends ConsumerWidget {
               ),
             ),
             data: (result) {
-              const order = ['profile', 'loans', 'savings', 'transactions'];
+              const order = [
+                'identity',
+                'profile',
+                'loans',
+                'savings',
+                'shares',
+                'transactions',
+              ];
               return Column(
                 children: order.map((key) {
                   final entry =
@@ -438,6 +441,7 @@ class _TopHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final notificationService = NotificationService.instance;
+    final greeting = _timeBasedGreeting(DateTime.now());
     final initials = accountName.trim().isEmpty
         ? 'U'
         : accountName
@@ -513,7 +517,7 @@ class _TopHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Hi, $greetingName',
+                '$greeting, $greetingName',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.titleLarge?.copyWith(
@@ -642,6 +646,12 @@ class _TopHeader extends StatelessWidget {
       ],
     );
   }
+}
+
+String _timeBasedGreeting(DateTime time) {
+  if (time.hour < 12) return 'Good morning';
+  if (time.hour < 17) return 'Good afternoon';
+  return 'Good evening';
 }
 
 class _HeaderActionButton extends StatelessWidget {
@@ -931,7 +941,9 @@ class _AccountInfoCard extends StatelessWidget {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'GH₵ ${viewData.availableBalance.toStringAsFixed(2)}',
+                                viewData.availableBalance == null
+                                    ? 'GH₵ —'
+                                    : 'GH₵ ${viewData.availableBalance!.toStringAsFixed(2)}',
                                 style: theme.textTheme.headlineSmall?.copyWith(
                                   color: _DashboardUi.cardTextColor,
                                   fontWeight: FontWeight.w800,
@@ -1299,7 +1311,7 @@ class _DashboardProfileViewData {
   final String branchName;
   final String accountNumber;
   final String accountStatus;
-  final double availableBalance;
+  final double? availableBalance;
   final String? profileImageUrl;
 
   const _DashboardProfileViewData({
@@ -1314,14 +1326,14 @@ class _DashboardProfileViewData {
   factory _DashboardProfileViewData.fromProfile(Map<String, dynamic>? profile) {
     return _DashboardProfileViewData(
       accountName: _readProfileName(profile),
-      branchName: _readProfileString(profile, 'branch', 'Accra Main'),
+      branchName: _readProfileString(profile, 'branch', 'Unavailable'),
       accountNumber: _readProfileString(
         profile,
         'account_number',
-        '0123456789',
+        'Unavailable',
       ),
-      accountStatus: _readProfileString(profile, 'status', 'Active'),
-      availableBalance: _readProfileDouble(profile, 'balance', 0),
+      accountStatus: _readProfileString(profile, 'status', 'Unavailable'),
+      availableBalance: _readOptionalProfileDouble(profile, 'balance'),
       profileImageUrl: _readProfileImageUrl(profile),
     );
   }
@@ -1530,18 +1542,14 @@ String? _readProfileImageUrl(Map<String, dynamic>? profile) {
   return null;
 }
 
-double _readProfileDouble(
+double? _readOptionalProfileDouble(
   Map<String, dynamic>? profile,
   String key,
-  double fallback,
 ) {
   final value = profile?[key];
   if (value is num) return value.toDouble();
-  if (value is String) {
-    final parsed = double.tryParse(value.trim());
-    if (parsed != null) return parsed;
-  }
-  return fallback;
+  if (value is String) return double.tryParse(value.replaceAll(',', ''));
+  return null;
 }
 
 String _maskAccountNumber(String accountNumber) {
@@ -1813,11 +1821,13 @@ class _DashboardTransactionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isCredit = (txn['type'] as String? ?? 'debit') == 'credit';
-    final amount = (txn['amount'] as num?)?.toDouble() ?? 0.0;
+    final transactionType = (txn['type'] as String? ?? 'unknown').toLowerCase();
+    final isCredit = transactionType == 'credit';
+    final isDebit = transactionType == 'debit';
+    final amount = (txn['amount'] as num?)?.toDouble();
     final description = txn['description'] as String? ?? '';
     final dateStr = txn['date'] as String? ?? '';
-    final status = (txn['status'] as String? ?? 'completed').toLowerCase();
+    final status = (txn['status'] as String? ?? 'unknown').toLowerCase();
 
     DateTime? date;
     try {
@@ -1829,10 +1839,14 @@ class _DashboardTransactionTile extends StatelessWidget {
         : const Color(0xFF1C1F1E);
     final badgeColor = status == 'pending'
         ? const Color(0xFFE2A93B)
-        : const Color(0xFF2E8B57);
+        : status == 'completed' || status == 'success' || status == 'successful'
+        ? const Color(0xFF2E8B57)
+        : theme.colorScheme.outline;
 
     final label = description.isEmpty ? 'Transaction' : description;
-    final icon = _transactionIcon(label, isCredit);
+    final icon = isCredit || isDebit
+        ? _transactionIcon(label, isCredit)
+        : Icons.receipt_long_outlined;
 
     return Row(
       children: [
@@ -1877,7 +1891,7 @@ class _DashboardTransactionTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              '${isCredit ? '+' : '-'} ₵${amount.toStringAsFixed(2)}',
+              '${isCredit ? '+' : isDebit ? '-' : ''} ₵${amount?.toStringAsFixed(2) ?? '—'}',
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w800,
                 color: accentColor,
@@ -1892,7 +1906,13 @@ class _DashboardTransactionTile extends StatelessWidget {
                 border: Border.all(color: badgeColor.withValues(alpha: 0.16)),
               ),
               child: Text(
-                status == 'pending' ? 'Pending' : 'Completed',
+                status == 'pending'
+                    ? 'Pending'
+                    : status == 'completed' ||
+                          status == 'success' ||
+                          status == 'successful'
+                    ? 'Completed'
+                    : 'Status unavailable',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: badgeColor,
                   fontWeight: FontWeight.w700,

@@ -10,12 +10,17 @@ import '../utils/logger.dart';
 /// HTTP client singleton for all API calls
 class HttpClient {
   static HttpClient? _instance;
+  static HttpClient? _paymentInstance;
   late Dio _dio;
+  final bool _supportsAuthRefresh;
 
-  HttpClient._internal() {
+  HttpClient._internal({
+    required String baseUrl,
+    bool supportsAuthRefresh = true,
+  }) : _supportsAuthRefresh = supportsAuthRefresh {
     _dio = Dio(
       BaseOptions(
-        baseUrl: ApiEndpoints.baseUrl,
+        baseUrl: baseUrl,
         connectTimeout: AppConstants.networkTimeout,
         receiveTimeout: AppConstants.apiTimeout,
         sendTimeout: AppConstants.apiTimeout,
@@ -24,8 +29,9 @@ class HttpClient {
           'Accept': 'application/json',
         },
         validateStatus: (status) {
-          // Accept all status codes to handle them manually
-          return status != null && status < 500;
+          // Route every non-success response through Dio's error interceptor.
+          // In particular, 401 must reach the token refresh handler below.
+          return status != null && status >= 200 && status < 300;
         },
       ),
     );
@@ -35,8 +41,17 @@ class HttpClient {
 
   /// Get singleton instance
   static HttpClient get instance {
-    _instance ??= HttpClient._internal();
+    _instance ??= HttpClient._internal(baseUrl: ApiEndpoints.baseUrl);
     return _instance!;
+  }
+
+  /// Client for the third-party payment gateway.
+  static HttpClient get paymentInstance {
+    _paymentInstance ??= HttpClient._internal(
+      baseUrl: ApiEndpoints.paymentServiceBaseUrl,
+      supportsAuthRefresh: false,
+    );
+    return _paymentInstance!;
   }
 
   /// Get Dio instance (for advanced use cases)
@@ -61,7 +76,7 @@ class HttpClient {
           // rely on request payload credentials instead of bearer tokens.
           if (_isDebugNoAuthMode) {
             options.headers.remove('Authorization');
-          } else {
+          } else if (options.extra['skipAuthRefresh'] != true) {
             await initializePreferences();
             final token = await SecureAuthStorage.instance.readAuthToken();
             if (token != null && token.isNotEmpty) {
@@ -82,17 +97,23 @@ class HttpClient {
             response.requestOptions.method,
             response.requestOptions.uri.toString(),
             response.data,
+            statusCode: response.statusCode,
           );
           return handler.next(response);
         },
         onError: (error, handler) async {
           // Handle token expiration (401)
-          if (!_isDebugNoAuthMode && error.response?.statusCode == 401) {
+          if (_supportsAuthRefresh &&
+              !_isDebugNoAuthMode &&
+              error.response?.statusCode == 401 &&
+              error.requestOptions.extra['skipAuthRefresh'] != true &&
+              error.requestOptions.extra['authRetry'] != true) {
             // Try to refresh token
             final refreshed = await _refreshToken();
             if (refreshed) {
               // Retry the original request
               final options = error.requestOptions;
+              options.extra['authRetry'] = true;
               final token = await SecureAuthStorage.instance.readAuthToken();
               options.headers['Authorization'] = 'Bearer $token';
 
@@ -144,7 +165,10 @@ class HttpClient {
       final response = await _dio.post(
         ApiEndpoints.refreshToken,
         data: {'refresh_token': refreshToken},
-        options: Options(headers: {'Authorization': 'Bearer $refreshToken'}),
+        options: Options(
+          headers: {'Authorization': 'Bearer $refreshToken'},
+          extra: {'skipAuthRefresh': true},
+        ),
       );
 
       if (response.statusCode == 200) {

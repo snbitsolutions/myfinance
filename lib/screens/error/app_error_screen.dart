@@ -11,7 +11,7 @@ class AppErrorScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Something went wrong')),
+      appBar: AppBar(title: const Text('Something Went Wrong')),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),

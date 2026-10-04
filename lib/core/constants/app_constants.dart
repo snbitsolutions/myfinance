@@ -16,8 +16,6 @@ class AppConstants {
   // Feature Flags
   static const bool enableBiometric = false;
   static const bool enableNotifications = false;
-  // Temporary offline UI mode while the payment flow pages are being refined.
-  static const bool enableOfflineMode = true;
   static const bool disableApiAuthInDebug = true;
   static const String debugApiPhoneNumber = String.fromEnvironment(
     'DEBUG_API_PHONE',
@@ -69,13 +67,15 @@ class AppConstants {
       'Please check your input and try again.';
 
   // Auth Messages
-  static const String invalidCredentialsMessage = 'Invalid email or password.';
+  static const String invalidCredentialsMessage = 'Invalid phone number or PIN.';
   static const String userNotFoundMessage = 'User account not found.';
   static const String accountLockedMessage =
       'Account is locked. Please contact support.';
   static const String invalidOtpMessage =
       'Invalid verification code. Please try again.';
   static const String pinMismatchMessage = 'PINs do not match.';
+  static const String pinResetUnavailableMessage =
+      'Forgot-PIN reset is not available because the backend does not document a PIN recovery endpoint.';
   static const String defaultMobileApiSKey = 'ArTM3c8yq0Lhlh';
   static const String pinTooSimpleMessage =
       'PIN is too simple. Please choose a different PIN.';
@@ -97,8 +97,10 @@ class AppConstants {
   static const String sharedPrefKeyUserRefreshToken = 'userRefreshToken';
   static const String sharedPrefKeyUserId = 'userId';
   static const String sharedPrefKeyUserEmail = 'userEmail';
+  static const String sharedPrefKeyUserName = 'userName';
   static const String sharedPrefKeyDeviceInstallId = 'deviceInstallId';
   static const String sharedPrefKeyRememberMe = 'rememberMe';
+  static const String sharedPrefKeyBiometricAuth = 'biometricAuth';
   static const String sharedPrefKeyDarkMode = 'darkMode';
   static const String sharedPrefKeyLanguage = 'language';
   static const String sharedPrefKeyTransferFavorites = 'transferFavorites';
@@ -140,37 +142,53 @@ class AppConstants {
 
 class ApiEndpoints {
   static const String baseUrl = 'https://adepaye.com/stccu-api';
+  // Customer and member endpoints are hosted under the API-prefixed route.
+  static const String mobileApiBaseUrl =
+      'https://adepaye.com/api/mobileapp-api';
 
   // Documented ATCCU mobile app auth endpoints
-  static const String confirmPhoneNumber = '/mobileapp-api/confirmPhoneNumber';
+  static const String confirmPhoneNumber =
+      '$mobileApiBaseUrl/confirmPhoneNumber';
   static const String confirmAccountNumber =
-      '/mobileapp-api/confirmAccountNumber';
+      '$mobileApiBaseUrl/confirmAccountNumber';
   // Use the published mobile app OTP endpoints directly so they do not depend on
   // the older STCCU base URL.
-  static const String sendLoginOtp = 'https://adepaye.com/api/mobileapp-api/sendOtp';
-  static const String verifyLoginOtp = 'https://adepaye.com/api/mobileapp-api/verifyOtp';
-  static const String confirmPin = '/verifyPin';
+  // OTP routes are hosted under the documented /api/mobileapp-api prefix.
+  static const String sendLoginOtp =
+      'https://adepaye.com/api/mobileapp-api/sendOtp';
+  static const String verifyLoginOtp =
+      'https://adepaye.com/api/mobileapp-api/verifyOtp';
+  static const String confirmPin = '$mobileApiBaseUrl/verifyPin';
   static const String register = 'https://adepaye.com/mobileapp-api/register';
-  static const String changePin = '/mobileapp-api/changePin';
-  static const String setPin = '/mobileapp-api/setPin';
+  static const String createMember = '$mobileApiBaseUrl/create';
+  static const String changePin = '$mobileApiBaseUrl/changePin';
+  static const String setPin = '$mobileApiBaseUrl/setPin';
 
   // STCCU account / data endpoints
-  static const String getAccountBalance = '/getAccountBalance';
-  static const String getLoans = '/getLoans';
-  static const String miniStatement = '/miniStatement';
-  static const String checkBalance = '/checkBalance';
-  static const String depositFunds = '/Deposit';
-  static const String withdrawFunds = '/Withdraw';
+  static const String getAccountBalance = '$mobileApiBaseUrl/getAccountBalance';
+  static const String getLoans = '$mobileApiBaseUrl/getMemLoans';
+  static const String miniStatement = '$mobileApiBaseUrl/miniStatement';
+  static const String checkBalance = '$mobileApiBaseUrl/checkBalance';
+  // The documented mobile-money funding endpoint is POST /deposit.
+  static const String depositFunds = '/deposit';
+  static const String withdrawFunds = '/withdraw';
   static const String stccuConfirmWithdrawal = '/confirmWithdrawal';
   static const String repayLoanStccu = '/repayLoan';
-  static const String buyAirtime = '/buyAirtime';
+  // The documented Buy Airtime request is POST /deposit.
+  static const String buyAirtime = '/deposit';
   static const String getBranches = '/getBranch';
-  static const String getSavingsProductsList = '/getSavingsProducts';
-  static const String getLoanProductsList = '/getLoanProducts';
+  static const String getSavingsProductsList =
+      '$mobileApiBaseUrl/getMemSavings';
+  static const String getSavingsBalance = '$mobileApiBaseUrl/getSavingsBalance';
+  static const String getLoanProductsList = '$mobileApiBaseUrl/getLoanProducts';
+  static const String getShares = '$mobileApiBaseUrl/getMemShares';
+  static const String getSavingsProducts = '$mobileApiBaseUrl/savings';
+  static const String getSharesProducts = '$mobileApiBaseUrl/shares';
+  static const String transferToSelf = '$mobileApiBaseUrl/transferToSelf';
 
-  // Legacy placeholder auth (kept for reference)
-  static const String login = '/auth/login';
-  static const String logout = '/auth/logout';
+  // Documented mobile app auth endpoints.
+  static const String login = '$mobileApiBaseUrl/login';
+  static const String logout = '$mobileApiBaseUrl/logout';
   static const String sendOtp = '/auth/send-otp';
   static const String verifyOtp = '/auth/verify-otp';
   static const String legacySetPin = '/auth/set-pin';
@@ -202,8 +220,8 @@ class ApiEndpoints {
   // Payments
   static const String paymentServiceBaseUrl =
       'https://adepaye.com/api/payment-services';
-  static const String initiatePayment = '/api/payment-services/initiate';
-  static const String verifyPayment = '/api/payment-services/verify';
+  static const String initiatePayment = '/initiate';
+  static const String verifyPayment = '/verify';
 
   // Settings
   static const String getSettings = '/settings';

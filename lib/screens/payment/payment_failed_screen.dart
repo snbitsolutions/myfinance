@@ -22,8 +22,8 @@ class PaymentFailedScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final retryRoute = isDeposit
         ? returnRoute.startsWith('/savings')
-            ? returnRoute
-            : '/savings'
+              ? returnRoute
+              : '/savings'
         : returnRoute.startsWith('/savings')
         ? returnRoute
         : '/home';
@@ -35,7 +35,12 @@ class PaymentFailedScreen extends StatelessWidget {
           // Dark green header at the very top
           Container(
             width: double.infinity,
-            padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 16, 20, 24),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              MediaQuery.of(context).padding.top + 16,
+              20,
+              24,
+            ),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [Color(0xFF075D21), Color(0xFF08752B)],
@@ -47,7 +52,10 @@ class PaymentFailedScreen extends StatelessWidget {
               children: [
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.arrow_back, color: Colors.white),
+                  child: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Text(
@@ -78,25 +86,30 @@ class PaymentFailedScreen extends StatelessWidget {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: theme.colorScheme.error.withOpacitySafe(0.3),
+                              color: theme.colorScheme.error.withOpacitySafe(
+                                0.3,
+                              ),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.close_rounded, size: 56, color: Colors.white),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 56,
+                          color: Colors.white,
+                        ),
                       ),
                       // Broken piggy bank below the X
-                      Positioned(
-                        top: 70,
-                        child: _BrokenPiggyBank(),
-                      ),
+                      Positioned(top: 70, child: _BrokenPiggyBank()),
                     ],
                   ),
                   const SizedBox(height: 100),
                   // Title
                   Text(
-                    isDeposit ? 'We couldn\'t complete your deposit' : 'Payment Failed',
+                    isDeposit
+                        ? 'We couldn\'t complete your deposit'
+                        : 'Payment Failed',
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: theme.colorScheme.onSurface,
@@ -119,7 +132,11 @@ class PaymentFailedScreen extends StatelessWidget {
                   AppCard(
                     child: Row(
                       children: [
-                        Icon(Icons.error_outline_rounded, color: theme.colorScheme.error, size: 24),
+                        Icon(
+                          Icons.error_outline_rounded,
+                          color: theme.colorScheme.error,
+                          size: 24,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
@@ -128,13 +145,17 @@ class PaymentFailedScreen extends StatelessWidget {
                               Text(
                                 'Reason',
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacitySafe(0.6),
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                reason ?? 'Network error. Please check your connection.',
-                                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                                reason ??
+                                    'Network error. Please check your connection.',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ],
                           ),
@@ -171,7 +192,9 @@ class PaymentFailedScreen extends StatelessWidget {
                       onPressed: () => context.go(retryRoute),
                       style: FilledButton.styleFrom(
                         backgroundColor: theme.colorScheme.primary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: const Text('Try Again'),
                     ),
@@ -183,7 +206,9 @@ class PaymentFailedScreen extends StatelessWidget {
                     child: OutlinedButton(
                       onPressed: () => context.go('/home'),
                       style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: const Text('Back Home'),
                     ),
@@ -198,7 +223,20 @@ class PaymentFailedScreen extends StatelessWidget {
   }
 
   String _formatDateTime(DateTime date) {
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
     final meridiem = date.hour >= 12 ? 'PM' : 'AM';
     return '${date.day} ${months[date.month - 1]} ${date.year} • $hour:${date.minute.toString().padLeft(2, '0')} $meridiem';
@@ -221,19 +259,12 @@ class _BrokenPiggyBank extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           // Piggy bank emoji
-          const Text(
-            '🐷',
-            style: TextStyle(fontSize: 48),
-          ),
+          const Text('🐷', style: TextStyle(fontSize: 48)),
           // Crack line (diagonal)
           Positioned(
             child: Transform.rotate(
               angle: -0.5,
-              child: Container(
-                width: 60,
-                height: 2,
-                color: Colors.red[400],
-              ),
+              child: Container(width: 60, height: 2, color: Colors.red[400]),
             ),
           ),
           // Error badge
@@ -303,7 +334,9 @@ class _TransactionDetailRow extends StatelessWidget {
                 ),
                 Text(
                   value,
-                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),

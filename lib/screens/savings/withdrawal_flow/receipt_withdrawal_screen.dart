@@ -23,7 +23,12 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
           // Dark green header
           Container(
             width: double.infinity,
-            padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 16, 20, 24),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              MediaQuery.of(context).padding.top + 16,
+              20,
+              24,
+            ),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [Color(0xFF075D21), Color(0xFF08752B)],
@@ -35,7 +40,10 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
               children: [
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.arrow_back, color: Colors.white),
+                  child: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 const Text(
@@ -96,7 +104,10 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
                         const SizedBox(height: 16),
                         // Success badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacitySafe(0.2),
                             borderRadius: BorderRadius.circular(8),
@@ -104,10 +115,18 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.check_circle, color: Colors.white, size: 16),
+                              Icon(
+                                data.isPending
+                                    ? Icons.hourglass_top_rounded
+                                    : Icons.check_circle,
+                                color: Colors.white,
+                                size: 16,
+                              ),
                               const SizedBox(width: 6),
                               Text(
-                                'Transaction Successful',
+                                data.isPending
+                                    ? 'Withdrawal Pending'
+                                    : 'Provider reported completion',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w600,
@@ -130,7 +149,7 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Withdrawal Amount',
+                    data.isPending ? 'Withdrawal Requested' : 'Withdrawal Amount',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
                     ),
@@ -141,13 +160,25 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _DetailRow('Transaction Type', 'Withdrawal', theme),
+                        _DetailRow(
+                          'Transaction Status',
+                          data.isPending ? 'Pending' : 'Provider reported completion',
+                          theme,
+                        ),
                         _Divider(theme),
-                        _DetailRow('Amount', 'GH₵ ${data.amount.toStringAsFixed(2)}', theme),
+                        _DetailRow(
+                          'Amount',
+                          'GH₵ ${data.amount.toStringAsFixed(2)}',
+                          theme,
+                        ),
                         _Divider(theme),
                         _DetailRow('Date & Time', dateFormat, theme),
                         _Divider(theme),
-                        _DetailRow('Reference Number', data.reference ?? 'N/A', theme),
+                        _DetailRow(
+                          'Reference Number',
+                          data.reference ?? 'N/A',
+                          theme,
+                        ),
                         _Divider(theme),
                         _DetailRow('Withdrawal Method', data.method, theme),
                         _Divider(theme),
@@ -165,15 +196,21 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'New Available Balance',
+                          data.isPending
+                              ? 'Balance will update after confirmation'
+                              : 'New Available Balance',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                            color: theme.colorScheme.onSurface.withOpacitySafe(
+                              0.6,
+                            ),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'GH₵ ${(data.newBalance ?? 44000).toStringAsFixed(2)}',
+                          data.isPending || data.newBalance == null
+                              ? 'Unavailable'
+                              : 'GH₵ ${data.newBalance!.toStringAsFixed(2)}',
                           style: theme.textTheme.displaySmall?.copyWith(
                             fontWeight: FontWeight.w800,
                             color: theme.colorScheme.primary,
@@ -188,17 +225,21 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 50,
                     child: FilledButton.icon(
-                      onPressed: () {
-                        // TODO: Implement download receipt functionality
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Receipt downloaded')),
-                        );
-                      },
+                      onPressed: () =>
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Receipt download is not available yet.',
+                              ),
+                            ),
+                          ),
                       icon: const Icon(Icons.download),
                       label: const Text('Download Receipt'),
                       style: FilledButton.styleFrom(
                         backgroundColor: theme.colorScheme.primary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ),
@@ -209,7 +250,9 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
                     child: OutlinedButton(
                       onPressed: () => context.go('/savings'),
                       style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: const Text('Back to Savings'),
                     ),
@@ -247,7 +290,9 @@ class _DetailRow extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             value,
-            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -262,9 +307,6 @@ class _Divider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Divider(
-      height: 1,
-      color: theme.colorScheme.outlineVariant,
-    );
+    return Divider(height: 1, color: theme.colorScheme.outlineVariant);
   }
 }

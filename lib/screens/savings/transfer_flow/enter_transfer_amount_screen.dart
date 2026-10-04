@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/app_card.dart';
+import '../../../core/app_scaffold.dart';
+import '../../../core/modern_input.dart';
 import 'transfer_model.dart';
 
 class EnterTransferAmountScreen extends StatefulWidget {
@@ -34,17 +37,7 @@ class _EnterTransferAmountScreenState extends State<EnterTransferAmountScreen> {
 
   bool get _canContinue {
     final amount = double.tryParse(_amountController.text) ?? 0.0;
-    return amount > 0 && amount <= 10000; // Mock max transfer amount
-  }
-
-  double get _transactionFee {
-    final amount = double.tryParse(_amountController.text) ?? 0.0;
-    return amount * 0.015; // 1.5% fee
-  }
-
-  double get _totalAmount {
-    final amount = double.tryParse(_amountController.text) ?? 0.0;
-    return amount + _transactionFee;
+    return amount > 0;
   }
 
   void _setAmount(double amount) {
@@ -56,12 +49,9 @@ class _EnterTransferAmountScreenState extends State<EnterTransferAmountScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Enter Amount'),
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
+    return AppScaffold(
+      title: 'Enter Amount',
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -74,17 +64,12 @@ class _EnterTransferAmountScreenState extends State<EnterTransferAmountScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            TextField(
+            ModernInput(
               controller: _amountController,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                hintText: '0.00',
-                prefixText: 'GH₵ ',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+              label: 'Amount',
+              prefixText: 'GH₵ ',
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 24),
@@ -109,78 +94,10 @@ class _EnterTransferAmountScreenState extends State<EnterTransferAmountScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Fee breakdown
-            Container(
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Fee Breakdown',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Amount',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.outline,
-                        ),
-                      ),
-                      Text(
-                        'GH₵${(double.tryParse(_amountController.text) ?? 0.0).toStringAsFixed(2)}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Transfer Fee (1.5%)',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.outline,
-                        ),
-                      ),
-                      Text(
-                        'GH₵${_transactionFee.toStringAsFixed(2)}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Divider(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Total',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        'GH₵${_totalAmount.toStringAsFixed(2)}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+            AppCard(
+              child: Text(
+                'Transfer fee and limits are unavailable until the backend provides the applicable terms. No fee is estimated here.',
+                style: theme.textTheme.bodyMedium,
               ),
             ),
             const SizedBox(height: 32),
@@ -195,7 +112,7 @@ class _EnterTransferAmountScreenState extends State<EnterTransferAmountScreen> {
                             double.tryParse(_amountController.text) ?? 0.0;
                         final updated = _data.copyWith(
                           amount: amount,
-                          transactionFee: _transactionFee,
+                          transactionFee: 0,
                         );
                         context.push(
                           '/transfer/review',

@@ -1,0 +1,18 @@
+unit: onboarding
+side_effects:
+  - source_loc: "lib/screens/onboarding/onboarding_screen.dart:64"
+    effect: "Persists the onboarding-completed flag in SharedPreferences."
+    must_preserve: true
+branches:
+  - source_loc: "lib/router/app_router.dart:244"
+    condition: "Onboarding has been seen."
+    behavior: "Redirects /onboarding to /login; otherwise keeps onboarding visible."
+    must_preserve: true
+error_paths: []
+concurrency:
+  model: async
+  tx_boundary:
+    source_loc: "lib/screens/onboarding/onboarding_screen.dart:64"
+    scope: "Single preference write when onboarding completes."
+    isolation: "not specified"
+    must_preserve: true

@@ -1,10 +1,10 @@
-enum TransactionType { deposit, withdrawal, repayment }
+enum TransactionType { deposit, withdrawal, repayment, unknown }
 
 class AppTransaction {
   final String id;
   final String title;
   final String? description;
-  final double amount;
+  final double? amount;
   final TransactionType type;
   final DateTime date;
   final String? category;

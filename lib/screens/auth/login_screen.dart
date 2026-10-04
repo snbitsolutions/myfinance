@@ -8,6 +8,8 @@ import '../../core/color_ext.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/exceptions/app_exceptions.dart';
 import '../../core/providers/app_providers.dart';
+import '../../core/services/biometric_auth_service.dart';
+import '../../router/app_router.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -18,14 +20,28 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   bool _showSnbReveal = false;
+  int _snbTapCount = 0;
   bool _isSubmitting = false;
+  bool _biometricEnabled = false;
+  bool _obscurePassword = true;
+  final _biometricAuthService = BiometricAuthService();
 
-  bool get _isValid => _phoneController.text.trim().length >= 9;
+  @override
+  void initState() {
+    super.initState();
+    _loadBiometricPreference();
+  }
+
+  bool get _isValid {
+    final phoneDigits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+    return phoneDigits.length >= 9 &&
+        _passwordController.text.trim().isNotEmpty;
+  }
 
   String get _normalizedPhoneNumber {
     final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
-    // The documented OTP endpoint expects Ghana's international format.
     if (digits.startsWith('233')) return digits;
     if (digits.startsWith('0') && digits.length == 10) {
       return '233${digits.substring(1)}';
@@ -43,6 +59,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _handleSnbTap() async {
     if (_showSnbReveal) return;
+    _snbTapCount++;
+    if (_snbTapCount < 10) return;
+
+    _snbTapCount = 0;
     setState(() => _showSnbReveal = true);
     await Future<void>.delayed(const Duration(milliseconds: 160));
     if (!mounted) return;
@@ -51,58 +71,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _showSnbReveal = false);
   }
 
-  Future<void> _handleContinue() async {
-    if (_isSubmitting) return;
+  Future<void> _handleLogin() async {
+    if (_isSubmitting || !_isValid) return;
 
     setState(() => _isSubmitting = true);
     try {
-      await ref
-          .read(authProvider.notifier)
-          .confirmPhoneNumber(phoneNumber: _normalizedPhoneNumber);
-
       final prefs = await SharedPreferences.getInstance();
-      final storedAccountNumber =
-          prefs.getString(AppConstants.sharedPrefKeyUserId)?.trim() ?? '';
-      final fallbackAccountNumber = storedAccountNumber.isNotEmpty
-          ? storedAccountNumber
-          : _normalizedPhoneNumber.replaceAll(RegExp(r'\D'), '');
-
+      await prefs.setBool(AppConstants.sharedPrefKeyDebugBypassAuth, false);
       await ref
           .read(authProvider.notifier)
-          .sendLoginOtp(
+          .login(
             phoneNumber: _normalizedPhoneNumber,
-            accountNumber: fallbackAccountNumber,
+            password: _passwordController.text,
           );
-
-      await prefs.setString(
-        AppConstants.sharedPrefKeyUserEmail,
-        _normalizedPhoneNumber,
-      );
-      await prefs.setString(
-        AppConstants.sharedPrefKeyUserId,
-        fallbackAccountNumber,
-      );
       if (!mounted) return;
-      context.go(
-        '/otp',
-        extra: {
-          'phoneNumber': _normalizedPhoneNumber,
-          'accountNumber': fallbackAccountNumber,
-        },
-      );
+
+      AppRouter.invalidateSessionCache();
+      context.go('/home');
     } on AppException catch (e) {
       if (!mounted) return;
       if (shouldRedirectToSignup(e.message)) {
         context.go('/signup?reason=not_registered');
         return;
       }
+
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to confirm phone number.')),
+        const SnackBar(content: Text('Unable to sign in. Please try again.')),
       );
     } finally {
       if (mounted) {
@@ -111,9 +110,54 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _handleBiometricSignIn() async {
+    if (_isSubmitting) return;
+    final prefs = await SharedPreferences.getInstance();
+    final enabled =
+        prefs.getBool(AppConstants.sharedPrefKeyBiometricAuth) ?? false;
+    if (!enabled) {
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      if (!await _biometricAuthService.authenticate()) return;
+      if (!await ref
+          .read(authProvider.notifier)
+          .restoreStoredSessionAfterBiometric()) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Your saved session is unavailable. Please sign in again.',
+            ),
+          ),
+        );
+        return;
+      }
+      if (!mounted) return;
+      // The router may have cached the unauthenticated result while this
+      // screen was open. Re-check the newly restored secure session.
+      AppRouter.invalidateSessionCache();
+      context.go('/home');
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _loadBiometricPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _biometricEnabled =
+          prefs.getBool(AppConstants.sharedPrefKeyBiometricAuth) ?? false;
+    });
+  }
+
   @override
   void dispose() {
     _phoneController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -174,13 +218,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const SizedBox(height: 40),
-                        Container(
-                          width: double.infinity,
-                          constraints: const BoxConstraints(maxWidth: 320),
-                          height: 142,
-                          child: Image.asset(
-                            'images/adepa_teachers_logo.png',
-                            fit: BoxFit.contain,
+                        GestureDetector(
+                          onTap: _handleSnbTap,
+                          child: Container(
+                            width: double.infinity,
+                            constraints: const BoxConstraints(maxWidth: 320),
+                            height: 142,
+                            child: Image.asset(
+                              'images/adepa_teachers_logo.png',
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -219,12 +266,48 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    'Phone Number',
-                                    style: theme.textTheme.bodyLarge?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          'Phone Number',
+                                          style: theme.textTheme.bodyLarge
+                                              ?.copyWith(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                        ),
+                                      ),
+                                      if (_biometricEnabled)
+                                        Tooltip(
+                                          message: 'Use biometric sign-in',
+                                          child: Container(
+                                            width: 42,
+                                            height: 38,
+                                            decoration: BoxDecoration(
+                                              border: Border.all(
+                                                color: Colors.white
+                                                    .withOpacitySafe(0.55),
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                            child: IconButton(
+                                              onPressed: _isSubmitting
+                                                  ? null
+                                                  : _handleBiometricSignIn,
+                                              padding: EdgeInsets.zero,
+                                              icon: const Icon(
+                                                Icons.fingerprint,
+                                                size: 22,
+                                              ),
+                                              color: Colors.white,
+                                              disabledColor: Colors.white54,
+                                              tooltip: 'Use biometric sign-in',
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                   const SizedBox(height: 8),
                                   TextField(
@@ -274,6 +357,77 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     ),
                                     style: const TextStyle(color: Colors.white),
                                   ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Password',
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                    controller: _passwordController,
+                                    obscureText: _obscurePassword,
+                                    onChanged: (_) => setState(() {}),
+                                    decoration: InputDecoration(
+                                      prefixIcon: const Icon(
+                                        Icons.lock_outline,
+                                        color: Colors.white70,
+                                      ),
+                                      hintText: 'Enter your password',
+                                      hintStyle: theme.textTheme.bodyMedium
+                                          ?.copyWith(color: Colors.white54),
+                                      suffixIcon: IconButton(
+                                        onPressed: () => setState(
+                                          () => _obscurePassword =
+                                              !_obscurePassword,
+                                        ),
+                                        icon: Icon(
+                                          _obscurePassword
+                                              ? Icons.visibility_outlined
+                                              : Icons.visibility_off_outlined,
+                                          color: Colors.white70,
+                                        ),
+                                        tooltip: _obscurePassword
+                                            ? 'Show password'
+                                            : 'Hide password',
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white.withOpacitySafe(
+                                        0.15,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: Colors.white.withOpacitySafe(
+                                            0.2,
+                                          ),
+                                        ),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: Colors.white.withOpacitySafe(
+                                            0.2,
+                                          ),
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 12,
+                                          ),
+                                    ),
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 28),
@@ -282,7 +436,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 height: 52,
                                 child: ElevatedButton(
                                   onPressed: _isValid && !_isSubmitting
-                                      ? _handleContinue
+                                      ? _handleLogin
                                       : null,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _isValid && !_isSubmitting
@@ -302,7 +456,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                           ),
                                         )
                                       : Text(
-                                          'Continue',
+                                          'Sign in',
                                           style: theme.textTheme.labelLarge
                                               ?.copyWith(
                                                 color: _isValid
@@ -419,22 +573,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                 ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: SafeArea(
-                    top: false,
-                    child: SizedBox(
-                      height: 76,
-                      child: GestureDetector(
-                        onTap: _handleSnbTap,
-                        behavior: HitTestBehavior.opaque,
-                        child: const SizedBox.expand(),
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -453,10 +591,10 @@ class _SnbITSolutionsSheet extends StatelessWidget {
     final primary = theme.colorScheme.primary;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 52, vertical: 8),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacitySafe(0.12),
@@ -466,7 +604,7 @@ class _SnbITSolutionsSheet extends StatelessWidget {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -478,51 +616,40 @@ class _SnbITSolutionsSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 24),
-            const SizedBox(height: 24),
+            const SizedBox(height: 6),
+            Image.asset(
+              'images/snb_it_solutions_logo.png',
+              width: 120,
+              height: 54,
+              fit: BoxFit.contain,
+            ),
             Text(
-              'SNB IT Solutions',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: theme.colorScheme.onSurface,
-                letterSpacing: 0.2,
+              'www.snbitsolutions.com',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                height: 1.35,
               ),
             ),
             const SizedBox(height: 6),
-            Text(
-              'Crafting smart digital experiences\nfor Africa\'s financial future.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
-                height: 1.55,
-              ),
-            ),
-            const SizedBox(height: 20),
             Divider(
               color: theme.colorScheme.outline.withOpacitySafe(0.15),
               thickness: 1,
             ),
-            const SizedBox(height: 16),
+
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.verified_rounded, size: 16, color: primary),
-                const SizedBox(width: 6),
+                Icon(Icons.phone_outlined, size: 14, color: primary),
+                const SizedBox(width: 4),
                 Text(
-                  'Powering ${AppConstants.appName}',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: primary,
-                    fontWeight: FontWeight.w600,
+                  '+233 57 225 8441',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '© 2025 SNB IT Solutions. All rights reserved.',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacitySafe(0.38),
-              ),
             ),
           ],
         ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/app_card.dart';
+import '../../../core/app_scaffold.dart';
 import 'transfer_model.dart';
 
 class ReviewTransferScreen extends StatelessWidget {
@@ -15,30 +17,22 @@ class ReviewTransferScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final data = initialData ?? TransferData();
 
-    final total = data.amount + data.transactionFee;
+    final total = data.amount;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Review Transfer'),
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
+    return AppScaffold(
+      title: 'Review Transfer',
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Summary card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
+            AppCard(
+              backgroundColor: theme.colorScheme.primaryContainer,
               child: Column(
                 children: [
                   Text(
-                    'Total Transfer Amount',
+              'Transfer Amount',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onPrimaryContainer,
                     ),
@@ -93,15 +87,16 @@ class ReviewTransferScreen extends StatelessWidget {
             const SizedBox(height: 12),
             _buildDetailRow(
               context,
-              'Transfer Fee',
-              'GH₵${data.transactionFee.toStringAsFixed(2)}',
-            ),
-            const SizedBox(height: 12),
-            _buildDetailRow(
-              context,
-              'Total',
+              'Amount before backend fees',
               'GH₵${total.toStringAsFixed(2)}',
               highlight: true,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'The transfer cannot be submitted until recipient verification, fees, and processing are supported by the backend.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
             ),
             const SizedBox(height: 32),
 
@@ -109,13 +104,8 @@ class ReviewTransferScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  context.push(
-                    '/transfer/authenticate',
-                    extra: data,
-                  );
-                },
-                child: const Text('Confirm & Continue'),
+                onPressed: null,
+                child: const Text('Transfer unavailable'),
               ),
             ),
 

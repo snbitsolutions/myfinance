@@ -1,95 +1,115 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_scaffold.dart';
 import '../../core/balance_card_shell.dart';
+import '../../core/providers/app_providers.dart';
 
-class SharesScreen extends StatefulWidget {
+class SharesScreen extends ConsumerStatefulWidget {
   const SharesScreen({super.key});
 
   @override
-  State<SharesScreen> createState() => _SharesScreenState();
+  ConsumerState<SharesScreen> createState() => _SharesScreenState();
 }
 
-class _SharesScreenState extends State<SharesScreen> {
-  // Mock in-house shares data
-  final List<Map<String, dynamic>> myShares = [
-    {
-      'id': 'SH-001',
-      'company': 'AdePa Fintech Ltd',
-      'shares_owned': 500,
-      'current_price': 12.50,
-      'total_value': 6250.00,
-      'purchase_date': '10 Jan 2025',
-      'dividend_per_share': 0.75,
-      'last_dividend': '15 Aug 2024',
-      'next_ex_dividend': '15 Feb 2026',
-      'dividend_yield': 6.00,
-      'change_24h': 2.5,
-      'change_color': true,
-      'icon': Icons.business,
-    },
-    {
-      'id': 'SH-002',
-      'company': 'Tech Solutions Ghana',
-      'shares_owned': 300,
-      'current_price': 18.75,
-      'total_value': 5625.00,
-      'purchase_date': '05 Mar 2024',
-      'dividend_per_share': 0.50,
-      'last_dividend': '10 Aug 2024',
-      'next_ex_dividend': '10 Feb 2026',
-      'dividend_yield': 2.67,
-      'change_24h': -1.2,
-      'change_color': false,
-      'icon': Icons.computer,
-    },
-    {
-      'id': 'SH-003',
-      'company': 'Green Energy Corp',
-      'shares_owned': 250,
-      'current_price': 22.00,
-      'total_value': 5500.00,
-      'purchase_date': '20 Jun 2024',
-      'dividend_per_share': 0.85,
-      'last_dividend': '12 Aug 2024',
-      'next_ex_dividend': '12 Feb 2026',
-      'dividend_yield': 3.86,
-      'change_24h': 0.8,
-      'change_color': true,
-      'icon': Icons.eco,
-    },
-  ];
-
+class _SharesScreenState extends ConsumerState<SharesScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
+    final sharesAsync = ref.watch(sharesProvider);
 
-    final totalPortfolioValue = myShares.fold<double>(
-      0,
-      (sum, share) => sum + (share['total_value'] as double),
+    if (sharesAsync.isLoading) {
+      return const AppScaffold(
+        title: 'Shares',
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (sharesAsync.hasError) {
+      return AppScaffold(
+        title: 'Shares',
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 42),
+                const SizedBox(height: 12),
+                Text(
+                  'Unable to load your shares.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Please check your connection and try again.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () => ref.invalidate(sharesProvider),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Try again'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final apiShares = sharesAsync.value ?? const [];
+    final displayedShares = apiShares.map(_mapApiShare).toList();
+    final shareValuesAvailable = displayedShares.every(
+      (share) => share['total_value'] != null,
+    );
+    final sharesOwnedAvailable = displayedShares.every(
+      (share) => share['shares_owned'] != null,
+    );
+    final dividendDataAvailable = displayedShares.every(
+      (share) => share['dividend_per_share'] != null,
+    );
+    final investedDataAvailable = displayedShares.every(
+      (share) => share['invested_value'] != null,
     );
 
-    final totalShares = myShares.fold<int>(
+    final totalPortfolioValue = displayedShares.fold<double>(
       0,
-      (sum, share) => sum + (share['shares_owned'] as int),
+      (sum, share) => sum + _asDouble(share['total_value']),
     );
 
-    final totalDividends = myShares.fold<double>(
+    final totalShares = displayedShares.fold<int>(
+      0,
+      (sum, share) => sum + _asInt(share['shares_owned']),
+    );
+
+    final totalDividends = displayedShares.fold<double>(
       0,
       (sum, share) =>
-          sum + ((share['shares_owned'] as int) * (share['dividend_per_share'] as double)),
+          sum +
+          (_asInt(share['shares_owned']) *
+              _asDouble(share['dividend_per_share'])),
     );
+    final totalInvested = displayedShares.fold<double>(
+      0,
+      (sum, share) => sum + _asDouble(share['invested_value']),
+    );
+    final hasInvestmentData = displayedShares.any(
+      (share) => share['has_investment_data'] == true,
+    );
+    final totalGain = hasInvestmentData
+        ? totalPortfolioValue - totalInvested
+        : null;
+    final returnPercent = hasInvestmentData && totalInvested > 0
+        ? (totalGain! / totalInvested) * 100
+        : null;
 
     return AppScaffold(
       title: 'Shares',
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.more_vert),
-          onPressed: () {},
-        ),
-      ],
       child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -132,6 +152,11 @@ class _SharesScreenState extends State<SharesScreen> {
                         ),
                       ),
                     ),
+                    const Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: AdepaLogoBadge(size: 128, opacity: 0.2),
+                    ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -162,7 +187,9 @@ class _SharesScreenState extends State<SharesScreen> {
                         ),
                         const SizedBox(height: 14),
                         Text(
-                          'GH₵ ${totalPortfolioValue.toStringAsFixed(2).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',')}',
+                          shareValuesAvailable
+                              ? 'GH₵ ${totalPortfolioValue.toStringAsFixed(2).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',')}'
+                              : 'Unavailable',
                           style: theme.textTheme.headlineMedium?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
@@ -184,13 +211,13 @@ class _SharesScreenState extends State<SharesScreen> {
                               child: Row(
                                 children: [
                                   const Icon(
-                                    Icons.trending_up,
+                                    Icons.info_outline,
                                     color: Color(0xFF7EF7B5),
                                     size: 14,
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    '+ 5.2% vs last month',
+                                    'Performance history unavailable',
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: const Color(0xFFDFFFEA),
                                       fontWeight: FontWeight.w700,
@@ -202,8 +229,8 @@ class _SharesScreenState extends State<SharesScreen> {
                             ),
                           ],
                         ),
-                    ],
-                  ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -214,7 +241,7 @@ class _SharesScreenState extends State<SharesScreen> {
                   Expanded(
                     child: _StatPill(
                       label: 'Total Shares',
-                      value: '$totalShares',
+                      value: sharesOwnedAvailable ? '$totalShares' : 'Unavailable',
                       accent: const Color(0xFF2E8B57),
                     ),
                   ),
@@ -222,7 +249,9 @@ class _SharesScreenState extends State<SharesScreen> {
                   Expanded(
                     child: _StatPill(
                       label: 'Dividends',
-                      value: 'GH₵ ${totalDividends.toStringAsFixed(2)}',
+                      value: dividendDataAvailable
+                          ? 'GH₵ ${totalDividends.toStringAsFixed(2)}'
+                          : 'Unavailable',
                       accent: const Color(0xFF0E8F87),
                     ),
                   ),
@@ -290,16 +319,39 @@ class _SharesScreenState extends State<SharesScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              ...myShares.map((share) => Padding(
+              if (displayedShares.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: theme.colorScheme.outline.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  child: Text(
+                    'No shares are currently linked to this account.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.68,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ...displayedShares.map(
+                  (share) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _ShareCard(
                       share: share,
                       theme: theme,
-                      onTap: () => context.go(
-                        '/shares/${share['id'] ?? 'unknown'}',
-                      ),
+                      onTap: () =>
+                          context.go('/shares/${share['id'] ?? 'unknown'}'),
                     ),
-                  )),
+                  ),
+                ),
               const SizedBox(height: 16),
 
               // Portfolio Overview Section
@@ -329,56 +381,62 @@ class _SharesScreenState extends State<SharesScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Portfolio Overview',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {},
-                          child: Text(
-                            'View Analytics →',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: primary,
-                              fontWeight: FontWeight.w700,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Portfolio Overview',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
+                            GestureDetector(
+                              onTap: () {},
+                              child: Text(
+                                'View Analytics →',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _OverviewItem(
-                            icon: Icons.account_balance_wallet,
-                            label: 'Total Invested',
-                            value: 'GH₵ 17,375.00',
-                            theme: theme,
-                          ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _OverviewItem(
+                                icon: Icons.account_balance_wallet,
+                                label: 'Total Invested',
+                                value: hasInvestmentData && investedDataAvailable
+                                    ? _formatCurrency(totalInvested)
+                                    : '—',
+                                theme: theme,
+                              ),
+                            ),
+                            Expanded(
+                              child: _OverviewItem(
+                                icon: Icons.trending_up,
+                                label: 'Total Gain',
+                                value: totalGain == null
+                                    ? '—'
+                                    : _formatCurrency(totalGain),
+                                theme: theme,
+                              ),
+                            ),
+                            Expanded(
+                              child: _OverviewItem(
+                                icon: Icons.percent,
+                                label: 'Overall Return',
+                                value: returnPercent == null
+                                    ? '—'
+                                    : '${returnPercent.toStringAsFixed(1)}%',
+                                theme: theme,
+                              ),
+                            ),
+                          ],
                         ),
-                        Expanded(
-                          child: _OverviewItem(
-                            icon: Icons.trending_up,
-                            label: 'Total Gain',
-                            value: 'GH₵ 968.00',
-                            theme: theme,
-                          ),
-                        ),
-                        Expanded(
-                          child: _OverviewItem(
-                            icon: Icons.percent,
-                            label: 'Overall Return',
-                            value: '5.6%',
-                            theme: theme,
-                          ),
-                        ),
-                      ],
-                    ),
                       ],
                     ),
                   ],
@@ -390,6 +448,82 @@ class _SharesScreenState extends State<SharesScreen> {
         ),
       ),
     );
+  }
+
+  double _asDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString().replaceAll(',', '') ?? '') ?? 0;
+  }
+
+  int _asInt(dynamic value) {
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  String _formatCurrency(double value) {
+    return 'GH₵ ${value.toStringAsFixed(2).replaceAllMapped(
+          RegExp(r'\B(?=(\d{3})+(?!\d))'),
+          (match) => ',',
+        )}';
+  }
+
+  Map<String, dynamic> _mapApiShare(Map<String, dynamic> item) {
+    final ownedRaw = item['shares_owned'] ?? item['quantity'] ?? item['units'] ?? item['shares'];
+    final owned = _asInt(
+      item['shares_owned'] ??
+          item['quantity'] ??
+          item['units'] ??
+          item['shares'],
+    );
+    final priceRaw = item['current_price'] ?? item['unit_price'] ?? item['price'] ?? item['share_price'];
+    final price = _asDouble(
+      item['current_price'] ??
+          item['unit_price'] ??
+          item['price'] ??
+          item['share_price'],
+    );
+    final valueRaw = item['total_value'] ?? item['market_value'] ?? item['current_value'] ?? item['value'] ?? item['shares_value'] ?? item['balance'];
+    final value = _asDouble(
+      item['total_value'] ??
+          item['market_value'] ??
+          item['current_value'] ??
+          item['value'] ??
+          item['shares_value'] ??
+          item['balance'],
+    );
+    final investedValue = item['invested_value'] ??
+        item['amount_invested'] ??
+        item['purchase_value'] ??
+        item['cost_basis'] ??
+        item['principal'];
+    return {
+      ...item,
+      'id': item['id'] ??
+          item['share_id'] ??
+          item['account_id'] ??
+          item['product_id'] ??
+          item['symbol'] ??
+          'share',
+      'company':
+          item['company'] ??
+          item['company_name'] ??
+          item['product_name'] ??
+          item['name'] ??
+          'Shares',
+      'shares_owned': ownedRaw == null ? null : owned,
+      'current_price': priceRaw == null ? null : price,
+      'total_value': valueRaw == null ? null : value,
+      'invested_value': investedValue == null ? null : _asDouble(investedValue),
+      'has_investment_data': investedValue != null,
+      'dividend_per_share': item['dividend_per_share'] == null && item['dividend'] == null
+          ? null
+          : _asDouble(item['dividend_per_share'] ?? item['dividend']),
+      'change_24h': item['change_24h'] == null && item['change'] == null
+          ? null
+          : _asDouble(item['change_24h'] ?? item['change']),
+      'change_color': _asDouble(item['change_24h'] ?? item['change']) >= 0,
+      'icon': Icons.business,
+    };
   }
 }
 
@@ -446,11 +580,7 @@ class _ActionButton extends StatelessWidget {
                   ),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(
-                  icon,
-                  color: theme.colorScheme.primary,
-                  size: 20,
-                ),
+                child: Icon(icon, color: theme.colorScheme.primary, size: 20),
               ),
               const SizedBox(height: 8),
               Text(
@@ -541,7 +671,9 @@ class _ShareCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = theme.colorScheme.primary;
-    final changeColor = (share['change_color'] as bool) ? Colors.green : Colors.red;
+    final changeColor = (share['change_color'] as bool)
+        ? Colors.green
+        : Colors.red;
 
     return Material(
       color: Colors.transparent,
@@ -619,7 +751,10 @@ class _ShareCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: changeColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(999),

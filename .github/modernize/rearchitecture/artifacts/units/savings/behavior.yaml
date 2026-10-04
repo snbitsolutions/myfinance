@@ -1,0 +1,26 @@
+unit: savings
+side_effects:
+  - source_loc: "lib/screens/savings/savings_storage.dart:11"
+    effect: "Persists local savings data in SharedPreferences."
+    must_preserve: true
+  - source_loc: "lib/core/providers/app_providers.dart:1129"
+    effect: "Loads savings accounts using authenticated member credentials."
+    must_preserve: true
+branches:
+  - source_loc: "lib/router/app_router.dart:728"
+    condition: "Savings route contains an ID parameter."
+    behavior: "Builds the detail screen for the selected savings account."
+    must_preserve: true
+error_paths:
+  - source_loc: "lib/core/providers/app_providers.dart:1188"
+    trigger: "Missing phone/account credentials for a savings mutation."
+    outcome: "Raises a validation error and prevents the mutation."
+    contract: "No mutation without a complete authenticated identity."
+    must_preserve: true
+concurrency:
+  model: async
+  tx_boundary:
+    source_loc: "lib/core/providers/app_providers.dart:1188"
+    scope: "Load selected savings account before withdrawal/transfer flow."
+    isolation: "not specified"
+    must_preserve: true

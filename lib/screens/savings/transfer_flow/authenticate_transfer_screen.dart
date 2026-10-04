@@ -1,15 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import '../../../core/services/secure_auth_storage.dart';
-import 'transfer_model.dart';
+import '../../../core/app_card.dart';
+import '../../../core/app_scaffold.dart';
 
 class AuthenticateTransferScreen extends StatefulWidget {
-  final TransferData? initialData;
-
-  const AuthenticateTransferScreen({
-    super.key,
-    this.initialData,
-  });
+  const AuthenticateTransferScreen({super.key});
 
   @override
   State<AuthenticateTransferScreen> createState() =>
@@ -20,14 +14,12 @@ class _AuthenticateTransferScreenState
     extends State<AuthenticateTransferScreen> {
   late String _pinInput;
   late String _errorMessage;
-  late TransferData _data;
 
   @override
   void initState() {
     super.initState();
     _pinInput = '';
     _errorMessage = '';
-    _data = widget.initialData ?? TransferData();
   }
 
   void _addDigit(String digit) {
@@ -60,33 +52,20 @@ class _AuthenticateTransferScreenState
   }
 
   Future<void> _validateAndProceed() async {
-    final storedPin = await SecureAuthStorage.instance.readPin();
-
-    if (_pinInput == storedPin) {
-      if (mounted) {
-        context.push(
-          '/transfer/processing',
-          extra: _data,
-        );
-      }
-    } else {
-      setState(() {
-        _errorMessage = 'Incorrect PIN. Please try again.';
-        _pinInput = '';
-      });
-    }
+    setState(() {
+      _errorMessage =
+          'Transfer authorization is unavailable because this transfer cannot be submitted to the backend.';
+      _pinInput = '';
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Authenticate Transfer'),
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
+    return AppScaffold(
+      title: 'Authenticate Transfer',
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,14 +79,11 @@ class _AuthenticateTransferScreenState
 
             // PIN display
             Center(
-              child: Container(
+              child: AppCard(
+                margin: EdgeInsets.zero,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 32.0,
                   vertical: 24.0,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -247,7 +223,7 @@ class _KeypadButtonState extends State<_KeypadButton> {
         padding: const EdgeInsets.all(16.0),
         decoration: BoxDecoration(
           color: _isPressed
-              ? theme.colorScheme.primary.withOpacity(0.2)
+              ? theme.colorScheme.primary.withValues(alpha: 0.2)
               : theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(

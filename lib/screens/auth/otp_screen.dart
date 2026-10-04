@@ -17,10 +17,12 @@ class OtpScreen extends ConsumerStatefulWidget {
     super.key,
     required this.phoneNumber,
     required this.accountNumber,
+    this.isRegistration = false,
   });
 
   final String phoneNumber;
   final String accountNumber;
+  final bool isRegistration;
 
   @override
   ConsumerState<OtpScreen> createState() => _OtpScreenState();
@@ -138,7 +140,18 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       ref.invalidate(savingsProvider);
       if (!mounted) return;
 
-      context.go('/home');
+      if (widget.isRegistration) {
+        context.go(
+          '/set-pin',
+          extra: {
+            'accountNumber': ref.read(authProvider).userId,
+            'phoneNumber': widget.phoneNumber,
+            'mode': 'register',
+          },
+        );
+      } else {
+        context.go('/home');
+      }
     } on AppException catch (e) {
       await NotificationService.instance.addNotification(
         AppNotification(
@@ -245,7 +258,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                             }
                           },
                           icon: const Icon(
-                            Icons.arrow_back,
+                            Icons.arrow_back_ios_new_rounded,
                             color: Colors.white,
                           ),
                         ),
@@ -296,7 +309,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                                 const SizedBox(height: 8),
                                 TextField(
                                   controller: _otpController,
-                                keyboardType: TextInputType.number,
+                                  keyboardType: TextInputType.number,
                                   inputFormatters: [
                                     FilteringTextInputFormatter.digitsOnly,
                                   ],
@@ -384,8 +397,8 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                             ),
                             const SizedBox(height: 16),
                             TextButton(
-                              onPressed: _isResending ||
-                                      _resendSecondsRemaining > 0
+                              onPressed:
+                                  _isResending || _resendSecondsRemaining > 0
                                   ? null
                                   : _handleResendCode,
                               child: Text(

@@ -5,6 +5,12 @@ import 'package:go_router/go_router.dart';
 import '../../core/balance_card_shell.dart';
 import '../../core/providers/app_providers.dart';
 
+String _timeBasedGreeting(DateTime time) {
+  if (time.hour < 12) return 'Good morning';
+  if (time.hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 class ProductsScreen extends ConsumerWidget {
   const ProductsScreen({super.key});
 
@@ -12,9 +18,22 @@ class ProductsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final profileAsync = ref.watch(userProfileProvider);
+    final savingsAsync = ref.watch(savingsProvider);
+    final sharesAsync = ref.watch(sharesProvider);
+    final investmentsAsync = ref.watch(investmentsApiProvider);
+    final loansAsync = ref.watch(loansProvider);
     final profile = profileAsync.maybeWhen(
       data: (value) => value,
       orElse: () => const <String, dynamic>{},
+    );
+    final savingsBalance = _sumBalances(savingsAsync.valueOrNull);
+    final sharesBalance = _sumBalances(sharesAsync.valueOrNull);
+    final loanBalance = _sumLoanBalances(loansAsync.valueOrNull);
+    final profileBalance = _toDouble(profile['balance']);
+    final savingsPortfolioAmount = _portfolioAmount(
+      savingsAsync,
+      savingsBalance,
+      const ['balance', 'current_balance', 'amount'],
     );
 
     final accountName =
@@ -37,7 +56,7 @@ class ProductsScreen extends ConsumerWidget {
       _ProductCard(
         title: 'Savings',
         subtitle: 'All your savings accounts',
-        amount: 'GH₵ 72,400.00',
+        amount: _portfolioAmount(savingsAsync, savingsBalance, const ['balance', 'current_balance', 'amount']),
         icon: Icons.savings_rounded,
         accent: const Color(0xFF0C8B5A),
         tint: const Color(0xFFEAF5EE),
@@ -46,16 +65,22 @@ class ProductsScreen extends ConsumerWidget {
       _ProductCard(
         title: 'Shares',
         subtitle: 'Your equity portfolio',
-        amount: 'GH₵ 28,350.00',
+        amount: _portfolioAmount(sharesAsync, sharesBalance, const ['total_value', 'market_value', 'current_value', 'value', 'shares_value', 'balance']),
         icon: Icons.pie_chart_rounded,
-        accent: const Color(0xFF0E8F87),
-        tint: const Color(0xFFE8F9F7),
+        accent: const Color(0xFFE7A817),
+        tint: const Color(0xFFFFF4DC),
         onTap: () => context.go('/shares'),
       ),
       _ProductCard(
         title: 'Investments',
         subtitle: 'Fixed deposits and more',
-        amount: 'GH₵ 80,650.00',
+        amount: investmentsAsync.hasError
+            ? 'Unavailable'
+            : _portfolioAmount(
+                investmentsAsync,
+                _sumBalances(investmentsAsync.valueOrNull),
+                const ['balance', 'current_balance', 'amount', 'current_value', 'value'],
+              ),
         icon: Icons.trending_up_rounded,
         accent: const Color(0xFF0C8B5A),
         tint: const Color(0xFFEAF5EE),
@@ -64,7 +89,7 @@ class ProductsScreen extends ConsumerWidget {
       _ProductCard(
         title: 'Loans',
         subtitle: 'Active loans and repayments',
-        amount: 'GH₵ 45,000.00',
+        amount: _portfolioAmount(loansAsync, loanBalance, const ['outstanding_balance', 'outstanding', 'balance']),
         icon: Icons.receipt_long_rounded,
         accent: const Color(0xFF2F7DEB),
         tint: const Color(0xFFEAF3FF),
@@ -119,7 +144,7 @@ class ProductsScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Good morning',
+                          _timeBasedGreeting(DateTime.now()),
                           style: theme.textTheme.labelLarge?.copyWith(
                             color: const Color(0xFF5F6E66),
                             fontWeight: FontWeight.w600,
@@ -204,7 +229,9 @@ class ProductsScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'GH₵ 229,250.00',
+                          profile['balance'] == null
+                              ? savingsPortfolioAmount
+                              : _money(profileBalance),
                           style: theme.textTheme.headlineSmall?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
@@ -234,7 +261,7 @@ class ProductsScreen extends ConsumerWidget {
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    '+ 12.4%',
+                                  'Unavailable',
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: const Color(0xFF9FD6B8),
                                       fontWeight: FontWeight.w700,
@@ -245,7 +272,7 @@ class ProductsScreen extends ConsumerWidget {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              'vs last month',
+                              'Change unavailable',
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: Colors.white.withValues(alpha: 0.72),
                               ),
@@ -260,14 +287,27 @@ class ProductsScreen extends ConsumerWidget {
               const SizedBox(height: 18),
               Row(
                 children: [
-                  Text(
-                    'Products',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF1B2A24),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Products',
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF1B2A24),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Your finances at a glance',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: const Color(0xFF718078),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const Spacer(),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -288,12 +328,62 @@ class ProductsScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              ...products,
+              for (var index = 0; index < products.length; index++) ...[
+                products[index],
+                if (index < products.length - 1) const SizedBox(height: 12),
+              ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  static double _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString().replaceAll(',', '') ?? '') ?? 0;
+  }
+
+  static double _sumBalances(List<Map<String, dynamic>>? accounts) {
+    return (accounts ?? const <Map<String, dynamic>>[]).fold<double>(
+      0,
+      (sum, account) =>
+          sum +
+          _toDouble(
+            account['balance'] ??
+                account['current_balance'] ??
+                account['amount'],
+          ),
+    );
+  }
+
+  static double _sumLoanBalances(List<Map<String, dynamic>>? loans) {
+    return (loans ?? const <Map<String, dynamic>>[]).fold<double>(
+      0,
+      (sum, loan) =>
+          sum +
+          _toDouble(
+            loan['outstanding_balance'] ??
+                loan['outstanding'] ??
+                loan['balance'],
+          ),
+    );
+  }
+
+  static String _money(double value) => 'GH₵ ${value.toStringAsFixed(2)}';
+
+  static String _portfolioAmount(
+    AsyncValue<List<Map<String, dynamic>>> value,
+    double amount,
+    List<String> keys,
+  ) {
+    if (value.isLoading) return 'Loading...';
+    if (value.hasError) return 'Unavailable';
+    final items = value.valueOrNull ?? const <Map<String, dynamic>>[];
+    if (items.any((item) => !keys.any((key) => item[key] != null))) {
+      return 'Unavailable';
+    }
+    return _money(amount);
   }
 }
 
@@ -403,35 +493,31 @@ class _ProductCard extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE5EAE6)),
-        ),
-        child: Stack(
-          clipBehavior: Clip.hardEdge,
-          children: [
-            Positioned(
-              top: 8,
-              right: 8,
-              bottom: 8,
-              child: IgnorePointer(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: AdepaLogoBadge(size: 92, color: accent, opacity: 0.24),
+      child: Stack(
+        clipBehavior: Clip.hardEdge,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE5EAE6)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF163326).withValues(alpha: 0.06),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
-              ),
+              ],
             ),
-            Row(
+            child: Row(
               children: [
                 Container(
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
                     color: tint,
-                    borderRadius: BorderRadius.circular(15),
+                    shape: BoxShape.circle,
                   ),
                   child: Icon(icon, color: accent, size: 26),
                 ),
@@ -469,16 +555,33 @@ class _ProductCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: Color(0xFF1B2A24),
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: tint,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.chevron_right_rounded, color: accent),
                     ),
                   ],
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          Positioned(
+            left: 0,
+            top: 12,
+            bottom: 12,
+            child: Container(
+              width: 4,
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

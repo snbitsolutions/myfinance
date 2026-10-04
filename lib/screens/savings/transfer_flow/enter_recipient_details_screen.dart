@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import '../../../core/app_card.dart';
+import '../../../core/app_scaffold.dart';
+import '../../../core/modern_input.dart';
 import 'transfer_model.dart';
 
 class EnterRecipientDetailsScreen extends StatefulWidget {
@@ -33,48 +35,38 @@ class _EnterRecipientDetailsScreenState
     super.dispose();
   }
 
-  bool get _canContinue =>
-      _phoneController.text.trim().isNotEmpty &&
-      _phoneController.text.trim().length >= 10;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Recipient Details'),
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
+    return AppScaffold(
+      title: 'Recipient Details',
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Recipient name display
             Text(
-              'Recipient Name',
+              'Recipient name (unverified)',
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w500,
               ),
             ),
             const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 12.0,
-              ),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: theme.colorScheme.outline,
-                ),
-                borderRadius: BorderRadius.circular(12),
-                color: theme.colorScheme.surface,
-              ),
-              child: Text(
-                _data.recipientName ?? 'Unknown',
-                style: theme.textTheme.bodyMedium,
+            AppCard(
+              child: Row(
+                children: [
+                  Icon(Icons.person_outline_rounded,
+                      color: theme.colorScheme.primary),
+                  const SizedBox(width: 12),
+                  Text(
+                    _data.recipientName ?? 'Not provided',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 24),
@@ -87,36 +79,29 @@ class _EnterRecipientDetailsScreenState
               ),
             ),
             const SizedBox(height: 8),
-            TextField(
+            ModernInput(
               controller: _phoneController,
               keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
-                hintText: 'Enter phone number',
-                prefixText: '+233 ',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+              label: 'Phone Number',
+              prefixText: '+233 ',
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 32),
+
+            Text(
+              'Recipient lookup is unavailable. You can review the details, but the transfer cannot continue until the backend can verify the recipient.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+            const SizedBox(height: 16),
 
             // Continue button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _canContinue
-                    ? () {
-                        final updated = _data.copyWith(
-                          recipientPhone: '+233${_phoneController.text.trim()}',
-                        );
-                        context.push(
-                          '/transfer/verify-recipient',
-                          extra: updated,
-                        );
-                      }
-                    : null,
-                child: const Text('Continue'),
+                onPressed: null,
+                child: const Text('Recipient lookup unavailable'),
               ),
             ),
           ],

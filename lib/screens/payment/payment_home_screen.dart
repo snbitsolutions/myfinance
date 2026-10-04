@@ -5,6 +5,42 @@ import 'package:go_router/go_router.dart';
 import '../../core/balance_card_shell.dart';
 import '../../core/providers/app_providers.dart';
 
+double _readAmount(dynamic value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString().replaceAll(',', '') ?? '') ?? 0;
+}
+
+double _sumAmounts(List<Map<String, dynamic>>? items, List<String> amountKeys) {
+  return (items ?? const <Map<String, dynamic>>[]).fold<double>(0, (
+    total,
+    item,
+  ) {
+    for (final key in amountKeys) {
+      final value = item[key];
+      if (value != null) return total + _readAmount(value);
+    }
+    return total;
+  });
+}
+
+String _formatAmount(double amount) => 'GH₵ ${amount.toStringAsFixed(2)}';
+
+bool allSavingsAmountsAvailable(List<Map<String, dynamic>>? items) =>
+    items != null &&
+    items.every(
+      (item) =>
+          item['balance'] != null ||
+          item['current_balance'] != null ||
+          item['amount'] != null,
+    );
+
+bool allAmountsAvailable(
+  List<Map<String, dynamic>>? items,
+  List<String> keys,
+) =>
+    items != null &&
+    items.every((item) => keys.any((key) => item[key] != null));
+
 class PaymentHomeScreen extends ConsumerWidget {
   const PaymentHomeScreen({super.key});
 
@@ -12,16 +48,65 @@ class PaymentHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final profileAsync = ref.watch(userProfileProvider);
+    final savingsAsync = ref.watch(savingsProvider);
+    final sharesAsync = ref.watch(sharesProvider);
+    final investmentsAsync = ref.watch(investmentsApiProvider);
+    final loansAsync = ref.watch(loansProvider);
 
     final profile = profileAsync.maybeWhen(
       data: (value) => value,
       orElse: () => const <String, dynamic>{},
     );
 
-    final accountName = (profile['name'] ?? profile['account_name'] ?? 'Your account')
-        .toString()
-        .trim();
+    final accountName =
+        (profile['name'] ?? profile['account_name'] ?? 'Your account')
+            .toString()
+            .trim();
     final resolvedName = accountName.isNotEmpty ? accountName : 'Your account';
+    final accountBalance = profile['balance'] == null
+        ? null
+        : _readAmount(profile['balance']);
+    final savingsBalance = _sumAmounts(savingsAsync.valueOrNull, const [
+      'balance',
+      'current_balance',
+      'amount',
+    ]);
+    final sharesBalance = _sumAmounts(sharesAsync.valueOrNull, const [
+      'balance',
+      'current_value',
+      'value',
+      'shares_value',
+    ]);
+    final investmentsBalance = _sumAmounts(investmentsAsync.valueOrNull, const [
+      'balance',
+      'current_value',
+      'value',
+      'amount',
+    ]);
+    final loansBalance = _sumAmounts(loansAsync.valueOrNull, const [
+      'outstanding_balance',
+      'balance',
+      'amount',
+    ]);
+    final totalBalanceAvailable = accountBalance != null;
+    final savingsBalancesAvailable = !savingsAsync.isLoading &&
+        !savingsAsync.hasError &&
+        allSavingsAmountsAvailable(savingsAsync.valueOrNull);
+    final sharesAvailable = !sharesAsync.isLoading &&
+        !sharesAsync.hasError &&
+        allAmountsAvailable(sharesAsync.valueOrNull, const [
+          'total_value', 'market_value', 'current_value', 'value', 'shares_value', 'balance',
+        ]);
+    final investmentsAvailable = !investmentsAsync.isLoading &&
+        !investmentsAsync.hasError &&
+        allAmountsAvailable(investmentsAsync.valueOrNull, const [
+          'current_value', 'current_balance', 'value', 'balance', 'amount',
+        ]);
+    final loansAvailable = !loansAsync.isLoading &&
+        !loansAsync.hasError &&
+        allAmountsAvailable(loansAsync.valueOrNull, const [
+          'outstanding_balance', 'balance', 'amount',
+        ]);
 
     final imageUrl = _resolveProfileImageUrl(profile);
     final initials = resolvedName
@@ -37,7 +122,7 @@ class PaymentHomeScreen extends ConsumerWidget {
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 8),
               _TopHeader(
@@ -46,7 +131,18 @@ class PaymentHomeScreen extends ConsumerWidget {
                 imageUrl: imageUrl,
               ),
               const SizedBox(height: 18),
-              _PortfolioSummaryCard(),
+              _PortfolioSummaryCard(
+                accountBalance: accountBalance,
+                totalBalanceAvailable: totalBalanceAvailable,
+                savingsAvailable: savingsBalancesAvailable,
+                sharesAvailable: sharesAvailable,
+                investmentsAvailable: investmentsAvailable,
+                loansAvailable: loansAvailable,
+                savingsBalance: savingsBalance,
+                sharesBalance: sharesBalance,
+                investmentsBalance: investmentsBalance,
+                loansBalance: loansBalance,
+              ),
               const SizedBox(height: 26),
               Row(
                 children: [
@@ -59,7 +155,10 @@ class PaymentHomeScreen extends ConsumerWidget {
                   ),
                   const SizedBox(width: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFEAF5EE),
                       borderRadius: BorderRadius.circular(999),
@@ -81,8 +180,13 @@ class PaymentHomeScreen extends ConsumerWidget {
                 tint: const Color(0xFFEAF4EE),
                 title: 'Savings',
                 subtitle: 'All your savings accounts\nand balances',
-                amount: 'GH₵ 72,400.00',
-                count: '3 accounts',
+                amount: savingsAsync.isLoading || savingsAsync.hasError ||
+                        !savingsBalancesAvailable
+                    ? 'Unavailable'
+                    : _formatAmount(savingsBalance),
+                count: savingsAsync.isLoading || savingsAsync.hasError
+                    ? 'Unavailable'
+                    : '${savingsAsync.valueOrNull?.length ?? 0} accounts',
                 amountColor: const Color(0xFF0B8F57),
                 onTap: () => context.go('/savings'),
               ),
@@ -93,8 +197,10 @@ class PaymentHomeScreen extends ConsumerWidget {
                 tint: const Color(0xFFF8F0E1),
                 title: 'Shares',
                 subtitle: 'Your shareholding and\nshare value',
-                amount: 'GH₵ 31,200.00',
-                count: '1 account',
+                amount: sharesAvailable ? _formatAmount(sharesBalance) : 'Unavailable',
+                count: sharesAsync.isLoading || sharesAsync.hasError
+                    ? 'Unavailable'
+                    : '${sharesAsync.valueOrNull?.length ?? 0} accounts',
                 amountColor: const Color(0xFFD49A1F),
                 onTap: () => context.go('/shares'),
               ),
@@ -105,8 +211,12 @@ class PaymentHomeScreen extends ConsumerWidget {
                 tint: const Color(0xFFEAF5EE),
                 title: 'Investments',
                 subtitle: 'Fixed deposits and other\ninvestments',
-                amount: 'GH₵ 80,650.00',
-                count: '2 investments',
+                amount: investmentsAvailable
+                    ? _formatAmount(investmentsBalance)
+                    : 'Unavailable',
+                count: investmentsAsync.isLoading || investmentsAsync.hasError
+                    ? 'Unavailable'
+                    : '${investmentsAsync.valueOrNull?.length ?? 0} investments',
                 amountColor: const Color(0xFF0B8F57),
                 onTap: () => context.go('/investments'),
               ),
@@ -117,8 +227,10 @@ class PaymentHomeScreen extends ConsumerWidget {
                 tint: const Color(0xFFEAF3FF),
                 title: 'Loans',
                 subtitle: 'Your active loans and\nrepayment status',
-                amount: 'GH₵ 45,000.00',
-                count: '1 active loan',
+                amount: loansAvailable ? _formatAmount(loansBalance) : 'Unavailable',
+                count: loansAsync.isLoading || loansAsync.hasError
+                    ? 'Unavailable'
+                    : '${loansAsync.valueOrNull?.length ?? 0} loan records',
                 amountColor: const Color(0xFF3E7DBF),
                 onTap: () => context.go('/loans'),
               ),
@@ -155,9 +267,8 @@ class _TopHeader extends StatelessWidget {
               width: 48,
               height: 48,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => _InitialsAvatar(
-                initials: initials,
-              ),
+              errorBuilder: (context, error, stackTrace) =>
+                  _InitialsAvatar(initials: initials),
             ),
           )
         : _InitialsAvatar(initials: initials);
@@ -300,6 +411,30 @@ class _HeaderButton extends StatelessWidget {
 }
 
 class _PortfolioSummaryCard extends StatelessWidget {
+  final double? accountBalance;
+  final bool totalBalanceAvailable;
+  final bool savingsAvailable;
+  final bool sharesAvailable;
+  final bool investmentsAvailable;
+  final bool loansAvailable;
+  final double savingsBalance;
+  final double sharesBalance;
+  final double investmentsBalance;
+  final double loansBalance;
+
+  const _PortfolioSummaryCard({
+    required this.accountBalance,
+    required this.totalBalanceAvailable,
+    required this.savingsAvailable,
+    required this.sharesAvailable,
+    required this.investmentsAvailable,
+    required this.loansAvailable,
+    required this.savingsBalance,
+    required this.sharesBalance,
+    required this.investmentsBalance,
+    required this.loansBalance,
+  });
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -311,11 +446,7 @@ class _PortfolioSummaryCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF0E5A3E),
-            Color(0xFF123D2D),
-            Color(0xFF0E5A3E),
-          ],
+          colors: [Color(0xFF0E5A3E), Color(0xFF123D2D), Color(0xFF0E5A3E)],
         ),
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
@@ -373,14 +504,21 @@ class _PortfolioSummaryCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 112),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.visibility_off_rounded, color: Colors.white, size: 12),
+                        const Icon(
+                          Icons.visibility_off_rounded,
+                          color: Colors.white,
+                          size: 12,
+                        ),
                         const SizedBox(width: 5),
                         Text(
                           'Hide',
@@ -403,7 +541,9 @@ class _PortfolioSummaryCard extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'GH₵ 229,250.00',
+                totalBalanceAvailable
+                    ? _formatAmount(accountBalance!)
+                    : 'Unavailable',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
@@ -414,17 +554,24 @@ class _PortfolioSummaryCard extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF9FD6B8).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.trending_up_rounded, color: Color(0xFF9FD6B8), size: 13),
+                        const Icon(
+                          Icons.trending_up_rounded,
+                          color: Color(0xFF9FD6B8),
+                          size: 13,
+                        ),
                         const SizedBox(width: 4),
                         Text(
-                          '+ 12.4%',
+                          'Unavailable',
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: const Color(0xFF9FD6B8),
                             fontWeight: FontWeight.w700,
@@ -435,7 +582,7 @@ class _PortfolioSummaryCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'vs last month',
+                    'Change unavailable',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: Colors.white.withValues(alpha: 0.72),
                     ),
@@ -448,8 +595,10 @@ class _PortfolioSummaryCard extends StatelessWidget {
                   Expanded(
                     child: _SummaryTile(
                       label: 'Total Savings',
-                      value: 'GH₵ 72,400.00',
-                      sub: '3 accounts',
+                      value: savingsAvailable
+                          ? _formatAmount(savingsBalance)
+                          : 'Unavailable',
+                      sub: 'Account count unavailable',
                       icon: Icons.savings_rounded,
                       iconColor: const Color(0xFFEAF5EE),
                       accent: const Color(0xFF9FD6B8),
@@ -459,8 +608,10 @@ class _PortfolioSummaryCard extends StatelessWidget {
                   Expanded(
                     child: _SummaryTile(
                       label: 'Total Shares',
-                      value: 'GH₵ 31,200.00',
-                      sub: '1 account',
+                      value: sharesAvailable
+                          ? _formatAmount(sharesBalance)
+                          : 'Unavailable',
+                      sub: 'Account count unavailable',
                       icon: Icons.pie_chart_rounded,
                       iconColor: const Color(0xFFFCE9BF),
                       accent: const Color(0xFFF2C75C),
@@ -474,8 +625,10 @@ class _PortfolioSummaryCard extends StatelessWidget {
                   Expanded(
                     child: _SummaryTile(
                       label: 'Investments',
-                      value: 'GH₵ 80,650.00',
-                      sub: '2 vehicles',
+                      value: investmentsAvailable
+                          ? _formatAmount(investmentsBalance)
+                          : 'Unavailable',
+                      sub: 'Count unavailable',
                       icon: Icons.trending_up_rounded,
                       iconColor: const Color(0xFFEAF5EE),
                       accent: const Color(0xFF6CD29D),
@@ -485,8 +638,10 @@ class _PortfolioSummaryCard extends StatelessWidget {
                   Expanded(
                     child: _SummaryTile(
                       label: 'Loans',
-                      value: 'GH₵ 45,000.00',
-                      sub: '1 active',
+                      value: loansAvailable
+                          ? _formatAmount(loansBalance)
+                          : 'Unavailable',
+                      sub: 'Count unavailable',
                       icon: Icons.description_outlined,
                       iconColor: const Color(0xFFE7F0FF),
                       accent: const Color(0xFF9ABCF7),
@@ -545,6 +700,7 @@ class _SummaryTile extends StatelessWidget {
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: Colors.white.withValues(alpha: 0.78),
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
           Text(
@@ -555,9 +711,11 @@ class _SummaryTile extends StatelessWidget {
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
                 width: 6,
@@ -620,11 +778,7 @@ class _CategoryTile extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Colors.white,
-            Colors.white,
-            tint.withValues(alpha: 0.02),
-          ],
+          colors: [Colors.white, Colors.white, tint.withValues(alpha: 0.02)],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFE7EDE8), width: 1.1),
@@ -651,10 +805,7 @@ class _CategoryTile extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  tint,
-                  tint.withValues(alpha: 0.82),
-                ],
+                colors: [tint, tint.withValues(alpha: 0.82)],
               ),
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
@@ -783,7 +934,10 @@ class _GrowCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 18),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF0E5A3E),
                     borderRadius: BorderRadius.circular(14),
@@ -821,11 +975,7 @@ class _GrowCard extends StatelessWidget {
             child: Stack(
               alignment: Alignment.bottomCenter,
               children: [
-                Positioned(
-                  bottom: 8,
-                  left: 18,
-                  child: _CoinStack(count: 4),
-                ),
+                Positioned(bottom: 8, left: 18, child: _CoinStack(count: 4)),
                 Positioned(
                   bottom: 0,
                   right: 16,
@@ -836,7 +986,11 @@ class _GrowCard extends StatelessWidget {
                       color: const Color(0xFF0E5A3E),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Icon(Icons.eco_rounded, color: Colors.white, size: 28),
+                    child: const Icon(
+                      Icons.eco_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
                   ),
                 ),
                 Positioned(

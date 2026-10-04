@@ -14,10 +14,9 @@ class ReceiptTransferScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final data = initialData ?? TransferData();
-    final total = data.amount + data.transactionFee;
 
-    return WillPopScope(
-      onWillPop: () async => false,
+    return PopScope(
+      canPop: false,
       child: Scaffold(
         body: SingleChildScrollView(
           child: Column(
@@ -47,7 +46,7 @@ class ReceiptTransferScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
+                        color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -88,14 +87,14 @@ class ReceiptTransferScreen extends StatelessWidget {
                           vertical: 8.0,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
+                          color: theme.colorScheme.surfaceContainerHighest,
                           border: Border.all(
-                            color: Colors.green,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '✓ Transfer Successful',
+                          'Transfer not submitted',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: Colors.green,
                             fontWeight: FontWeight.bold,
@@ -116,14 +115,14 @@ class ReceiptTransferScreen extends StatelessWidget {
                       child: Column(
                         children: [
                           Text(
-                            'Amount Transferred',
+                            'Amount entered',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onPrimaryContainer,
                             ),
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'GH₵${total.toStringAsFixed(2)}',
+                            'GH₵${data.amount.toStringAsFixed(2)}',
                             style: theme.textTheme.headlineSmall?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: theme.colorScheme.onPrimaryContainer,
@@ -158,20 +157,20 @@ class ReceiptTransferScreen extends StatelessWidget {
                     const SizedBox(height: 12),
                     _buildReceiptRow(
                       context,
-                      'Amount Transferred',
+                      'Amount entered',
                       'GH₵${data.amount.toStringAsFixed(2)}',
                     ),
                     const SizedBox(height: 12),
                     _buildReceiptRow(
                       context,
-                      'Transfer Fee (1.5%)',
-                      'GH₵${data.transactionFee.toStringAsFixed(2)}',
+                      'Transfer fee',
+                      'Unavailable',
                     ),
                     const SizedBox(height: 12),
                     _buildReceiptRow(
                       context,
-                      'Total Debited',
-                      'GH₵${total.toStringAsFixed(2)}',
+                      'Total debit',
+                      'Unavailable',
                       highlight: true,
                     ),
                     const SizedBox(height: 24),

@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/color_ext.dart';
 import 'transfer_model.dart';
 
 class VerifyRecipientScreen extends StatelessWidget {
   final TransferData? initialData;
 
-  const VerifyRecipientScreen({
-    super.key,
-    this.initialData,
-  });
+  const VerifyRecipientScreen({super.key, this.initialData});
 
   @override
   Widget build(BuildContext context) {
@@ -16,26 +14,22 @@ class VerifyRecipientScreen extends StatelessWidget {
     final data = initialData ?? TransferData();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Verify Recipient'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Verify Recipient'), elevation: 0),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Status indicator
             Center(
               child: Container(
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  color: theme.colorScheme.primary.withOpacitySafe(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.check_circle,
+                  Icons.person_search_outlined,
                   color: theme.colorScheme.primary,
                   size: 48,
                 ),
@@ -45,7 +39,7 @@ class VerifyRecipientScreen extends StatelessWidget {
 
             // Recipient details
             Text(
-              'Recipient Details',
+              'Confirm recipient details',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -59,9 +53,7 @@ class VerifyRecipientScreen extends StatelessWidget {
                 vertical: 12.0,
               ),
               decoration: BoxDecoration(
-                border: Border.all(
-                  color: theme.colorScheme.outline,
-                ),
+                border: Border.all(color: theme.colorScheme.outline),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -91,9 +83,7 @@ class VerifyRecipientScreen extends StatelessWidget {
                 vertical: 12.0,
               ),
               decoration: BoxDecoration(
-                border: Border.all(
-                  color: theme.colorScheme.outline,
-                ),
+                border: Border.all(color: theme.colorScheme.outline),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -115,18 +105,20 @@ class VerifyRecipientScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 32),
+            Text(
+              'Recipient verification is not available because the backend does not provide a recipient lookup endpoint. No transfer can be authorized from these unverified details.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacitySafe(0.7),
+              ),
+            ),
+            const SizedBox(height: 16),
 
-            // Confirm and Continue button
+            // Do not allow unverified recipient details into amount/auth steps.
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  context.push(
-                    '/transfer/enter-amount',
-                    extra: data,
-                  );
-                },
-                child: const Text('Continue'),
+                onPressed: null,
+                child: const Text('Recipient verification unavailable'),
               ),
             ),
 

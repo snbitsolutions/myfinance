@@ -79,10 +79,17 @@ class AppLogger {
   }
 
   /// Log API response
-  static void logApiResponse(String method, String endpoint, dynamic response) {
+  static void logApiResponse(
+    String method,
+    String endpoint,
+    dynamic response, {
+    int? statusCode,
+  }) {
     if (kDebugMode) {
       debug(
-        'API RESPONSE: $method $endpoint\nResponse: ${_sanitizeForLogging(response)}',
+        'API RESPONSE: $method $endpoint'
+        '${statusCode == null ? '' : '\nSTATUS: $statusCode'}'
+        '\nBODY: ${_sanitizeForLogging(response)}',
       );
     }
   }

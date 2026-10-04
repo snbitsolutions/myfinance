@@ -8,16 +8,26 @@ class NavigationHistory {
 
   final List<String> _history = <String>[];
   bool _isAttached = false;
+  GoRouter? _attachedRouter;
 
   void attach(GoRouter router) {
-    if (_isAttached) return;
+    if (_isAttached && identical(_attachedRouter, router)) return;
+
+    _history.clear();
     _isAttached = true;
+    _attachedRouter = router;
 
     void syncCurrentLocation() {
       final current = _currentLocation(router);
       if (current == null || current.isEmpty) return;
       if (_history.isEmpty || _history.last != current) {
         _history.add(current);
+      }
+
+      // Authentication screens must not remain reachable through back
+      // navigation after the user enters the authenticated app shell.
+      if (!_isAuthenticationLocation(current)) {
+        _history.removeWhere(_isAuthenticationLocation);
       }
 
       // Keep memory bounded.
@@ -96,6 +106,23 @@ class NavigationHistory {
     }
 
     return null;
+  }
+
+  bool _isAuthenticationLocation(String location) {
+    final path = location.split('?').first.split('#').first;
+    const authenticationRoutes = <String>{
+      '/',
+      '/onboarding',
+      '/login',
+      '/signup',
+      '/existing-member-enrollment',
+      '/otp',
+      '/set-pin',
+    };
+
+    return authenticationRoutes.any(
+      (route) => path == route || path.startsWith('$route/'),
+    );
   }
 
   String? _currentLocation(GoRouter router) {

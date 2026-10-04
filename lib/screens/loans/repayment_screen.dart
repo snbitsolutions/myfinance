@@ -2,10 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/exceptions/app_exceptions.dart';
-import '../../core/models/loan_repayment_result.dart';
-import '../../core/providers/app_providers.dart';
-import '../../core/services/secure_auth_storage.dart';
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
 import '../../core/balance_card_shell.dart';
@@ -25,7 +21,6 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
   static const _momoProvider = 'Mobile Money';
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
-  bool _isSubmitting = false;
 
   void _setAmount(double value) {
     final text = value.toStringAsFixed(value % 1 == 0 ? 0 : 2);
@@ -68,110 +63,17 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
     super.dispose();
   }
 
-  Future<void> _completeRepayment(
-    BuildContext context,
-    LoanApplicationState loan,
-    double amount,
-  ) async {
-    final momoPhone = _phoneController.text.trim();
-    final navigator = GoRouter.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    if (_isSubmitting) return;
-
-    setState(() => _isSubmitting = true);
-
-    try {
-      final loanService = ref.read(loanServiceProvider);
-      final auth = ref.read(authProvider);
-      final pin = await SecureAuthStorage.instance.readPin() ?? '';
-      final account = auth.userId ?? '';
-
-      final response = await loanService.repayLoan(
-        loanId: loan.referenceNumber,
-        amount: amount,
-        currentOutstanding: loan.outstandingBalance,
-        accountNumber: account,
-        pin: pin,
-        paymentMethod: _momoProvider,
-        momoPhoneNumber: momoPhone,
-      );
-      final result = LoanRepaymentResult.fromApiResponse(response);
-      final safeAmount = result.amount > 0 ? result.amount : amount;
-      final safeNewOutstanding = result.newOutstanding > 0
-          ? result.newOutstanding
-          : (loan.outstandingBalance - amount).clamp(
-              0,
-              loan.outstandingBalance,
-            );
-
-      ref
-          .read(loanApplicationProvider.notifier)
-          .recordPayment(result.amountApplied);
-
-      if (!mounted) return;
-      navigator.go(
-        '/payment-success',
-        extra: {
-          'amount': safeAmount,
-          'processedAt': result.processedAt.toIso8601String(),
-          'reference': result.transactionId,
-          'title': 'Loan Repayment Successful',
-          'message':
-              'Your repayment of GH₵${safeAmount.toStringAsFixed(2)} via ${result.paymentMethod} from $momoPhone was received. Remaining balance: GH₵${safeNewOutstanding.toStringAsFixed(2)}.',
-          'primaryActionLabel': 'View Loan Details',
-          'primaryActionRoute': '/loan-detail',
-          'secondaryActionLabel': 'Back to Loans',
-          'secondaryActionRoute': '/loans',
-        },
-      );
-    } on AppException catch (error) {
-      if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline, color: Colors.white, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  error.message,
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: const Color(0xFFE74C3C),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 4),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final amt = _amount;
-    final loan = ref.watch(loanApplicationProvider);
+    // Local application drafts are not backend loan records and cannot be
+    // used as repayment identifiers.
+    final LoanApplicationState? loan = null;
     final outstanding = loan?.outstandingBalance ?? 0.0;
     final amountError = _amountError(outstanding);
-    final fee = amt * 0.01;
-    final total = amt + fee;
-    final balanceAfter = (outstanding - amt).clamp(0, outstanding);
     final phoneText = _phoneController.text.trim();
     final showPhoneError = phoneText.isNotEmpty && !_isValidPhone(phoneText);
-    final canContinue =
-        loan != null &&
-        outstanding > 0 &&
-        amt > 0 &&
-        amountError == null &&
-        _isValidPhone(phoneText);
 
     return AppScaffold(
       title: 'Repay Loan',
@@ -194,14 +96,14 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'No active loan to repay',
+                        'Repayment data unavailable',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Apply for a loan first, then your repayment options will appear here.',
+                        'Repayment requires a loan account returned by the backend. A locally saved application draft is not an active loan.',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurface.withOpacitySafe(
@@ -457,11 +359,11 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Processing Fee (1%)',
+                                'Repayment fee',
                                 style: theme.textTheme.bodySmall,
                               ),
                               Text(
-                                'GH₵${fee.toStringAsFixed(2)}',
+                                'Unavailable',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: theme.colorScheme.error,
@@ -489,7 +391,7 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
                                     style: theme.textTheme.bodyMedium,
                                   ),
                                   Text(
-                                    'GH₵${total.toStringAsFixed(2)}',
+                                    'Unavailable',
                                     style: theme.textTheme.titleMedium
                                         ?.copyWith(
                                           color: theme.colorScheme.primary,
@@ -499,22 +401,6 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Balance after payment',
-                                    style: theme.textTheme.bodySmall,
-                                  ),
-                                  Text(
-                                    'GH₵${balanceAfter.toStringAsFixed(2)}',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
                               if (phoneText.isNotEmpty &&
                                   _isValidPhone(phoneText)) ...[
                                 const SizedBox(height: 8),
@@ -560,7 +446,7 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                'Enter an amount to see fee & total',
+                                'Repayment terms unavailable',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.onSurface
                                       .withOpacitySafe(0.45),
@@ -579,31 +465,9 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
                   width: double.infinity,
                   height: 52,
                   child: FilledButton.icon(
-                    onPressed: canContinue
-                        ? (_isSubmitting
-                              ? null
-                              : () {
-                                  _completeRepayment(context, loan, amt);
-                                })
-                        : null,
-                    icon: Icon(
-                      _isSubmitting
-                          ? Icons.hourglass_top_rounded
-                          : canContinue
-                          ? Icons.check_circle_outline_rounded
-                          : amt > 0
-                          ? Icons.phone_android_rounded
-                          : Icons.payments_outlined,
-                    ),
-                    label: Text(
-                      _isSubmitting
-                          ? 'Processing repayment...'
-                          : canContinue
-                          ? 'Pay GH₵${total.toStringAsFixed(2)}'
-                          : amt > 0
-                          ? 'Enter your MoMo number to continue'
-                          : 'Enter an amount to continue',
-                    ),
+                    onPressed: null,
+                    icon: const Icon(Icons.info_outline_rounded),
+                    label: const Text('Repayment unavailable'),
                   ),
                 ),
               ],

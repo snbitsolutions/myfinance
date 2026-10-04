@@ -1,0 +1,26 @@
+unit: app-startup
+side_effects:
+  - source_loc: "lib/main.dart:15"
+    effect: "Initializes secure storage, HTTP preferences, network monitoring, and device identity before runApp."
+    must_preserve: true
+  - source_loc: "lib/main.dart:36"
+    effect: "Starts the app after an eight-second initialization timeout rather than blocking indefinitely."
+    must_preserve: true
+branches:
+  - source_loc: "lib/router/app_router.dart:207"
+    condition: "Splash, onboarding, auth route, debug bypass, or authenticated session state."
+    behavior: "Redirects to the correct startup/authenticated location."
+    must_preserve: true
+error_paths:
+  - source_loc: "lib/main.dart:40"
+    trigger: "Core initialization timeout or exception."
+    outcome: "Logs the failure and still starts the application."
+    contract: "Startup must not remain blocked."
+    must_preserve: true
+concurrency:
+  model: async
+  tx_boundary:
+    source_loc: "lib/main.dart:52"
+    scope: "Sequential core-service initialization before runApp."
+    isolation: "not specified"
+    must_preserve: true

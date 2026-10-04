@@ -1,0 +1,8 @@
+unit: savings
+commit: false
+candidate_splits:
+  - id: "lib/screens/savings/withdrawal_flow/withdrawal_screen.dart:1"
+    drivers: [lifecycle_split, protocol_split]
+    rationale: "Withdrawal and transfer flows each have review, authentication, processing, success, and receipt lifecycle stages."
+    source_slice: {file: lib/screens/savings/withdrawal_flow/withdrawal_screen.dart, lines: [1, 1]}
+

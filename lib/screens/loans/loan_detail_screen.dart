@@ -1,76 +1,55 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
+import '../../core/providers/app_providers.dart';
 
-class LoanDetailScreen extends StatefulWidget {
+class LoanDetailScreen extends ConsumerWidget {
   final String? loanId;
 
   const LoanDetailScreen({this.loanId, super.key});
 
   @override
-  State<LoanDetailScreen> createState() => _LoanDetailScreenState();
-}
-
-class _LoanDetailScreenState extends State<LoanDetailScreen> {
-  // Mock loan detail data
-  final Map<String, dynamic> loanData = {
-    'loan_id': 'LN-826471',
-    'loan_type': 'Instant Loan',
-    'description': 'Short term financing',
-    'status': 'Active',
-    'outstanding_balance': 4083.60,
-    'next_payment_due': '26 Jun 2026',
-    'days_until_due': 31,
-    'disbursement_date': '26 Feb 2026',
-    'loan_amount': 5000.00,
-    'total_interest': 920.00,
-    'total_payable': 5920.00,
-    'amount_disbursed': 5000.00,
-    'maturity_date': '26 Aug 2026',
-    'interest_rate': '2.0% per month',
-    'loan_tenure': '6 months',
-    'interest_type': 'Reducing Balance',
-    'repayment_method': 'Monthly',
-    'repayment_day': '26th of every month',
-    'collateral': 'None',
-    'guarantor': 'None',
-    'purpose': 'Personal Use',
-    'loan_officer': 'Akosua Mensah',
-    'total_paid': 1836.40,
-    'payments_made': 3,
-    'total_payments': 6,
-    'progress_percentage': 31,
-  };
-
-  final List<Map<String, dynamic>> paymentHistory = [
-    {
-      'payment_number': 'Payment #3',
-      'date': '26 Apr 2026 • 10:42 AM',
-      'amount': 612.20,
-      'type': 'Principal + Interest',
-      'status': 'completed',
-    },
-    {
-      'payment_number': 'Payment #2',
-      'date': '26 Mar 2026 • 09:15 AM',
-      'amount': 612.20,
-      'type': 'Principal + Interest',
-      'status': 'completed',
-    },
-    {
-      'payment_number': 'Payment #1',
-      'date': '26 Feb 2026 • 14:30 PM',
-      'amount': 612.00,
-      'type': 'Principal + Interest',
-      'status': 'completed',
-    },
-  ];
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final loansAsync = ref.watch(loansProvider);
+    final loans = loansAsync.valueOrNull ?? const <Map<String, dynamic>>[];
+    Map<String, dynamic>? loanData;
+    for (final loan in loans) {
+      if (loan['loan_id']?.toString() == loanId) {
+        loanData = loan;
+        break;
+      }
+    }
+
+    if (loansAsync.isLoading) {
+      return const AppScaffold(
+        title: 'Loan Details',
+        backRoute: '/loans',
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (loansAsync.hasError || loanData == null) {
+      return AppScaffold(
+        title: 'Loan Details',
+        backRoute: '/loans',
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              loansAsync.hasError
+                  ? 'Unable to load this loan from the server.'
+                  : 'This loan is no longer available in the account data.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+    final displayedLoanId = loanData['loan_id'];
 
     return AppScaffold(
       title: 'Loan Details',
@@ -131,10 +110,10 @@ class _LoanDetailScreenState extends State<LoanDetailScreen> {
 
             // Payment History
             _PaymentHistory(
-              paymentHistory: paymentHistory,
+              paymentHistory: const [],
               theme: theme,
               onViewAll: () =>
-                  context.go('/loan-payment-history/${loanData['loan_id']}'),
+                  context.go('/loan-payment-history/$displayedLoanId'),
             ),
             const SizedBox(height: 24),
           ],
@@ -227,7 +206,7 @@ class _LoanHeroCard extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  loanData['status'] ?? 'Active',
+                  loanData['status'] ?? 'Unavailable',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,

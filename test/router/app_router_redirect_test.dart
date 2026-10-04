@@ -8,7 +8,6 @@ import 'package:adepa_teachers/core/constants/app_constants.dart';
 import 'package:adepa_teachers/core/services/device_identity_service.dart';
 import 'package:adepa_teachers/main.dart';
 import 'package:adepa_teachers/router/app_router.dart';
-import 'package:adepa_teachers/screens/auth/account_number_screen.dart';
 import 'package:adepa_teachers/screens/auth/otp_screen.dart';
 import 'package:adepa_teachers/screens/auth/signup_screen.dart';
 import 'package:adepa_teachers/screens/dashboard/dashboard_screen.dart';
@@ -82,10 +81,22 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 50));
   }
 
-  testWidgets('starts unauthenticated users on the login flow from root', (
+  testWidgets('starts unauthenticated users on onboarding from root', (
     tester,
   ) async {
     await pumpAt(tester, '/');
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(OnboardingScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+    expect(find.byType(DashboardScreen), findsNothing);
+  });
+
+  testWidgets('redirects protected routes to login when onboarding not seen', (
+    tester,
+  ) async {
+    await pumpAt(tester, '/home');
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
 
@@ -93,19 +104,6 @@ void main() {
     expect(find.byType(OnboardingScreen), findsNothing);
     expect(find.byType(DashboardScreen), findsNothing);
   });
-
-  testWidgets(
-    'redirects protected routes to login when onboarding not seen',
-    (tester) async {
-      await pumpAt(tester, '/home');
-      await tester.pump(const Duration(seconds: 5));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(LoginScreen), findsOneWidget);
-      expect(find.byType(OnboardingScreen), findsNothing);
-      expect(find.byType(DashboardScreen), findsNothing);
-    },
-  );
 
   testWidgets(
     'redirects protected routes to login when onboarding seen and session missing',
@@ -155,11 +153,26 @@ void main() {
     );
   });
 
+  testWidgets('keeps startup on login even when debug auth bypass is enabled', (
+    tester,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(AppConstants.sharedPrefKeyOnboarding, true);
+    await prefs.setString(AppConstants.sharedPrefKeyUserId, '001060000004075');
+    await prefs.setString(AppConstants.sharedPrefKeyUserEmail, '233501234567');
+
+    await pumpAt(tester, '/?debugAuth=true');
+
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(DashboardScreen), findsNothing);
+  });
+
   testWidgets(
-    'keeps startup on login even when debug auth bypass is enabled',
+    'keeps protected routes on login even when debug auth bypass is enabled',
     (tester) async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(AppConstants.sharedPrefKeyOnboarding, true);
+      await prefs.setBool(AppConstants.sharedPrefKeyDebugBypassAuth, true);
       await prefs.setString(
         AppConstants.sharedPrefKeyUserId,
         '001060000004075',
@@ -169,27 +182,12 @@ void main() {
         '233501234567',
       );
 
-      await pumpAt(tester, '/?debugAuth=true');
+      await pumpAt(tester, '/home?debugAuth=true');
 
       expect(find.byType(LoginScreen), findsOneWidget);
       expect(find.byType(DashboardScreen), findsNothing);
     },
   );
-
-  testWidgets('keeps protected routes on login even when debug auth bypass is enabled', (
-    tester,
-  ) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(AppConstants.sharedPrefKeyOnboarding, true);
-    await prefs.setBool(AppConstants.sharedPrefKeyDebugBypassAuth, true);
-    await prefs.setString(AppConstants.sharedPrefKeyUserId, '001060000004075');
-    await prefs.setString(AppConstants.sharedPrefKeyUserEmail, '233501234567');
-
-    await pumpAt(tester, '/home?debugAuth=true');
-
-    expect(find.byType(LoginScreen), findsOneWidget);
-    expect(find.byType(DashboardScreen), findsNothing);
-  });
 
   testWidgets(
     'shows SignupScreen at /signup when onboarding seen and no session',
@@ -200,28 +198,6 @@ void main() {
       await pumpAt(tester, '/signup');
 
       expect(find.byType(SignupScreen), findsOneWidget);
-      expect(find.byType(LoginScreen), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'shows AccountNumberScreen at /account-number when onboarding seen and no session',
-    (tester) async {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(AppConstants.sharedPrefKeyOnboarding, true);
-
-      AppRouter.router.go(
-        '/account-number',
-        extra: {'phoneNumber': '233501234567'},
-      );
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp.router(routerConfig: AppRouter.router),
-        ),
-      );
-      await tester.pumpAndSettle(const Duration(milliseconds: 50));
-
-      expect(find.byType(AccountNumberScreen), findsOneWidget);
       expect(find.byType(LoginScreen), findsNothing);
     },
   );

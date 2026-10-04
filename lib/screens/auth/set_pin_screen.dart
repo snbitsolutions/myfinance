@@ -26,14 +26,17 @@ class SetPinScreen extends ConsumerStatefulWidget {
 class _SetPinScreenState extends ConsumerState<SetPinScreen> {
   final TextEditingController _pinController = TextEditingController();
   final TextEditingController _confirmController = TextEditingController();
+  final TextEditingController _currentPinController = TextEditingController();
   bool _showPin = false;
   bool _isSubmitting = false;
 
   bool get _isRegisterMode => widget.mode == 'register';
   bool get _isSignInMode => widget.mode == 'signin';
+  bool get _isChangeMode => widget.mode == 'change';
 
   bool get _canSubmit =>
       _pinController.text.trim().length == 4 &&
+      (!_isChangeMode || _currentPinController.text.length == 4) &&
       (_isSignInMode || _pinController.text == _confirmController.text);
 
   bool get _pinMatch =>
@@ -48,27 +51,26 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
       final router = GoRouter.of(context);
 
       if (_isRegisterMode) {
-        if (widget.accountNumber.isEmpty) {
+        final accountNumber = widget.accountNumber.isNotEmpty
+            ? widget.accountNumber
+            : ref.read(authProvider).userId ?? '';
+        if (accountNumber.isEmpty) {
           throw ValidationException(
             message: 'Missing account details. Please restart registration.',
           );
         }
-        final message = await ref
+        await ref
             .read(authProvider.notifier)
-            .submitRegistration(
-              accountNumber: widget.accountNumber,
-              phoneNumber: widget.phoneNumber,
-              pin: pin,
-            );
+            .setPin(userId: accountNumber, pin: pin);
         if (!mounted) return;
         await showDialog<void>(
           context: context,
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
-            title: const Text('Registration Submitted'),
+            title: const Text('PIN Created'),
             content: Text(
-              '$message\n\nYour account is pending approval. '
-              'Once approved you can log in with your phone number.',
+              'Your mobile banking PIN has been created successfully. '
+              'You can now sign in with your phone number and PIN.',
             ),
             actions: [
               TextButton(
@@ -81,6 +83,21 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
             ],
           ),
         );
+        return;
+      }
+
+      if (_isChangeMode) {
+        if (_currentPinController.text.length != 4) {
+          throw ValidationException(message: 'Enter your current 4-digit PIN.');
+        }
+        await ref
+            .read(authProvider.notifier)
+            .changePin(currentPin: _currentPinController.text, newPin: pin);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PIN changed successfully.')),
+        );
+        router.go('/settings');
         return;
       }
 
@@ -146,6 +163,7 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
   void dispose() {
     _pinController.dispose();
     _confirmController.dispose();
+    _currentPinController.dispose();
     super.dispose();
   }
 
@@ -205,7 +223,11 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                       Text(
                         _isRegisterMode
                             ? 'Create PIN'
-                            : (_isSignInMode ? 'Enter PIN' : 'Update PIN'),
+                            : (_isSignInMode
+                                  ? 'Enter PIN'
+                                  : (_isChangeMode
+                                        ? 'Change PIN'
+                                        : 'Update PIN')),
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
@@ -217,7 +239,9 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                             ? 'Create a 4-digit PIN to secure your account'
                             : (_isSignInMode
                                   ? 'Enter your 4-digit PIN to sign in'
-                                  : 'Set a new 4-digit PIN for your account'),
+                                  : (_isChangeMode
+                                        ? 'Verify your current PIN before choosing a new one'
+                                        : 'Set a new 4-digit PIN for your account')),
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.white70,
@@ -240,6 +264,69 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                         ),
                         child: Column(
                           children: [
+                            if (_isChangeMode) ...[
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Current PIN',
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                    controller: _currentPinController,
+                                    keyboardType: TextInputType.number,
+                                    maxLength: 4,
+                                    obscureText: true,
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.headlineMedium
+                                        ?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 8,
+                                        ),
+                                    decoration: InputDecoration(
+                                      counterText: '',
+                                      hintText: '••••',
+                                      hintStyle: theme.textTheme.bodyMedium
+                                          ?.copyWith(color: Colors.white54),
+                                      filled: true,
+                                      fillColor: Colors.white.withOpacitySafe(
+                                        0.15,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: Colors.white.withOpacitySafe(
+                                            0.2,
+                                          ),
+                                        ),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: Colors.white.withOpacitySafe(
+                                            0.2,
+                                          ),
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                    ),
+                                    onChanged: (_) => setState(() {}),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                            ],
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [

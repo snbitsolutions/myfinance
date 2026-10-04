@@ -1,5 +1,5 @@
 name: adepa_teachers
-description: "A new Flutter project."
+description: "Adepa Teachers personal finance app."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
@@ -44,6 +44,7 @@ dependencies:
   pretty_dio_logger: ^1.3.1
   crypto: ^3.0.7
   flutter_secure_storage: ^10.0.0
+  local_auth: ^3.0.2
 
 dev_dependencies:
   flutter_test:
@@ -72,6 +73,7 @@ flutter:
     - images/adepa_teachers_logo.png
     - images/dstv_logo.webp
     - images/ecg_logo.jpg
+    - images/snb_it_solutions_logo.png
     - images/gwcl_logo.png
     # TODO: add other image assets here as needed
 

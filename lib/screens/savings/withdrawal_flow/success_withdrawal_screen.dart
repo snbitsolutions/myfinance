@@ -43,6 +43,7 @@ class SuccessWithdrawalScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isPending = data.isPending;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -51,7 +52,12 @@ class SuccessWithdrawalScreen extends StatelessWidget {
           // Dark green header at the very top
           Container(
             width: double.infinity,
-            padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 16, 20, 24),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              MediaQuery.of(context).padding.top + 16,
+              20,
+              24,
+            ),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [Color(0xFF075D21), Color(0xFF08752B)],
@@ -63,11 +69,14 @@ class SuccessWithdrawalScreen extends StatelessWidget {
               children: [
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.arrow_back, color: Colors.white),
+                  child: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white,
+                  ),
                 ),
                 const SizedBox(width: 16),
-                const Text(
-                  'Withdrawal Successful',
+                Text(
+                  isPending ? 'Withdrawal Pending' : 'Provider reported completion',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -95,20 +104,28 @@ class SuccessWithdrawalScreen extends StatelessWidget {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: theme.colorScheme.primary.withOpacitySafe(0.3),
+                              color: theme.colorScheme.primary.withOpacitySafe(
+                                0.3,
+                              ),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.check_rounded, size: 56, color: Colors.white),
+                        child: Icon(
+                        isPending
+                            ? Icons.hourglass_top_rounded
+                            : Icons.check_rounded,
+                          size: 56,
+                          color: Colors.white,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 24),
                   // Title
                   Text(
-                    'Withdrawal Successful!',
+                    isPending ? 'Withdrawal Pending' : 'Provider reported completion',
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -117,7 +134,9 @@ class SuccessWithdrawalScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   // Message
                   Text(
-                    'Your withdrawal has been processed successfully.',
+                    isPending
+                        ? 'Your withdrawal request was accepted and is awaiting confirmation.'
+                        : 'The provider reported that the withdrawal completed.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
                     ),
@@ -134,7 +153,7 @@ class SuccessWithdrawalScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Amount Withdrawn',
+                    isPending ? 'Withdrawal Requested' : 'Amount Withdrawn',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
                     ),
@@ -158,22 +177,33 @@ class SuccessWithdrawalScreen extends StatelessWidget {
                     backgroundColor: const Color(0xFFF0F8EF),
                     child: Row(
                       children: [
-                        Icon(Icons.trending_up_rounded, color: theme.colorScheme.primary, size: 24),
+                        Icon(
+                          Icons.trending_up_rounded,
+                          color: theme.colorScheme.primary,
+                          size: 24,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'New Available Balance',
+                                isPending
+                                    ? 'Balance will update after confirmation'
+                                    : 'New Available Balance',
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacitySafe(0.6),
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'GH₵ ${(data.newBalance ?? 44000).toStringAsFixed(2)}',
-                                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+                                isPending || data.newBalance == null
+                                    ? 'Unavailable'
+                                    : 'GH₵ ${data.newBalance!.toStringAsFixed(2)}',
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ],
                           ),
@@ -187,10 +217,13 @@ class SuccessWithdrawalScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 50,
                     child: FilledButton(
-                      onPressed: () => context.push('/withdrawal/receipt', extra: data),
+                      onPressed: () =>
+                          context.push('/withdrawal/receipt', extra: data),
                       style: FilledButton.styleFrom(
                         backgroundColor: theme.colorScheme.primary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: const Text('View Receipt'),
                     ),
@@ -202,7 +235,9 @@ class SuccessWithdrawalScreen extends StatelessWidget {
                     child: OutlinedButton(
                       onPressed: () => context.go('/savings'),
                       style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: const Text('Done'),
                     ),
@@ -244,7 +279,9 @@ class _DetailRow extends StatelessWidget {
                 ),
                 Text(
                   value,
-                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),

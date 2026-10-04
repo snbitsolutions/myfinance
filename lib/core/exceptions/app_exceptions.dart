@@ -36,11 +36,7 @@ class ServerException extends AppException {
 
 /// Authentication exceptions
 class AuthException extends AppException {
-  AuthException({
-    required super.message,
-    super.code,
-    super.originalException,
-  });
+  AuthException({required super.message, super.code, super.originalException});
 }
 
 /// Validation exceptions
@@ -57,16 +53,21 @@ class ValidationException extends AppException {
 
 /// Cache/Storage exceptions
 class CacheException extends AppException {
-  CacheException({
+  CacheException({required super.message, super.code, super.originalException});
+}
+
+/// Not Found exceptions
+class NotFoundException extends AppException {
+  NotFoundException({
     required super.message,
     super.code,
     super.originalException,
   });
 }
 
-/// Not Found exceptions
-class NotFoundException extends AppException {
-  NotFoundException({
+/// The UI supports an operation whose backend contract is not available yet.
+class BackendNotConfiguredException extends AppException {
+  BackendNotConfiguredException({
     required super.message,
     super.code,
     super.originalException,

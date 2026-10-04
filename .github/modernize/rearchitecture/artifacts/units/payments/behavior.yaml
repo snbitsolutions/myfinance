@@ -1,0 +1,23 @@
+unit: payments
+side_effects:
+  - source_loc: "lib/screens/payment/payment_screen.dart:1"
+    effect: "Submits payment requests and routes to success, failure, or receipt screens."
+    must_preserve: true
+branches:
+  - source_loc: "lib/screens/payment/payment_screen.dart:1"
+    condition: "Selected payment method and positive amount."
+    behavior: "Controls form validity and payment request shape."
+    must_preserve: true
+error_paths:
+  - source_loc: "lib/screens/payment/payment_failed_screen.dart:1"
+    trigger: "Payment service rejects or fails."
+    outcome: "Shows a failure terminal screen with retry/navigation options."
+    contract: "Failed payments must not be presented as successful."
+    must_preserve: true
+concurrency:
+  model: async
+  tx_boundary:
+    source_loc: "lib/screens/payment/payment_screen.dart:1"
+    scope: "Payment submission through terminal result routing."
+    isolation: "not specified"
+    must_preserve: true

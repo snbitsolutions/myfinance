@@ -1,96 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
 import '../../core/balance_card_shell.dart';
+import '../../core/providers/app_providers.dart';
 
-class InvestmentsScreen extends StatefulWidget {
+class InvestmentsScreen extends ConsumerStatefulWidget {
   const InvestmentsScreen({super.key});
 
   @override
-  State<InvestmentsScreen> createState() => _InvestmentsScreenState();
+  ConsumerState<InvestmentsScreen> createState() => _InvestmentsScreenState();
 }
 
-class _InvestmentsScreenState extends State<InvestmentsScreen> {
-  // Mock investments data
-  final List<Map<String, dynamic>> myInvestments = [
-    {
-      'id': 'INV-001',
-      'type': 'Fixed Deposit',
-      'plan': '12 Months Plan',
-      'status': 'Active',
-      'current_value': 10000.00,
-      'maturity_date': '15 Jan 2026',
-      'principal': 10000.00,
-      'interest_rate': 8.00,
-      'days_to_maturity': 225,
-      'tenure_months': 12,
-      'interest_payment': 'At Maturity',
-      'auto_renewal': true,
-      'opening_date': '15 Jan 2025',
-      'total_interest': 800.00,
-      'monthly_value': 10800.00,
-      'icon': Icons.account_balance,
-    },
-    {
-      'id': 'INV-002',
-      'type': 'Savings Bond',
-      'plan': '24 Months Plan',
-      'status': 'Active',
-      'current_value': 8500.00,
-      'maturity_date': '10 Aug 2026',
-      'principal': 8000.00,
-      'interest_rate': 6.50,
-      'days_to_maturity': 275,
-      'tenure_months': 24,
-      'interest_payment': 'Quarterly',
-      'auto_renewal': false,
-      'opening_date': '10 Aug 2024',
-      'total_interest': 650.00,
-      'monthly_value': 8650.00,
-      'icon': Icons.savings,
-    },
-    {
-      'id': 'INV-003',
-      'type': 'Monthly Investment Plan',
-      'plan': 'Regular Contribution',
-      'status': 'Active',
-      'current_value': 7250.00,
-      'maturity_date': '05 Jun 2026',
-      'principal': 6500.00,
-      'interest_rate': 7.25,
-      'days_to_maturity': 250,
-      'tenure_months': 12,
-      'interest_payment': 'At Maturity',
-      'auto_renewal': true,
-      'opening_date': '15 Jan 2025',
-      'total_interest': 525.00,
-      'monthly_value': 7350.00,
-      'icon': Icons.trending_up,
-    },
-  ];
-
+class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
+    final investmentsAsync = ref.watch(investmentsApiProvider);
+    final apiInvestments = investmentsAsync.valueOrNull ?? const [];
+    final displayedInvestments = apiInvestments.map(_mapApiInvestment).toList();
 
-    final totalBalance = myInvestments.fold<double>(
+    final totalBalance = displayedInvestments.fold<double>(
       0,
-      (sum, inv) => sum + (inv['current_value'] as double),
+      (sum, inv) => sum + _asDouble(inv['current_value']),
+    );
+    final totalInvested = displayedInvestments.fold<double>(
+      0,
+      (sum, inv) => sum + _asDouble(inv['principal']),
     );
 
-    final totalEarnings = myInvestments.fold<double>(
+    final totalEarnings = displayedInvestments.fold<double>(
       0,
-      (sum, inv) => sum + (inv['total_interest'] as double),
+      (sum, inv) => sum + _asDouble(inv['total_interest']),
+    );
+    final balancesAvailable = displayedInvestments.every(
+      (item) => item['current_value'] != null,
+    );
+    final principalAvailable = displayedInvestments.every(
+      (item) => item['principal'] != null,
+    );
+    final earningsAvailable = displayedInvestments.every(
+      (item) => item['total_interest'] != null,
     );
 
     return AppScaffold(
       title: 'Investments',
-      actions: [
-        IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
-      ],
       child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -121,9 +78,9 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                 child: Stack(
                   children: [
                     const Positioned(
-                      top: 0,
-                      right: 0,
-                      child: AdepaLogoBadge(size: 92),
+                      top: -14,
+                      right: -10,
+                      child: AdepaLogoBadge(size: 140, opacity: 0.32),
                     ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,29 +118,26 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                         ),
                         const SizedBox(height: 18),
                         Text(
-                          'GH₵ ${totalBalance.toStringAsFixed(2).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',')}',
+                          investmentsAsync.hasError ||
+                                  investmentsAsync.isLoading
+                              ? 'GH₵ —'
+                              : balancesAvailable
+                                  ? 'GH₵ ${totalBalance.toStringAsFixed(2).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',')}'
+                                  : 'Unavailable',
                           style: theme.textTheme.headlineMedium?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 18),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.trending_up,
-                              color: Colors.greenAccent,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '+ 8.6% vs last month',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: Colors.greenAccent,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          investmentsAsync.hasError
+                              ? 'Investment data unavailable'
+                              : 'Performance history unavailable',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.82),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         Row(
@@ -191,8 +145,12 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                             Expanded(
                               child: _PortfolioMetric(
                                 label: 'YTD Return',
-                                value:
-                                    'GH₵ ${totalEarnings.toStringAsFixed(2)}',
+                                value: investmentsAsync.hasError ||
+                                        investmentsAsync.isLoading
+                                    ? '—'
+                                    : earningsAvailable
+                                        ? 'GH₵ ${totalEarnings.toStringAsFixed(2)}'
+                                        : 'Unavailable',
                                 accent: Colors.white,
                               ),
                             ),
@@ -200,7 +158,10 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                             Expanded(
                               child: _PortfolioMetric(
                                 label: 'Active Plans',
-                                value: '${myInvestments.length}',
+                                value: investmentsAsync.hasError ||
+                                        investmentsAsync.isLoading
+                                    ? '—'
+                                    : '${displayedInvestments.length}',
                                 accent: Colors.white,
                               ),
                             ),
@@ -213,43 +174,13 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Action Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: _ActionButton(
-                      icon: Icons.add,
-                      label: 'New\nInvestment',
-                      onTap: () {},
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _ActionButton(
-                      icon: Icons.arrow_upward,
-                      label: 'Top Up',
-                      onTap: () {},
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _ActionButton(
-                      icon: Icons.arrow_downward,
-                      label: 'Withdraw\nEarnings',
-                      onTap: () {},
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _ActionButton(
-                      icon: Icons.description,
-                      label: 'Investment\nStatement',
-                      onTap: () {},
-                    ),
-                  ),
-                ],
+              AppCard(
+                child: Text(
+                  'Investment actions will be available when the investment service is connected.',
+                  style: theme.textTheme.bodySmall,
+                ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
               // My Investments Section
               Row(
@@ -261,31 +192,57 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () {},
-                    child: Text(
-                      'View Closed Investments →',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: primary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
                 ],
               ),
               const SizedBox(height: 12),
-              ...myInvestments.map(
-                (investment) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _InvestmentCard(
-                    investment: investment,
-                    theme: theme,
-                    onTap: () => context.go(
-                      '/investments/${investment['id'] ?? 'unknown'}',
+              if (investmentsAsync.isLoading)
+                const AppCard(
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (investmentsAsync.hasError)
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Investments are unavailable',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'The investment service is unavailable, so account data cannot be shown.',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      TextButton.icon(
+                        onPressed: () => ref.invalidate(investmentsApiProvider),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              else if (displayedInvestments.isEmpty)
+                AppCard(
+                  child: Text(
+                    'You do not have any investment accounts yet.',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                )
+              else
+                ...displayedInvestments.map(
+                  (investment) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _InvestmentCard(
+                      investment: investment,
+                      theme: theme,
+                      onTap: () => context.go(
+                        '/investments/${investment['id'] ?? 'unknown'}',
+                      ),
                     ),
                   ),
                 ),
-              ),
               const SizedBox(height: 16),
 
               // Investment Overview Section
@@ -302,16 +259,6 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        GestureDetector(
-                          onTap: () {},
-                          child: Text(
-                            'View Analytics →',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: primary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -321,7 +268,12 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                           child: _OverviewItem(
                             icon: Icons.account_balance_wallet,
                             label: 'Total Invested',
-                            value: 'GH₵ 24,000.00',
+                            value: investmentsAsync.hasError ||
+                                    investmentsAsync.isLoading
+                                ? '—'
+                                : principalAvailable
+                                    ? 'GH₵ ${totalInvested.toStringAsFixed(2)}'
+                                    : 'Unavailable',
                             theme: theme,
                           ),
                         ),
@@ -329,7 +281,12 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                           child: _OverviewItem(
                             icon: Icons.trending_up,
                             label: 'Total Earnings',
-                            value: 'GH₵ 1,750.00',
+                            value: investmentsAsync.hasError ||
+                                    investmentsAsync.isLoading
+                                ? '—'
+                                : earningsAvailable
+                                    ? 'GH₵ ${totalEarnings.toStringAsFixed(2)}'
+                                    : 'Unavailable',
                             theme: theme,
                           ),
                         ),
@@ -337,7 +294,9 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                           child: _OverviewItem(
                             icon: Icons.percent,
                             label: 'Average Return',
-                            value: '7.3% p.a',
+                            value: displayedInvestments.isEmpty
+                                ? '—'
+                                : 'Not provided',
                             theme: theme,
                           ),
                         ),
@@ -352,6 +311,47 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
         ),
       ),
     );
+  }
+
+  double _asDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString().replaceAll(',', '') ?? '') ?? 0;
+  }
+
+  Map<String, dynamic> _mapApiInvestment(Map<String, dynamic> item) {
+    final principal = _numberOrNull(item['principal'] ?? item['amount']);
+    final current = _numberOrNull(
+      item['current_value'] ?? item['current_balance'] ?? item['value'],
+    );
+    final interest = _numberOrNull(
+      item['total_interest'] ?? item['interest_earned'] ?? item['earnings'],
+    );
+    return {
+      ...item,
+      'id': item['id'] ?? item['investment_id'] ?? item['account_id'] ?? '',
+      'type': item['type'] ?? item['investment_type'] ?? 'Investment',
+      'plan': item['plan'] ?? item['plan_name'] ?? 'Investment Plan',
+      'status': item['status'] ?? 'Unavailable',
+      'principal': principal,
+      'current_value': current,
+      'total_interest': interest,
+      'monthly_value': _asDouble(
+        item['monthly_value'] ?? item['maturity_value'],
+      ),
+      'interest_rate': _numberOrNull(item['interest_rate'] ?? item['rate']),
+      'days_to_maturity': item['days_to_maturity'],
+      'tenure_months': item['tenure_months'] ?? item['term_months'],
+      'interest_payment': item['interest_payment'] ?? 'Unavailable',
+      'auto_renewal': item['auto_renewal'] ?? false,
+      'opening_date': item['opening_date'] ?? item['start_date'] ?? '—',
+      'maturity_date': item['maturity_date'] ?? item['end_date'] ?? '—',
+      'icon': Icons.account_balance,
+    };
+  }
+
+  double? _numberOrNull(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString().replaceAll(',', '') ?? '');
   }
 }
 
@@ -393,52 +393,6 @@ class _PortfolioMetric extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AppCard(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: theme.colorScheme.primary, size: 20),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.labelSmall?.copyWith(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -505,7 +459,9 @@ class _InvestmentCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    'GH₵ ${(investment['current_value'] as double).toStringAsFixed(2)}',
+                    investment['current_value'] == null
+                        ? 'Unavailable'
+                        : 'GH₵ ${(investment['current_value'] as num).toStringAsFixed(2)}',
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),

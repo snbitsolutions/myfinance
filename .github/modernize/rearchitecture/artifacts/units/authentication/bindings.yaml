@@ -1,0 +1,21 @@
+unit: authentication
+bindings:
+  - type: route-declaration
+    name: "GoRoute /login, /otp, /signup, /set-pin"
+    source_loc: "lib/router/app_router.dart:325"
+    target: "Authentication screens"
+    must_appear_in_target: true
+    notes: "Auth routes are explicitly excluded from protected-route redirects."
+  - type: di-registration
+    name: "authProvider"
+    source_loc: "lib/core/providers/app_providers.dart:983"
+    target: "AuthNotifier"
+    must_appear_in_target: true
+    notes: "Riverpod StateNotifier owns authentication state."
+runtime_config:
+  - key: "biometricAuth"
+    source_loc: "lib/screens/auth/login_screen.dart:153"
+    source: code
+    default_value: "false"
+    must_appear_in_target: true
+    notes: "Optional biometric shortcut; phone + OTP remains the primary login path."

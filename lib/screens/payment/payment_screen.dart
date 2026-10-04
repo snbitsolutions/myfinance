@@ -2,21 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/app_scaffold.dart';
 import '../../core/app_card.dart';
+import '../../core/app_scaffold.dart';
 import '../../core/color_ext.dart';
 import '../../core/exceptions/app_exceptions.dart';
 import '../../core/layout/responsive.dart';
 import '../../core/modern_input.dart';
-import '../../core/models/notification_models.dart';
 import '../../core/providers/app_providers.dart';
-import '../../core/services/notification_service.dart';
+import '../../core/services/secure_auth_storage.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
   final String? sourceLabel;
   final String? returnRoute;
+  final double? initialAmount;
+  final String? initialMethod;
+  final String? savingsId;
 
-  const PaymentScreen({super.key, this.sourceLabel, this.returnRoute});
+  const PaymentScreen({
+    super.key,
+    this.sourceLabel,
+    this.returnRoute,
+    this.initialAmount,
+    this.initialMethod,
+    this.savingsId,
+  });
 
   @override
   ConsumerState<PaymentScreen> createState() => _PaymentScreenState();
@@ -39,10 +48,24 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _momoPhoneController = TextEditingController();
   String _method = _paymentMethods.first;
-  bool _isSubmitting = false;
   String _selectedShareAccount = _shareSourceAccounts.first;
   String _selectedInternalAccount = _shareSourceAccounts.first;
   String _selectedMomoProvider = _momoProviders.first;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isDepositFlow) _method = 'MoMo';
+    final initialAmount = widget.initialAmount;
+    if (initialAmount != null && initialAmount > 0) {
+      _amountController.text = initialAmount.toStringAsFixed(2);
+    }
+    if (widget.initialMethod == 'MoMo' || widget.initialMethod == 'Account') {
+      if (!_isDepositFlow || widget.initialMethod == 'MoMo') {
+        _method = widget.initialMethod!;
+      }
+    }
+  }
 
   bool get _isDepositFlow =>
       (widget.sourceLabel ?? '').trim().toLowerCase() == 'deposit';
@@ -52,137 +75,137 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     return RegExp(r'^0\d{9}$').hasMatch(phone);
   }
 
-  String _resolveReturnRoute(String? explicitRoute) {
-    final normalized = (explicitRoute ?? '').trim();
-    if (normalized.isNotEmpty) {
-      return normalized.startsWith('/') ? normalized : '/$normalized';
+  Future<void> _handleProceed() async {
+    if (_isDepositFlow) {
+      await _submitDeposit();
+      return;
     }
 
-    final isDepositFlow = (widget.sourceLabel ?? '').toLowerCase() == 'deposit';
-    return isDepositFlow ? '/savings' : '/home';
+    final message =
+        'This payment is unavailable because no matching backend operation is configured. No payment has been made.';
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _handleProceed() async {
-    if (_isSubmitting) return;
+  Future<void> _submitDeposit() async {
+    final amount =
+        double.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
+    final phone = ref.read(authProvider).userEmail ?? '';
+    final account = ref.read(authProvider).userId ?? '';
+    final savingsId = widget.savingsId ?? 'member-savings';
+    final pin = await SecureAuthStorage.instance.readPin() ?? '';
 
-    final amount = double.tryParse(_amountController.text.trim()) ?? 0;
-    final useExistingAccount = widget.sourceLabel == 'Existing account';
-    final isMomo = !useExistingAccount && _method == 'MoMo';
-    final momoPhone = _momoPhoneController.text.trim();
-    final isDepositFlow = _isDepositFlow;
-    final canProceed = amount > 0 && (!isMomo || _isValidMomoNumber(momoPhone));
+    if (amount <= 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid deposit amount.')),
+      );
+      return;
+    }
 
-    if (!canProceed) return;
+    if (phone.isEmpty || account.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Your session is incomplete. Please sign in again.'),
+        ),
+      );
+      return;
+    }
 
-    setState(() => _isSubmitting = true);
+    if (pin.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Your PIN is required to complete this deposit.'),
+        ),
+      );
+      return;
+    }
+
     try {
-      final authState = ref.read(authProvider);
-      final accountNumber = authState.userId ?? '';
-      final phoneNumber = authState.userEmail ?? '';
-
+      if (!mounted) return;
       final response = await ref
-          .read(paymentServiceProvider)
-          .chargePayment(
-            accountNumber: accountNumber,
-            phoneNumber: phoneNumber,
+          .read(savingsServiceProvider)
+          .depositSavings(
+            phoneNumber: phone,
+            accountNumber: account,
+            pin: pin,
             amount: amount,
-            paymentMethod: _method,
-            momoPhoneNumber: isMomo ? momoPhone : null,
+            savingsId: savingsId,
+            channel: 'mtn-gh',
+            username:
+                ref
+                    .read(userProfileProvider)
+                    .valueOrNull?['name']
+                    ?.toString() ??
+                'Member',
           );
 
       if (!mounted) return;
-      final statusValue = response['status'];
-      final isSuccess =
-          statusValue == 'success' ||
-          statusValue == 1 ||
-          statusValue == '1' ||
-          (statusValue is String && statusValue.toLowerCase() == 'success') ||
-          (response['data'] is Map &&
-              (response['data'] as Map)['status'] == 'success');
+      final transactionId = response['transaction_id']?.toString();
+      final reference = response['reference']?.toString() ?? transactionId;
+      final newBalanceValue = response['new_balance'];
+      final newBalance = newBalanceValue is num
+          ? newBalanceValue.toDouble()
+          : double.tryParse(newBalanceValue?.toString() ?? '');
+      final isPending = response['is_pending'] == true;
 
-      if (isSuccess) {
-        await NotificationService.instance.addNotification(
-          AppNotification(
-            id: 'payment_success_${DateTime.now().millisecondsSinceEpoch}',
-            title: 'Payment completed',
-            message:
-                'Your payment of GH₵${amount.toStringAsFixed(2)} was processed successfully.',
-            timestamp: DateTime.now(),
-            type: AppNotificationType.transaction,
-            read: false,
-          ),
-        );
-        if (!mounted) return;
-        final returnRoute = _resolveReturnRoute(widget.returnRoute);
-        final isSavingsReturn = returnRoute.startsWith('/savings');
-        final successUri = Uri(
-          path: '/payment-success',
-          queryParameters: {'returnRoute': returnRoute},
-        );
-        context.go(
-          successUri.toString(),
-          extra: {
-            'amount': amount,
-            'processedAt': DateTime.now().toIso8601String(),
-            'reference':
-                response['transaction_id'] ??
-                response['reference'] ??
-                response['transactionId'] ??
-                'PAY#${DateTime.now().millisecondsSinceEpoch}',
-            'title': isDepositFlow ? 'Deposit Successful' : 'Payment Successful',
-            'message':
-                response['message'] ??
-                (isDepositFlow
-                    ? 'Your deposit has been credited to your account.'
-                    : 'Your transaction was completed successfully.'),
-            'primaryActionRoute': returnRoute,
-            'primaryActionLabel': isSavingsReturn ? 'Done' : 'Go Home',
-            'secondaryActionLabel': isDepositFlow ? 'View Receipt' : null,
-            'secondaryActionRoute': isDepositFlow ? '/payment-receipt' : null,
-            'account': _selectedInternalAccount,
-            'paymentMethod': isMomo
-                ? '$_method ($_selectedMomoProvider)'
-                : '$_method ($_selectedInternalAccount)',
-            'newBalance': response['new_balance'],
-          },
-        );
-      } else {
-        await NotificationService.instance.addNotification(
-          AppNotification(
-            id: 'payment_failed_${DateTime.now().millisecondsSinceEpoch}',
-            title: 'Payment needs attention',
-            message:
-                'Your payment of GH₵${amount.toStringAsFixed(2)} could not be completed.',
-            timestamp: DateTime.now(),
-            type: AppNotificationType.security,
-            read: false,
-          ),
-        );
-        if (!mounted) return;
-        final returnRoute = _resolveReturnRoute(widget.returnRoute);
-        context.go(
-          '/payment-failed?returnRoute=${Uri.encodeComponent(returnRoute)}',
-          extra: {
-            'amount': amount,
-            'message':
-                response['message'] ?? 'Your payment could not be completed.',
-            'returnRoute': returnRoute,
-            'isDeposit': _isDepositFlow,
-          },
-        );
-      }
-    } on AppException catch (e) {
+      ref.invalidate(savingsProvider);
+      ref.invalidate(transactionsProvider);
+      ref.invalidate(userProfileProvider);
+
+      final route = isPending ? '/payment-success' : '/payment-success';
+      context.push(
+        route,
+        extra: {
+          'amount': amount,
+          'reference': reference,
+          'account': 'Member Savings',
+          'paymentMethod': 'MoMo',
+          'newBalance': newBalance,
+          'processedAt': DateTime.now().toIso8601String(),
+          'message':
+              response['message']?.toString() ??
+              'Deposit submitted successfully.',
+          'title': isPending ? 'Deposit Pending' : 'Deposit Successful',
+          'isPending': isPending,
+          'primaryActionLabel': 'Back to Savings',
+          'primaryActionRoute': widget.returnRoute ?? '/savings',
+          'secondaryActionLabel': 'Home',
+          'secondaryActionRoute': '/home',
+        },
+      );
+    } on AppException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(e.message)));
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to process payment right now.')),
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+      context.push(
+        '/payment-failed',
+        extra: {
+          'returnRoute': widget.returnRoute ?? '/savings',
+          'isDeposit': true,
+          'amount': amount,
+          'message': error.message,
+        },
       );
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Deposit failed: $error')));
+      context.push(
+        '/payment-failed',
+        extra: {
+          'returnRoute': widget.returnRoute ?? '/savings',
+          'isDeposit': true,
+          'amount': amount,
+          'message': 'Deposit failed. Please try again.',
+        },
+      );
     }
   }
 
@@ -206,7 +229,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final isMomoPhoneValid = _isValidMomoNumber(momoPhone);
     final showMomoPhoneError =
         isMomo && momoPhone.isNotEmpty && !isMomoPhoneValid;
-    final canProceed = amt > 0 && (!isMomo || isMomoPhoneValid);
+    final canProceed =
+        amt > 0 && (!isMomo || isMomoPhoneValid) && (!isDepositFlow || isMomo);
     final selectedSource = useExistingAccount
         ? _selectedShareAccount
         : _method == 'Account'
@@ -250,9 +274,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _PaymentSectionHeader(
-                          title: isDepositFlow
-                              ? 'Deposit Amount'
-                              : 'Amount',
+                          title: isDepositFlow ? 'Deposit Amount' : 'Amount',
                           subtitle: isDepositFlow
                               ? 'Enter how much you want to deposit'
                               : 'Enter how much you want to pay',
@@ -335,6 +357,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                 color: theme.colorScheme.primary,
                               ),
                               items: _paymentMethods
+                                  .where(
+                                    (method) =>
+                                        !isDepositFlow || method == 'MoMo',
+                                  )
                                   .map(
                                     (m) => DropdownMenuItem(
                                       value: m,
@@ -530,7 +556,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                   children: [
                                     Text(
                                       isDepositFlow
-                                          ? 'Amount Deposited'
+                                          ? 'Amount entered'
                                           : 'Total',
                                       style: theme.textTheme.bodyMedium,
                                     ),
@@ -579,22 +605,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     width: double.infinity,
                     height: 52,
                     child: FilledButton.icon(
-                      onPressed: canProceed && !_isSubmitting
-                          ? _handleProceed
-                          : null,
-                      icon: _isSubmitting
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.lock_outline_rounded),
+                      onPressed: canProceed ? () => _handleProceed() : null,
+                      icon: Icon(
+                        isDepositFlow
+                            ? Icons.arrow_forward_rounded
+                            : Icons.info_outline_rounded,
+                      ),
                       label: Text(
-                        _isSubmitting
-                            ? 'Processing...'
-                            : isDepositFlow
-                            ? 'Make Deposit'
-                            : 'Proceed to Payment',
+                        isDepositFlow ? 'Deposit now' : 'Payment unavailable',
                       ),
                       style: FilledButton.styleFrom(
                         elevation: 0,

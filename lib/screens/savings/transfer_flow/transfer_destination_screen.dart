@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/app_card.dart';
+import '../../../core/app_scaffold.dart';
+import '../../../core/color_ext.dart';
 import 'transfer_model.dart';
 
 class TransferDestinationScreen extends StatelessWidget {
   final TransferData? initialData;
 
-  const TransferDestinationScreen({
-    super.key,
-    this.initialData,
-  });
+  const TransferDestinationScreen({super.key, this.initialData});
 
   @override
   Widget build(BuildContext context) {
@@ -16,11 +16,7 @@ class TransferDestinationScreen extends StatelessWidget {
     final data = initialData ?? TransferData();
 
     final destinations = [
-      {
-        'id': 'adepa_member',
-        'name': 'Adepa Member',
-        'icon': Icons.people,
-      },
+      {'id': 'adepa_member', 'name': 'Adepa Member', 'icon': Icons.people},
       {
         'id': 'bank_account',
         'name': 'Bank Account',
@@ -31,19 +27,12 @@ class TransferDestinationScreen extends StatelessWidget {
         'name': 'Mobile Money',
         'icon': Icons.phone_android,
       },
-      {
-        'id': 'international',
-        'name': 'International',
-        'icon': Icons.language,
-      },
+      {'id': 'international', 'name': 'International', 'icon': Icons.language},
     ];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Select Destination'),
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
+    return AppScaffold(
+      title: 'Select Destination',
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -56,48 +45,66 @@ class TransferDestinationScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             ...destinations.map((dest) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
-                child: GestureDetector(
-                  onTap: () {
-                    final updated = data.copyWith(
-                      destination: dest['id'] as String,
-                    );
-                    context.push(
-                      '/transfer/select-recipient',
-                      extra: updated,
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(16.0),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: theme.colorScheme.outline,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
+              final isMember = dest['id'] == 'adepa_member';
+              return AppCard(
+                padding: EdgeInsets.zero,
+                onTap: isMember
+                    ? () {
+                        final updated = data.copyWith(
+                          destination: dest['id'] as String,
+                        );
+                        context.push(
+                          '/transfer/select-recipient',
+                          extra: updated,
+                        );
+                      }
+                    : null,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withOpacitySafe(
+                            0.12,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
                           dest['icon'] as IconData,
                           color: theme.colorScheme.primary,
-                          size: 28,
                         ),
-                        const SizedBox(width: 16),
-                        Text(
-                          dest['name'] as String,
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              dest['name'] as String,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            if (!isMember)
+                              Text(
+                                'Unavailable until backend support is added',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.outline,
+                                ),
+                              ),
+                          ],
                         ),
-                        const Spacer(),
+                      ),
+                      if (isMember)
                         Icon(
-                          Icons.arrow_forward_ios,
+                          Icons.arrow_forward_ios_rounded,
                           size: 16,
                           color: theme.colorScheme.outline,
                         ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
               );

@@ -1,7 +1,59 @@
-import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'dart:async';
 
-class ExistingMemberEnrollmentScreen extends StatefulWidget {
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../core/constants/app_constants.dart';
+import '../../core/exceptions/app_exceptions.dart';
+import '../../core/providers/app_providers.dart';
+
+class _GhanaCardInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final raw = newValue.text.toUpperCase().replaceAll(
+      RegExp(r'[^A-Z0-9-]'),
+      '',
+    );
+    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    final hasPrefix =
+        raw.isEmpty || 'GHA'.startsWith(raw) || raw.startsWith('GHA');
+
+    if (!hasPrefix) {
+      return oldValue;
+    }
+
+    // Preserve the partial prefix while the user types G, then GH, then GHA.
+    if (raw.length <= 3 && digits.isEmpty) {
+      return TextEditingValue(
+        text: raw,
+        selection: TextSelection.collapsed(offset: raw.length),
+      );
+    }
+
+    final limitedDigits = digits.substring(
+      0,
+      digits.length > 10 ? 10 : digits.length,
+    );
+    var formatted = limitedDigits.isEmpty ? '' : 'GHA-$limitedDigits';
+    if (limitedDigits.length > 9) {
+      formatted =
+          'GHA-${limitedDigits.substring(0, 9)}-${limitedDigits.substring(9)}';
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+class ExistingMemberEnrollmentScreen extends ConsumerStatefulWidget {
   const ExistingMemberEnrollmentScreen({
     super.key,
     this.memberType = 'existing',
@@ -10,15 +62,23 @@ class ExistingMemberEnrollmentScreen extends StatefulWidget {
   final String memberType;
 
   @override
-  State<ExistingMemberEnrollmentScreen> createState() =>
+  ConsumerState<ExistingMemberEnrollmentScreen> createState() =>
       _ExistingMemberEnrollmentScreenState();
 }
 
 class _ExistingMemberEnrollmentScreenState
-    extends State<ExistingMemberEnrollmentScreen> {
+    extends ConsumerState<ExistingMemberEnrollmentScreen> {
   final PageController _pageController = PageController();
   final TextEditingController _memberIdController = TextEditingController();
+  final TextEditingController _existingPhoneController =
+      TextEditingController();
   final TextEditingController _otpController = TextEditingController();
+  final TextEditingController _fullNameController = TextEditingController();
+  final TextEditingController _ghanaCardController = TextEditingController();
+  final TextEditingController _birthDateController = TextEditingController();
+  final TextEditingController _genderController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
@@ -28,16 +88,105 @@ class _ExistingMemberEnrollmentScreenState
   final TextEditingController _finalOtpController = TextEditingController();
 
   bool _biometricsEnabled = true;
+  bool _savingsProductSelected = true;
+  bool _sharesProductSelected = false;
+  bool _fixedDepositSelected = false;
+  bool _loanProductSelected = false;
+  String? _fundingMethod;
+  bool _isSubmittingRegistration = false;
   int _currentStep = 0;
+  int _otpResendSecondsRemaining = 45;
+  Timer? _otpResendTimer;
 
   bool get _isNewMember => widget.memberType == 'new';
 
   late final List<_EnrollmentStep> _steps;
 
+  String _formatCountdown(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
+  String _resolvedPhoneNumber() {
+    if (!_isNewMember) {
+      return _existingPhoneController.text.replaceAll(RegExp(r'\D'), '');
+    }
+    final digits = _otpController.text.replaceAll(RegExp(r'\D'), '');
+    return digits.isNotEmpty
+        ? digits
+        : _memberIdController.text.replaceAll(RegExp(r'\D'), '');
+  }
+
+  Future<void> _resendOtpCode() async {
+    if (_otpResendSecondsRemaining > 0) {
+      return;
+    }
+
+    final phoneNumber = _resolvedPhoneNumber();
+    final accountNumber = _memberIdController.text.trim().isNotEmpty
+        ? _memberIdController.text.trim()
+        : (await SharedPreferences.getInstance())
+                  .getString(AppConstants.sharedPrefKeyUserId)
+                  ?.trim() ??
+              '';
+
+    if (phoneNumber.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Enter a valid phone number before resending the code.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    try {
+      await ref
+          .read(authProvider.notifier)
+          .sendLoginOtp(phoneNumber: phoneNumber, accountNumber: accountNumber);
+      if (!mounted) return;
+      _startOtpResendCountdown();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A new verification code has been sent.')),
+      );
+    } on AppException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to resend the OTP right now.')),
+      );
+    }
+  }
+
+  void _startOtpResendCountdown() {
+    _otpResendTimer?.cancel();
+    setState(() => _otpResendSecondsRemaining = 45);
+    _otpResendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_otpResendSecondsRemaining <= 1) {
+        timer.cancel();
+        setState(() => _otpResendSecondsRemaining = 0);
+        return;
+      }
+      setState(() => _otpResendSecondsRemaining--);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     _steps = _buildSteps();
+    _startOtpResendCountdown();
   }
 
   List<_EnrollmentStep> _buildSteps() {
@@ -114,7 +263,7 @@ class _ExistingMemberEnrollmentScreenState
           title: 'Verify Phone Number',
           subtitle: 'Confirm your phone number',
           description:
-              'We sent a 6-digit code to your registered phone number.',
+              'We sent a ${AppConstants.otpLength}-digit code to your registered phone number.',
           label: 'Verify Phone Number',
           body: _buildOtpBody,
         ),
@@ -166,7 +315,8 @@ class _ExistingMemberEnrollmentScreenState
         number: 3,
         title: 'Verify Identity (OTP)',
         subtitle: 'Confirm your phone number',
-        description: 'We sent a 6-digit code to the registered phone number.',
+        description:
+            'We sent a ${AppConstants.otpLength}-digit code to the registered phone number.',
         label: 'Verify Identity',
         body: _buildOtpBody,
       ),
@@ -233,11 +383,27 @@ class _ExistingMemberEnrollmentScreenState
     final current = _steps[_currentStep];
     final title = current.title;
 
+    if (title == 'Personal Information') {
+      final fullName = _fullNameController.text.trim();
+      final phone = _otpController.text.replaceAll(RegExp(r'\D'), '');
+      return fullName.isNotEmpty && phone.length >= 9;
+    }
+    if (title == 'Verify Identity (KYC)') {
+      return _ghanaCardController.text.trim().isNotEmpty &&
+          _birthDateController.text.trim().isNotEmpty;
+    }
+    if (title == 'Additional Information') {
+      return _genderController.text.trim().isNotEmpty &&
+          _addressController.text.trim().isNotEmpty;
+    }
     if (title == 'Verify Membership') {
-      return _memberIdController.text.trim().isNotEmpty;
+      final phone = _existingPhoneController.text.replaceAll(RegExp(r'\D'), '');
+      return _memberIdController.text.trim().isNotEmpty &&
+          phone.length >= 9 &&
+          _birthDateController.text.trim().isNotEmpty;
     }
     if (title == 'Verify Identity (OTP)' || title == 'Verify Phone Number') {
-      return _otpController.text.trim().length == 6;
+      return _otpController.text.trim().length == AppConstants.otpLength;
     }
     if (title == 'Create Login Credentials') {
       return _usernameController.text.trim().isNotEmpty &&
@@ -249,8 +415,17 @@ class _ExistingMemberEnrollmentScreenState
       return _pinController.text.trim().length == 4 &&
           _confirmPinController.text.trim() == _pinController.text.trim();
     }
+    if (title == 'Choose Products') {
+      return _savingsProductSelected ||
+          _sharesProductSelected ||
+          _fixedDepositSelected ||
+          _loanProductSelected;
+    }
+    if (title == 'Fund Your Account') {
+      return _fundingMethod != null;
+    }
     if (title == 'Verify Final Authentication') {
-      return _finalOtpController.text.trim().length == 6;
+      return _finalOtpController.text.trim().length == AppConstants.otpLength;
     }
     return true;
   }
@@ -265,19 +440,116 @@ class _ExistingMemberEnrollmentScreenState
     );
   }
 
-  void _nextStep() {
+  Future<void> _nextStep() async {
     if (_currentStep >= _steps.length - 1) {
       context.go('/home');
       return;
     }
 
     if (!_canContinue) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please complete the required information.'),
-        ),
-      );
+      final message = switch (_steps[_currentStep].title) {
+        'Create Login Credentials' =>
+          'Enter a username, a password with at least 8 characters, and matching passwords.',
+        'Set Transaction PIN' =>
+          'Enter a 4-digit PIN and confirm that both PINs match.',
+        'Choose Products' => 'Select at least one product to continue.',
+        _ => 'Please complete the required information.',
+      };
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
       return;
+    }
+
+    if (_steps[_currentStep].title == 'Review & Confirm') {
+      if (_isSubmittingRegistration) return;
+      setState(() => _isSubmittingRegistration = true);
+      try {
+        final authNotifier = ref.read(authProvider.notifier);
+        final message = _isNewMember
+            ? await authNotifier.submitNewMemberRegistration(
+                fullName: _fullNameController.text.trim(),
+                ghanaCard: _ghanaCardController.text.trim(),
+                phoneNumber: _otpController.text.replaceAll(RegExp(r'\D'), ''),
+                birthDate: _birthDateController.text.trim(),
+                gender: _genderController.text.trim(),
+                address: _addressController.text.trim(),
+                email: _emailController.text.trim(),
+                savingsProduct: _savingsProductSelected || _fixedDepositSelected
+                    ? 1
+                    : 0,
+                sharesProduct: _sharesProductSelected ? 5 : 0,
+                password: _passwordController.text.trim(),
+                transactionPin: _pinController.text.trim(),
+                imeiNumber: '0',
+                phoneMake: 'Flutter mobile app',
+              )
+            : await ref
+                  .read(authProvider.notifier)
+                  .submitRegistration(
+                    accountNumber: _memberIdController.text.trim(),
+                    phoneNumber: _existingPhoneController.text.replaceAll(
+                      RegExp(r'\D'),
+                      '',
+                    ),
+                    birthDate: _birthDateController.text.trim(),
+                    imeiNumber: '0',
+                    phoneMake: 'Flutter mobile app',
+                  );
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+        // Persist phone/account for OTP flow and navigate to OTP screen
+        final prefs = await SharedPreferences.getInstance();
+        final normalizedPhone =
+            (_isNewMember ? _otpController.text : _existingPhoneController.text)
+                .replaceAll(RegExp(r'\D'), '');
+        final accountNumber = _isNewMember
+            ? (authNotifier.lastRegisteredAccountNumber?.trim().isNotEmpty ==
+                      true
+                  ? authNotifier.lastRegisteredAccountNumber!.trim()
+                  : prefs.getString(AppConstants.sharedPrefKeyUserId)?.trim() ??
+                        '')
+            : _memberIdController.text.trim();
+        await prefs.setString(
+          AppConstants.sharedPrefKeyUserEmail,
+          normalizedPhone,
+        );
+        if (accountNumber.isNotEmpty) {
+          await prefs.setString(
+            AppConstants.sharedPrefKeyUserId,
+            accountNumber,
+          );
+        }
+        if (!mounted) return;
+        final otpRoute = Uri(
+          path: '/otp',
+          queryParameters: {
+            'phoneNumber': normalizedPhone,
+            'accountNumber': accountNumber,
+          },
+        ).toString();
+        context.go(
+          otpRoute,
+          extra: {
+            'phoneNumber': normalizedPhone,
+            'accountNumber': accountNumber,
+            'isRegistration': _isNewMember,
+          },
+        );
+        return;
+      } on AppException catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+        return;
+      } finally {
+        if (mounted) {
+          setState(() => _isSubmittingRegistration = false);
+        }
+      }
     }
 
     _goToStep(_currentStep + 1);
@@ -291,7 +563,7 @@ class _ExistingMemberEnrollmentScreenState
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primary,
+        color: const Color(0xFFF9FCFA),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -318,9 +590,17 @@ class _ExistingMemberEnrollmentScreenState
 
   @override
   void dispose() {
+    _otpResendTimer?.cancel();
     _pageController.dispose();
     _memberIdController.dispose();
+    _existingPhoneController.dispose();
     _otpController.dispose();
+    _fullNameController.dispose();
+    _ghanaCardController.dispose();
+    _birthDateController.dispose();
+    _genderController.dispose();
+    _addressController.dispose();
+    _emailController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -340,7 +620,7 @@ class _ExistingMemberEnrollmentScreenState
       backgroundColor: theme.colorScheme.secondary,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         elevation: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 0,
@@ -351,7 +631,7 @@ class _ExistingMemberEnrollmentScreenState
               height: 36,
               margin: const EdgeInsets.only(left: 12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: const Color(0xFF173D32),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFDDE7E2)),
               ),
@@ -365,8 +645,8 @@ class _ExistingMemberEnrollmentScreenState
                   _goToStep(_currentStep - 1);
                 },
                 icon: const Icon(
-                  Icons.arrow_back,
-                  color: Color(0xFF0E2B28),
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Color(0xFF2E8B57),
                   size: 18,
                 ),
               ),
@@ -461,7 +741,7 @@ class _ExistingMemberEnrollmentScreenState
                                 vertical: 8,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.12),
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(999),
                                 border: Border.all(
                                   color: Colors.white.withValues(alpha: 0.2),
@@ -470,7 +750,7 @@ class _ExistingMemberEnrollmentScreenState
                               child: Text(
                                 _steps[_currentStep].label,
                                 style: theme.textTheme.labelLarge?.copyWith(
-                                  color: Colors.white,
+                                  color: const Color(0xFF1D6B49),
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.2,
                                 ),
@@ -495,22 +775,32 @@ class _ExistingMemberEnrollmentScreenState
                                 width: double.infinity,
                                 height: 50,
                                 child: ElevatedButton(
-                                  onPressed: _canContinue ? _nextStep : null,
+                                  onPressed: _isSubmittingRegistration
+                                      ? null
+                                      : _nextStep,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: primary,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(14),
                                     ),
                                   ),
-                                  child: Text(
-                                    _currentStep == 0
-                                        ? 'Get Started'
-                                        : 'Continue',
-                                    style: theme.textTheme.labelLarge?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
+                                  child: _isSubmittingRegistration
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : Text(
+                                          'Continue',
+                                          style: theme.textTheme.labelLarge
+                                              ?.copyWith(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                        ),
                                 ),
                               ),
                             if (_currentStep == lastStepIndex)
@@ -571,7 +861,7 @@ class _ExistingMemberEnrollmentScreenState
         const SizedBox(height: 18),
         _buildTextField(
           label: 'Full Name',
-          controller: _memberIdController,
+          controller: _fullNameController,
           hint: 'Enter your full name',
           icon: Icons.person_outline_rounded,
         ),
@@ -582,11 +872,15 @@ class _ExistingMemberEnrollmentScreenState
           hint: 'Enter your active phone number',
           icon: Icons.phone_rounded,
           keyboardType: TextInputType.phone,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(15),
+          ],
         ),
         const SizedBox(height: 14),
         _buildTextField(
           label: 'Email Address (Optional)',
-          controller: _usernameController,
+          controller: _emailController,
           hint: 'Enter your email address',
           icon: Icons.email_outlined,
           keyboardType: TextInputType.emailAddress,
@@ -615,17 +909,24 @@ class _ExistingMemberEnrollmentScreenState
         ),
         const SizedBox(height: 18),
         _buildTextField(
-          label: 'ID Type',
-          controller: _memberIdController,
-          hint: 'Select ID Type',
+          label: 'Ghana Card Number',
+          controller: _ghanaCardController,
+          hint: 'GHA-XXXXXXXXX-X',
           icon: Icons.badge_outlined,
+          keyboardType: TextInputType.text,
+          inputFormatters: [_GhanaCardInputFormatter()],
         ),
         const SizedBox(height: 14),
         _buildTextField(
-          label: 'ID Number',
-          controller: _otpController,
-          hint: 'Enter your ID number',
-          icon: Icons.numbers_outlined,
+          label: 'Date of Birth',
+          controller: _birthDateController,
+          hint: 'YYYY-MM-DD',
+          icon: Icons.calendar_today_outlined,
+          keyboardType: TextInputType.datetime,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[\d-]')),
+            LengthLimitingTextInputFormatter(10),
+          ],
         ),
       ],
     );
@@ -650,25 +951,99 @@ class _ExistingMemberEnrollmentScreenState
           ),
         ),
         const SizedBox(height: 18),
-        _buildTextField(
-          label: 'Employment Status',
-          controller: _memberIdController,
-          hint: 'Select your employment status',
-          icon: Icons.work_outline_rounded,
-        ),
+        _buildGenderField(theme),
         const SizedBox(height: 14),
         _buildTextField(
-          label: 'Occupation',
-          controller: _otpController,
-          hint: 'Enter your occupation',
-          icon: Icons.business_center_rounded,
-        ),
-        const SizedBox(height: 14),
-        _buildTextField(
-          label: 'Source of Income',
-          controller: _usernameController,
-          hint: 'Select your income source',
+          label: 'Address',
+          controller: _addressController,
+          hint: 'Enter your residential address',
           icon: Icons.account_balance_wallet_rounded,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGenderField(ThemeData theme) {
+    final selectedGender = _genderController.text.trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Gender',
+          style: TextStyle(
+            color: Color(0xFF173D32),
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFD5E5DD)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.035),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: InputDecorator(
+            decoration: InputDecoration(
+              prefixIcon: const Icon(
+                Icons.wc_outlined,
+                color: Color(0xFF2E8B57),
+                size: 20,
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFD5E5DD)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFD5E5DD)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: Color(0xFF2E8B57),
+                  width: 1.5,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 0,
+              ),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: selectedGender.isEmpty ? null : selectedGender,
+                isExpanded: true,
+                hint: const Text(
+                  'Select gender',
+                  style: TextStyle(
+                    color: Color(0xFF789188),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                  ),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'Male', child: Text('Male')),
+                  DropdownMenuItem(value: 'Female', child: Text('Female')),
+                  DropdownMenuItem(value: 'Other', child: Text('Other')),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => _genderController.text = value);
+                },
+              ),
+            ),
+          ),
         ),
       ],
     );
@@ -693,10 +1068,34 @@ class _ExistingMemberEnrollmentScreenState
           ),
         ),
         const SizedBox(height: 22),
-        _productCheckRow(label: 'Savings Account'),
-        _productCheckRow(label: 'Member Savings', isSelected: true),
-        _productCheckRow(label: 'Fixed Deposit'),
-        _productCheckRow(label: 'Loan Product'),
+        _productCheckRow(
+          label: 'Savings Account',
+          isSelected: _savingsProductSelected,
+          onChanged: (selected) {
+            setState(() => _savingsProductSelected = selected);
+          },
+        ),
+        _productCheckRow(
+          label: 'Member Savings',
+          isSelected: _sharesProductSelected,
+          onChanged: (selected) {
+            setState(() => _sharesProductSelected = selected);
+          },
+        ),
+        _productCheckRow(
+          label: 'Fixed Deposit',
+          isSelected: _fixedDepositSelected,
+          onChanged: (selected) {
+            setState(() => _fixedDepositSelected = selected);
+          },
+        ),
+        _productCheckRow(
+          label: 'Loan Product',
+          isSelected: _loanProductSelected,
+          onChanged: (selected) {
+            setState(() => _loanProductSelected = selected);
+          },
+        ),
       ],
     );
   }
@@ -720,10 +1119,27 @@ class _ExistingMemberEnrollmentScreenState
           ),
         ),
         const SizedBox(height: 20),
-        _productCheckRow(label: 'Mobile Money', isSelected: true),
-        _productCheckRow(label: 'Bank Transfer'),
-        _productCheckRow(label: 'Debit/Credit Card'),
-        _productCheckRow(label: 'Pay in Branch'),
+        _productCheckRow(
+          label: 'Mobile Money',
+          isSelected: _fundingMethod == 'Mobile Money',
+          onChanged: (_) => setState(() => _fundingMethod = 'Mobile Money'),
+        ),
+        _productCheckRow(
+          label: 'Bank Transfer',
+          isSelected: _fundingMethod == 'Bank Transfer',
+          onChanged: (_) => setState(() => _fundingMethod = 'Bank Transfer'),
+        ),
+        _productCheckRow(
+          label: 'Debit/Credit Card',
+          isSelected: _fundingMethod == 'Debit/Credit Card',
+          onChanged: (_) =>
+              setState(() => _fundingMethod = 'Debit/Credit Card'),
+        ),
+        _productCheckRow(
+          label: 'Pay in Branch',
+          isSelected: _fundingMethod == 'Pay in Branch',
+          onChanged: (_) => setState(() => _fundingMethod = 'Pay in Branch'),
+        ),
       ],
     );
   }
@@ -732,63 +1148,121 @@ class _ExistingMemberEnrollmentScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE7F5EE),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.account_balance_rounded,
-                color: Color(0xFF1D7A52),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text(
-                    'Welcome to Adepa',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF0E2B28),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Enroll for mobile banking and access your account anytime, anywhere.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: const Color.fromARGB(255, 239, 240, 240),
-                      fontSize: 8,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 68),
-        Align(
-          alignment: Alignment.center,
+        Center(
           child: Container(
-            width: 170,
-            height: 170,
-            decoration: BoxDecoration(
+            width: 72,
+            height: 72,
+            decoration: const BoxDecoration(
+              color: Color(0xFFE7F5EE),
               shape: BoxShape.circle,
-              color: const Color(0xFFE8F7EE),
             ),
             child: const Icon(
-              Icons.smartphone_rounded,
-              size: 72,
+              Icons.account_balance_rounded,
               color: Color(0xFF1D7A52),
+              size: 36,
             ),
           ),
         ),
+        const SizedBox(height: 18),
+        Center(
+          child: Text(
+            'Activate mobile banking',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0E2B28),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Connect your existing Adepa account to the mobile app securely.',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: const Color(0xFF4B5E59),
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Have these details ready',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFF0E2B28),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _welcomeRequirement(
+          icon: Icons.account_balance_wallet_outlined,
+          text: 'Your Adepa account number',
+        ),
+        _welcomeRequirement(
+          icon: Icons.phone_outlined,
+          text: 'The phone number registered with Adepa',
+        ),
+        _welcomeRequirement(
+          icon: Icons.calendar_today_outlined,
+          text: 'Your date of birth',
+        ),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F8F4),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.lock_outline_rounded,
+                color: Color(0xFF1D7A52),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Your details are used only to verify your membership and send a one-time code.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFF4B5E59),
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _welcomeRequirement({required IconData icon, required String text}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE7F5EE),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(icon, color: const Color(0xFF1D7A52), size: 17),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Color(0xFF173D32),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -807,31 +1281,40 @@ class _ExistingMemberEnrollmentScreenState
         Text(
           'Let’s find your membership',
           style: theme.textTheme.bodyMedium?.copyWith(
-            color: const Color.fromARGB(255, 250, 251, 250),
+            color: const Color(0xFF4B5E59),
           ),
         ),
         const SizedBox(height: 18),
-        Text(
-          'Member ID or Account Number',
-          style: theme.textTheme.labelLarge?.copyWith(
-            color: const Color(0xFF0E2B28),
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 10),
-        TextField(
+        _buildTextField(
+          label: 'Member ID or Account Number',
           controller: _memberIdController,
+          hint: 'Enter your member ID or account number',
+          icon: Icons.badge_outlined,
           keyboardType: TextInputType.text,
-          onChanged: (_) => setState(() {}),
-          decoration: InputDecoration(
-            hintText: 'Enter your member ID or account number',
-            filled: true,
-            fillColor: const Color(0xFFF5F7F5),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-          ),
+        ),
+        const SizedBox(height: 14),
+        _buildTextField(
+          label: 'Registered Phone Number',
+          controller: _existingPhoneController,
+          hint: 'Enter the phone number registered with Adepa',
+          icon: Icons.phone_rounded,
+          keyboardType: TextInputType.phone,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(15),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _buildTextField(
+          label: 'Date of Birth',
+          controller: _birthDateController,
+          hint: 'YYYY-MM-DD',
+          icon: Icons.calendar_today_outlined,
+          keyboardType: TextInputType.datetime,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[\d-]')),
+            LengthLimitingTextInputFormatter(10),
+          ],
         ),
       ],
     );
@@ -850,35 +1333,24 @@ class _ExistingMemberEnrollmentScreenState
         ),
         const SizedBox(height: 8),
         Text(
-          'We sent a 6-digit code to +233 123 4567',
+          'We sent a ${AppConstants.otpLength}-digit code to your registered mobile number.',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: const Color(0xFF4B5E59),
           ),
         ),
         const SizedBox(height: 18),
-        Text(
-          'Enter verification code',
-          style: theme.textTheme.labelLarge?.copyWith(
-            color: const Color(0xFF0E2B28),
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 10),
-        TextField(
+        _buildTextField(
+          label: 'Enter verification code',
           controller: _otpController,
+          hint: 'Enter ${AppConstants.otpLength}-digit code',
+          icon: Icons.lock_outline_rounded,
           keyboardType: TextInputType.number,
-          maxLength: 6,
-          onChanged: (_) => setState(() {}),
-          decoration: InputDecoration(
-            hintText: '123456',
-            counterText: '',
-            filled: true,
-            fillColor: const Color(0xFFF5F7F5),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-          ),
+          maxLength: AppConstants.otpLength,
+          obscureText: true,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(AppConstants.otpLength),
+          ],
         ),
         const SizedBox(height: 10),
         Row(
@@ -890,11 +1362,21 @@ class _ExistingMemberEnrollmentScreenState
               ),
             ),
             const SizedBox(width: 6),
-            Text(
-              'Resend in 00:45',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w700,
+            TextButton(
+              onPressed: _otpResendSecondsRemaining > 0 ? null : _resendOtpCode,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                _otpResendSecondsRemaining > 0
+                    ? 'Resend in ${_formatCountdown(_otpResendSecondsRemaining)}'
+                    : 'Resend code',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],
@@ -975,6 +1457,10 @@ class _ExistingMemberEnrollmentScreenState
           keyboardType: TextInputType.number,
           maxLength: 4,
           obscureText: true,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(4),
+          ],
         ),
         const SizedBox(height: 14),
         _buildTextField(
@@ -985,6 +1471,10 @@ class _ExistingMemberEnrollmentScreenState
           keyboardType: TextInputType.number,
           maxLength: 4,
           obscureText: true,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(4),
+          ],
         ),
       ],
     );
@@ -1068,7 +1558,14 @@ class _ExistingMemberEnrollmentScreenState
 
   Widget _buildReviewBody(BuildContext context, ThemeData theme) {
     final memberId = _memberIdController.text.trim();
-    final phone = '+233 123 4567';
+    final phone = _otpController.text.trim();
+    final fullName = _fullNameController.text.trim();
+    final ghanaCard = _ghanaCardController.text.trim();
+    final birthDate = _birthDateController.text.trim();
+    final gender = _genderController.text.trim();
+    final address = _addressController.text.trim();
+    final email = _emailController.text.trim();
+    final username = _usernameController.text.trim();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1088,17 +1585,54 @@ class _ExistingMemberEnrollmentScreenState
           ),
         ),
         const SizedBox(height: 16),
-        _infoRow(label: 'Member Name', value: 'John Mensah'),
-        _infoRow(
-          label: 'Member ID',
-          value: memberId.isEmpty ? 'ADEP123456' : memberId,
-        ),
-        _infoRow(label: 'Phone Number', value: phone),
+        if (_isNewMember) ...[
+          _infoRow(
+            label: 'Full Name',
+            value: fullName.isEmpty ? 'Not provided' : fullName,
+          ),
+          _infoRow(
+            label: 'Ghana Card',
+            value: ghanaCard.isEmpty ? 'Not provided' : ghanaCard,
+          ),
+          _infoRow(
+            label: 'Date of Birth',
+            value: birthDate.isEmpty ? 'Not provided' : birthDate,
+          ),
+          _infoRow(
+            label: 'Gender',
+            value: gender.isEmpty ? 'Not provided' : gender,
+          ),
+          _infoRow(
+            label: 'Address',
+            value: address.isEmpty ? 'Not provided' : address,
+          ),
+          _infoRow(
+            label: 'Phone Number',
+            value: phone.isEmpty ? 'Not provided' : phone,
+          ),
+          _infoRow(
+            label: 'Email',
+            value: email.isEmpty ? 'Not provided' : email,
+          ),
+        ] else ...[
+          _infoRow(
+            label: 'Member ID',
+            value: memberId.isEmpty ? 'Not provided' : memberId,
+          ),
+          _infoRow(
+            label: 'Phone Number',
+            value: _existingPhoneController.text.trim().isEmpty
+                ? 'Not provided'
+                : _existingPhoneController.text.trim(),
+          ),
+          _infoRow(
+            label: 'Date of Birth',
+            value: birthDate.isEmpty ? 'Not provided' : birthDate,
+          ),
+        ],
         _infoRow(
           label: 'Username',
-          value: _usernameController.text.trim().isEmpty
-              ? 'johnmensah'
-              : _usernameController.text.trim(),
+          value: username.isEmpty ? 'Not provided' : username,
         ),
         const SizedBox(height: 18),
         Text(
@@ -1133,10 +1667,15 @@ class _ExistingMemberEnrollmentScreenState
         _buildTextField(
           label: 'One-time password',
           controller: _finalOtpController,
-          hint: '123456',
+          hint: 'Enter ${AppConstants.otpLength}-digit code',
           icon: Icons.verified_user_outlined,
           keyboardType: TextInputType.number,
-          maxLength: 6,
+          maxLength: AppConstants.otpLength,
+          obscureText: true,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(AppConstants.otpLength),
+          ],
         ),
       ],
     );
@@ -1248,6 +1787,8 @@ class _ExistingMemberEnrollmentScreenState
     bool obscureText = false,
     TextInputType keyboardType = TextInputType.text,
     int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
+    TextCapitalization textCapitalization = TextCapitalization.none,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1255,7 +1796,7 @@ class _ExistingMemberEnrollmentScreenState
         Text(
           label,
           style: const TextStyle(
-            color: Colors.white,
+            color: Color(0xFF173D32),
             fontWeight: FontWeight.w700,
             fontSize: 12,
           ),
@@ -1263,18 +1804,27 @@ class _ExistingMemberEnrollmentScreenState
         const SizedBox(height: 5),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.12),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+            border: Border.all(color: const Color(0xFFD5E5DD)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.035),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: TextField(
             controller: controller,
             obscureText: obscureText,
             keyboardType: keyboardType,
             maxLength: maxLength,
+            inputFormatters: inputFormatters,
+            textCapitalization: textCapitalization,
             onChanged: (_) => setState(() {}),
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF173D32),
               fontWeight: FontWeight.w600,
               fontSize: 14,
             ),
@@ -1284,10 +1834,10 @@ class _ExistingMemberEnrollmentScreenState
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.16),
+                  color: const Color(0xFFE4F3EA),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, color: Colors.white, size: 16),
+                child: Icon(icon, color: const Color(0xFF2E8B57), size: 16),
               ),
               prefixIconConstraints: const BoxConstraints(
                 minWidth: 0,
@@ -1295,24 +1845,27 @@ class _ExistingMemberEnrollmentScreenState
               ),
               hintText: hint,
               hintStyle: const TextStyle(
-                color: Colors.white70,
+                color: Color(0xFF789188),
                 fontWeight: FontWeight.w500,
                 fontSize: 13,
               ),
               counterText: '',
               filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.12),
+              fillColor: Colors.white,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+                borderSide: const BorderSide(color: Color(0xFFD5E5DD)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+                borderSide: const BorderSide(color: Color(0xFFD5E5DD)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.white, width: 1.1),
+                borderSide: const BorderSide(
+                  color: Color(0xFF2E8B57),
+                  width: 1.5,
+                ),
               ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 10,
@@ -1358,32 +1911,44 @@ class _ExistingMemberEnrollmentScreenState
     );
   }
 
-  Widget _productCheckRow({required String label, bool isSelected = false}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F7F5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isSelected ? const Color(0xFF1D7A52) : const Color(0xFFE3E8E5),
+  Widget _productCheckRow({
+    required String label,
+    bool isSelected = false,
+    ValueChanged<bool>? onChanged,
+  }) {
+    return InkWell(
+      onTap: onChanged == null ? null : () => onChanged(!isSelected),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F7F5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF1D7A52)
+                : const Color(0xFFE3E8E5),
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          Checkbox(
-            value: isSelected,
-            onChanged: (_) {},
-            activeColor: const Color(0xFF1D7A52),
-          ),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF0E2B28),
-              fontWeight: FontWeight.w600,
+        child: Row(
+          children: [
+            Checkbox(
+              value: isSelected,
+              onChanged: onChanged == null
+                  ? null
+                  : (value) => onChanged(value ?? false),
+              activeColor: const Color(0xFF1D7A52),
             ),
-          ),
-        ],
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF0E2B28),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

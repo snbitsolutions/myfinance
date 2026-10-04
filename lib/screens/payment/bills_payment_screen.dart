@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/app_card.dart';
+
 class BillsPaymentScreen extends StatefulWidget {
   const BillsPaymentScreen({super.key});
 
@@ -20,30 +22,29 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
       title: 'Enter Details',
       subtitle: 'Add your meter or account number',
     ),
-    _StepMeta(title: 'Verify', subtitle: 'Confirm your customer details'),
-    _StepMeta(title: 'Amount', subtitle: 'Enter the amount to pay'),
-    _StepMeta(title: 'Review', subtitle: 'Check payment details'),
-    _StepMeta(title: 'PIN', subtitle: 'Authorize payment'),
-    _StepMeta(title: 'Success', subtitle: 'Payment complete'),
+    _StepMeta(title: 'Verify Customer', subtitle: 'Details are not verified'),
+    _StepMeta(title: 'Amount', subtitle: 'Enter amount to pay'),
+    _StepMeta(title: 'Review', subtitle: 'Review the payment details'),
+    _StepMeta(
+      title: 'Unavailable',
+      subtitle: 'Payment authorization is not connected',
+    ),
   ];
 
   int _currentStep = 0;
   String _selectedBiller = 'ECG';
-  final TextEditingController _meterController = TextEditingController(
-    text: '1234567890',
-  );
-  final TextEditingController _amountController = TextEditingController(
-    text: '200',
-  );
-  final TextEditingController _pinController = TextEditingController();
+  final TextEditingController _meterController = TextEditingController();
+  final TextEditingController _customerNameController = TextEditingController();
+  final TextEditingController _amountController = TextEditingController();
 
-  double get _amountValue => double.tryParse(_amountController.text) ?? 0;
+  double get _amountValue =>
+      double.tryParse(_amountController.text.replaceAll(',', '').trim()) ?? 0;
 
   bool get _canContinue {
     if (_currentStep == 0) return true;
     if (_currentStep == 1) return _meterController.text.trim().isNotEmpty;
     if (_currentStep == 3) return _amountValue > 0;
-    if (_currentStep == 5) return _pinController.text.trim().length >= 4;
+    if (_currentStep == 5) return false;
     return true;
   }
 
@@ -66,7 +67,6 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
       return;
     }
 
-    context.go('/home');
   }
 
   void _previousStep() {
@@ -84,8 +84,8 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
   @override
   void dispose() {
     _meterController.dispose();
+    _customerNameController.dispose();
     _amountController.dispose();
-    _pinController.dispose();
     super.dispose();
   }
 
@@ -117,9 +117,10 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
                   Expanded(
                     child: Text(
                       'Pay Bills',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF1C1F1E),
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.primary,
                       ),
                     ),
                   ),
@@ -170,10 +171,8 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            _currentStep == 3
-                                ? 'Amount ready for payment'
-                                : _currentStep > 3
-                                ? 'Review and confirm payment'
+                            _currentStep == 5
+                                ? 'Payment service unavailable'
                                 : 'Bill details in progress',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: const Color(0xFF5A625D),
@@ -192,7 +191,9 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        'GH₵ ${_amountValue.toStringAsFixed(2)}',
+                        _currentStep == 5
+                            ? 'Unavailable'
+                            : 'No payment yet',
                         style: theme.textTheme.labelLarge?.copyWith(
                           fontWeight: FontWeight.w800,
                           color: const Color(0xFF2E8B57),
@@ -208,23 +209,10 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
               Expanded(
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 220),
-                  child: Container(
+                  child: AppCard(
                     key: ValueKey<int>(_currentStep),
+                    margin: EdgeInsets.zero,
                     padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: const Color(0xFFE8EFEA)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(
-                            0xFF0C291A,
-                          ).withValues(alpha: 0.04),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
                     child: _buildStepContent(
                       theme,
                       currentTitle,
@@ -233,8 +221,6 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
                   ),
                 ),
               ),
-              if (_currentStep < _steps.length - 1) ...[
-              ],
               const SizedBox(height: 18),
               Row(
                 children: [
@@ -266,7 +252,7 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
                         ),
                       ),
                       child: Text(
-                        _currentStep == _steps.length - 1 ? 'Done' : 'Continue',
+                        _currentStep == _steps.length - 1 ? 'Unavailable' : 'Continue',
                       ),
                     ),
                   ),
@@ -294,32 +280,45 @@ class _BillsPaymentScreenState extends State<BillsPaymentScreen> {
       case 1:
         return _CustomerDetailsPage(
           meterController: _meterController,
+          customerNameController: _customerNameController,
           selectedBiller: _selectedBiller,
+          onChanged: () => setState(() {}),
         );
       case 2:
         return _VerificationPage(
           biller: _selectedBiller,
           meterNumber: _meterController.text,
+          customerName: _customerNameController.text,
         );
       case 3:
         return _AmountPage(
           amountController: _amountController,
-          selectedBiller: _selectedBiller,
+          biller: _selectedBiller,
+          onChanged: () => setState(() {}),
         );
       case 4:
-        return _ReviewPage(biller: _selectedBiller, amount: _amountValue);
-      case 5:
-        return _AuthorizationPage(
-          pinController: _pinController,
-          amount: _amountValue,
+        return _ReviewPage(
           biller: _selectedBiller,
+          meterNumber: _meterController.text,
+          amount: _amountValue,
         );
-      case 6:
-        return _SuccessPage(
-          biller: _selectedBiller,
-          amount: _amountValue,
-          reference:
-              'ADEPA-${DateTime.now().millisecondsSinceEpoch.toString().substring(5, 11)}',
+      case 5:
+        return const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.info_outline_rounded, size: 44, color: Color(0xFFB86A14)),
+            SizedBox(height: 12),
+            Text(
+              'Bill payment authorization is unavailable',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'No bill payment service is connected. No PIN was collected and no payment has been made.',
+              textAlign: TextAlign.center,
+            ),
+          ],
         );
       default:
         return Column(
@@ -507,11 +506,15 @@ class _SelectBillerPage extends StatelessWidget {
 
 class _CustomerDetailsPage extends StatelessWidget {
   final TextEditingController meterController;
+  final TextEditingController customerNameController;
   final String selectedBiller;
+  final VoidCallback onChanged;
 
   const _CustomerDetailsPage({
     required this.meterController,
+    required this.customerNameController,
     required this.selectedBiller,
+    required this.onChanged,
   });
 
   @override
@@ -537,6 +540,7 @@ class _CustomerDetailsPage extends StatelessWidget {
         TextField(
           controller: meterController,
           keyboardType: TextInputType.number,
+          onChanged: (_) => onChanged(),
           decoration: InputDecoration(
             labelText: 'Meter / Account Number',
             border: OutlineInputBorder(
@@ -557,10 +561,12 @@ class _CustomerDetailsPage extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         TextField(
+          controller: customerNameController,
           keyboardType: TextInputType.name,
+          onChanged: (_) => onChanged(),
           decoration: InputDecoration(
             labelText: 'Customer Name',
-            hintText: 'John Mensah',
+            hintText: 'Enter customer name',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Color(0xFFE0E5E2)),
@@ -585,60 +591,12 @@ class _CustomerDetailsPage extends StatelessWidget {
 class _VerificationPage extends StatelessWidget {
   final String biller;
   final String meterNumber;
+  final String customerName;
 
-  const _VerificationPage({required this.biller, required this.meterNumber});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Verify Customer',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEAF5EE),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.check_circle_rounded, color: Color(0xFF2E8B57)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Customer found successfully for $biller',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
-        _SummaryRow(label: 'Biller', value: biller),
-        _SummaryRow(label: 'Meter Number', value: meterNumber),
-        _SummaryRow(label: 'Customer', value: 'John Mensah'),
-        _SummaryRow(label: 'Address', value: 'Agbogba, Accra'),
-      ],
-    );
-  }
-}
-
-class _AmountPage extends StatelessWidget {
-  final TextEditingController amountController;
-  final String selectedBiller;
-
-  const _AmountPage({
-    required this.amountController,
-    required this.selectedBiller,
+  const _VerificationPage({
+    required this.biller,
+    required this.meterNumber,
+    required this.customerName,
   });
 
   @override
@@ -647,63 +605,52 @@ class _AmountPage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Enter Amount',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
+        Text('Review customer details', style: theme.textTheme.headlineSmall),
+        const SizedBox(height: 16),
+        _BillDetail(label: 'Biller', value: biller),
+        _BillDetail(label: 'Meter / account', value: meterNumber),
+        _BillDetail(
+          label: 'Customer name entered',
+          value: customerName.trim().isEmpty ? 'Not provided' : customerName,
         ),
+        const SizedBox(height: 12),
+        const Text(
+          'These details have not been verified with the biller. The next screens are a preview only; no payment can be submitted.',
+        ),
+      ],
+    );
+  }
+}
+
+class _AmountPage extends StatelessWidget {
+  final TextEditingController amountController;
+  final String biller;
+  final VoidCallback onChanged;
+
+  const _AmountPage({
+    required this.amountController,
+    required this.biller,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Payment amount', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
-        Text(
-          'How much do you want to pay to $selectedBiller?',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: const Color(0xFF5A625D),
-          ),
-        ),
-        const SizedBox(height: 20),
-        TextFormField(
+        Text('Amount for $biller. This is a preview only.'),
+        const SizedBox(height: 16),
+        TextField(
           controller: amountController,
+          onChanged: (_) => onChanged(),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(
-            prefixText: 'GH₵ ',
+          decoration: const InputDecoration(
             labelText: 'Amount',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE0E5E2)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE0E5E2)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF2E8B57)),
-            ),
-            filled: true,
-            fillColor: const Color(0xFFF7F8F7),
+            prefixText: 'GH₵ ',
+            border: OutlineInputBorder(),
           ),
-        ),
-        const SizedBox(height: 18),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: ['50', '100', '200', '500'].map((value) {
-            return GestureDetector(
-              onTap: () => amountController.text = value,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F7F5),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFE0E5E2)),
-                ),
-                child: Text('GH₵ $value'),
-              ),
-            );
-          }).toList(),
         ),
       ],
     );
@@ -712,287 +659,49 @@ class _AmountPage extends StatelessWidget {
 
 class _ReviewPage extends StatelessWidget {
   final String biller;
+  final String meterNumber;
   final double amount;
 
-  const _ReviewPage({required this.biller, required this.amount});
+  const _ReviewPage({
+    required this.biller,
+    required this.meterNumber,
+    required this.amount,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final fee = amount * 0.025;
-    final total = amount + fee;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Review Payment',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 20),
-        _SummaryRow(label: 'Biller', value: biller),
-        _SummaryRow(label: 'Amount', value: 'GH₵ ${amount.toStringAsFixed(2)}'),
-        _SummaryRow(label: 'Fee', value: 'GH₵ ${fee.toStringAsFixed(2)}'),
+        Text('Review payment', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 16),
+        _BillDetail(label: 'Biller', value: biller),
+        _BillDetail(label: 'Meter / account', value: meterNumber),
+        _BillDetail(label: 'Amount', value: 'GH₵ ${amount.toStringAsFixed(2)}'),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF2E8B57).withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Total',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              Text(
-                'GH₵ ${total.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF2E8B57),
-                ),
-              ),
-            ],
-          ),
-        ),
+        const Text('No payment has been initiated.'),
       ],
     );
   }
 }
 
-class _AuthorizationPage extends StatelessWidget {
-  final TextEditingController pinController;
-  final double amount;
-  final String biller;
-
-  const _AuthorizationPage({
-    required this.pinController,
-    required this.amount,
-    required this.biller,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Authorize Payment',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Enter your 4-digit PIN to authorize this payment of GH₵ ${amount.toStringAsFixed(2)} to $biller.',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: const Color(0xFF5A625D),
-          ),
-        ),
-        const SizedBox(height: 22),
-        TextField(
-          controller: pinController,
-          keyboardType: TextInputType.number,
-          obscureText: true,
-          maxLength: 4,
-          decoration: InputDecoration(
-            labelText: 'PIN',
-            counterText: '',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE0E5E2)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE0E5E2)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF2E8B57)),
-            ),
-            filled: true,
-            fillColor: const Color(0xFFF7F8F7),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SuccessPage extends StatelessWidget {
-  final String biller;
-  final double amount;
-  final String reference;
-
-  const _SuccessPage({
-    required this.biller,
-    required this.amount,
-    required this.reference,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            color: const Color(0xFFEAF5EE),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.check_rounded,
-            size: 38,
-            color: Color(0xFF2E8B57),
-          ),
-        ),
-        const SizedBox(height: 18),
-        Text(
-          'Payment Successful',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Your payment to $biller was processed successfully.',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: const Color(0xFF5A625D),
-          ),
-        ),
-        const SizedBox(height: 22),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF5F7F5),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            children: [
-              _SummaryRow(label: 'Biller', value: biller),
-              _SummaryRow(
-                label: 'Amount',
-                value: 'GH₵ ${amount.toStringAsFixed(2)}',
-              ),
-              _SummaryRow(label: 'Reference', value: reference),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _InfoAssistCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  const _InfoAssistCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FBF9),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE1EAE3)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF153524).withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF5EE),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: const Color(0xFF2E8B57), size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1E2B26),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: const Color(0xFF5A625D),
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryRow extends StatelessWidget {
+class _BillDetail extends StatelessWidget {
   final String label;
   final String value;
 
-  const _SummaryRow({required this.label, required this.value});
+  const _BillDetail({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(color: Color(0xFF5A625D), fontSize: 12),
-            ),
-          ),
+          Expanded(child: Text(label)),
           const SizedBox(width: 12),
           Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF1C1F1E),
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-              ),
-            ),
+            child: Text(value, textAlign: TextAlign.end),
           ),
         ],
       ),

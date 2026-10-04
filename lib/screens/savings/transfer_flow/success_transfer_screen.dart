@@ -14,10 +14,9 @@ class SuccessTransferScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final data = initialData ?? TransferData();
-    final total = data.amount + data.transactionFee;
 
-    return WillPopScope(
-      onWillPop: () async => false,
+    return PopScope(
+      canPop: false,
       child: Scaffold(
         body: SingleChildScrollView(
           child: Column(
@@ -55,7 +54,7 @@ class SuccessTransferScreen extends StatelessWidget {
                           margin: const EdgeInsets.only(left: 4),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.3),
+                            color: Colors.white.withValues(alpha: 0.3),
                           ),
                         ),
                       ),
@@ -69,10 +68,10 @@ class SuccessTransferScreen extends StatelessWidget {
                         height: 80,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                         ),
                         child: const Icon(
-                          Icons.check_circle,
+                          Icons.info_outline_rounded,
                           color: Colors.white,
                           size: 48,
                         ),
@@ -85,7 +84,7 @@ class SuccessTransferScreen extends StatelessWidget {
                       child: Column(
                         children: [
                           Text(
-                            'Transfer Successful',
+                            'Transfer not submitted',
                             style: theme.textTheme.titleMedium?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -93,7 +92,7 @@ class SuccessTransferScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'GH₵${total.toStringAsFixed(2)}',
+                            'GH₵${data.amount.toStringAsFixed(2)}',
                             style: theme.textTheme.headlineSmall?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -143,15 +142,15 @@ class SuccessTransferScreen extends StatelessWidget {
                     _buildDetailRow(
                       context,
                       'Transfer Fee',
-                      'GH₵${data.transactionFee.toStringAsFixed(2)}',
+                      'Unavailable',
                     ),
                     const SizedBox(height: 12),
 
                     // Total
                     _buildDetailRow(
                       context,
-                      'Total Debited',
-                      'GH₵${total.toStringAsFixed(2)}',
+                      'Total Debit',
+                      'Unavailable',
                       highlight: true,
                     ),
                     const SizedBox(height: 32),

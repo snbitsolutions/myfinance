@@ -1,0 +1,15 @@
+unit: profile-and-settings
+bindings:
+  - type: route-declaration
+    name: "Routes /settings, /profile/edit, /kyc"
+    source_loc: "lib/router/app_router.dart:517"
+    target: "Profile/settings/KYC screens"
+    must_appear_in_target: true
+    notes: "Settings exposes security, notification, currency, and account actions."
+runtime_config:
+  - key: "biometricAuth"
+    source_loc: "lib/screens/profile/settings_screen.dart:1088"
+    source: code
+    default_value: "false"
+    must_appear_in_target: true
+    notes: "Preference controls the biometric login affordance."

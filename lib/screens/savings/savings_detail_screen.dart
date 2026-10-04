@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/app_scaffold.dart';
+import '../../core/providers/app_providers.dart';
 import 'savings_model.dart';
 
 class _SavingsDetailData {
@@ -8,187 +11,184 @@ class _SavingsDetailData {
   final String title;
   final IconData icon;
   final Color accent;
-  final double target;
-  final double balance;
-  final double interest;
-  final double monthlyDeposit;
+  final double? balance;
+  final double? interest;
+  final double? monthlyDeposit;
   final String createdLabel;
   final List<Map<String, dynamic>> transactions;
+  final bool isRemote;
 
   const _SavingsDetailData({
     required this.id,
     required this.title,
     required this.icon,
     required this.accent,
-    required this.target,
     required this.balance,
     required this.interest,
     required this.monthlyDeposit,
     required this.createdLabel,
     required this.transactions,
+    required this.isRemote,
   });
 }
 
-final Map<String, _SavingsDetailData> _savingsCatalog = {
-  'member-savings': _SavingsDetailData(
-    id: 'member-savings',
-    title: 'Member Savings',
-    icon: Icons.groups_rounded,
-    accent: const Color(0xFF2F7C52),
-    target: 120000,
-    balance: 45000.00,
-    interest: 1250.00,
-    monthlyDeposit: 5000,
-    createdLabel: '15 Jan 2022',
-    transactions: [
-      {'type': 'Deposit', 'amount': 1000.0, 'date': '23 Aug 2026'},
-      {'type': 'Withdrawal', 'amount': 500.0, 'date': '20 Aug 2026'},
-      {'type': 'Deposit', 'amount': 2000.0, 'date': '18 Aug 2026'},
-      {'type': 'Transfer In', 'amount': 5000.0, 'date': '15 Aug 2026'},
-      {'type': 'Interest Credit', 'amount': 150.0, 'date': '08 Aug 2026'},
-    ],
-  ),
-  'current-savings': _SavingsDetailData(
-    id: 'current-savings',
-    title: 'Current Savings',
-    icon: Icons.account_balance_wallet_rounded,
-    accent: const Color(0xFF3498DB),
-    target: 6000,
-    balance: 2140,
-    interest: 24.80,
-    monthlyDeposit: 220,
-    createdLabel: 'Created Jan 12, 2026',
-    transactions: [
-      {'type': 'Deposit', 'amount': 220.0, 'date': 'Mar 03, 2026'},
-      {'type': 'Deposit', 'amount': 180.0, 'date': 'Feb 18, 2026'},
-      {'type': 'Interest', 'amount': 4.8, 'date': 'Feb 15, 2026'},
-    ],
-  ),
-  'kiddy-savings': _SavingsDetailData(
-    id: 'kiddy-savings',
-    title: 'Kiddy Savings',
-    icon: Icons.child_care_rounded,
-    accent: const Color(0xFFFF6B9D),
-    target: 10000,
-    balance: 3650,
-    interest: 61.20,
-    monthlyDeposit: 300,
-    createdLabel: 'Created Dec 20, 2025',
-    transactions: [
-      {'type': 'Deposit', 'amount': 300.0, 'date': 'Mar 01, 2026'},
-      {'type': 'Deposit', 'amount': 250.0, 'date': 'Feb 10, 2026'},
-      {'type': 'Interest', 'amount': 11.2, 'date': 'Feb 01, 2026'},
-    ],
-  ),
-  'fixed-savings': _SavingsDetailData(
-    id: 'fixed-savings',
-    title: 'Fixed Savings',
-    icon: Icons.lock_clock_rounded,
-    accent: const Color(0xFF9B59B6),
-    target: 25000,
-    balance: 15400,
-    interest: 480.00,
-    monthlyDeposit: 1200,
-    createdLabel: 'Created Nov 15, 2025',
-    transactions: [
-      {'type': 'Deposit', 'amount': 1200.0, 'date': 'Mar 01, 2026'},
-      {'type': 'Interest', 'amount': 80.0, 'date': 'Feb 28, 2026'},
-      {'type': 'Deposit', 'amount': 1000.0, 'date': 'Feb 01, 2026'},
-    ],
-  ),
-  'emergency-fund': _SavingsDetailData(
-    id: 'emergency-fund',
-    title: 'Emergency Fund',
-    icon: Icons.medical_information_rounded,
-    accent: const Color(0xFFE74C3C),
-    target: 2000,
-    balance: 1200,
-    interest: 45.50,
-    monthlyDeposit: 150,
-    createdLabel: 'Created Jan 15, 2026',
-    transactions: [
-      {'type': 'Deposit', 'amount': 200.0, 'date': 'Jan 20, 2026'},
-      {'type': 'Interest', 'amount': 5.50, 'date': 'Jan 15, 2026'},
-      {'type': 'Deposit', 'amount': 150.0, 'date': 'Jan 10, 2026'},
-    ],
-  ),
-  'goal-savings': _SavingsDetailData(
-    id: 'goal-savings',
-    title: 'Goal Savings',
-    icon: Icons.flag_rounded,
-    accent: const Color(0xFF16A085),
-    target: 8000,
-    balance: 2950,
-    interest: 73.10,
-    monthlyDeposit: 400,
-    createdLabel: 'Created Jan 05, 2026',
-    transactions: [
-      {'type': 'Deposit', 'amount': 400.0, 'date': 'Mar 05, 2026'},
-      {'type': 'Deposit', 'amount': 350.0, 'date': 'Feb 05, 2026'},
-      {'type': 'Interest', 'amount': 8.1, 'date': 'Feb 01, 2026'},
-    ],
-  ),
-  'vacation-savings': _SavingsDetailData(
-    id: 'vacation-savings',
-    title: 'Vacation',
-    icon: Icons.flight_takeoff_rounded,
-    accent: const Color(0xFFF39C12),
-    target: 7000,
-    balance: 3200,
-    interest: 55.00,
-    monthlyDeposit: 350,
-    createdLabel: 'Created Dec 01, 2025',
-    transactions: [
-      {'type': 'Deposit', 'amount': 350.0, 'date': 'Mar 01, 2026'},
-      {'type': 'Deposit', 'amount': 300.0, 'date': 'Feb 01, 2026'},
-      {'type': 'Interest', 'amount': 7.0, 'date': 'Jan 31, 2026'},
-    ],
-  ),
-  'education-savings': _SavingsDetailData(
-    id: 'education-savings',
-    title: 'Education',
-    icon: Icons.school_rounded,
-    accent: const Color(0xFF8E44AD),
-    target: 15000,
-    balance: 6400,
-    interest: 121.40,
-    monthlyDeposit: 650,
-    createdLabel: 'Created Oct 10, 2025',
-    transactions: [
-      {'type': 'Deposit', 'amount': 650.0, 'date': 'Mar 01, 2026'},
-      {'type': 'Deposit', 'amount': 600.0, 'date': 'Feb 01, 2026'},
-      {'type': 'Interest', 'amount': 16.4, 'date': 'Jan 31, 2026'},
-    ],
-  ),
-  'custom-savings': _SavingsDetailData(
-    id: 'custom-savings',
-    title: 'Custom Savings',
-    icon: Icons.add_circle_outline_rounded,
-    accent: const Color(0xFF34495E),
-    target: 5000,
-    balance: 900,
-    interest: 14.90,
-    monthlyDeposit: 120,
-    createdLabel: 'Created Mar 01, 2026',
-    transactions: [
-      {'type': 'Deposit', 'amount': 200.0, 'date': 'Mar 08, 2026'},
-      {'type': 'Deposit', 'amount': 150.0, 'date': 'Mar 05, 2026'},
-      {'type': 'Interest', 'amount': 1.9, 'date': 'Mar 04, 2026'},
-    ],
-  ),
-};
-
-class SavingsDetailScreen extends StatefulWidget {
+class SavingsDetailScreen extends ConsumerStatefulWidget {
   final String savingsId;
   final Savings? savings;
 
   const SavingsDetailScreen({super.key, required this.savingsId, this.savings});
 
   @override
-  State<SavingsDetailScreen> createState() => _SavingsDetailScreenState();
+  ConsumerState<SavingsDetailScreen> createState() =>
+      _SavingsDetailScreenState();
 }
 
-class _SavingsDetailScreenState extends State<SavingsDetailScreen> {
+class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
+  void _showLocalGoalMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'This local goal is not a backend account. Deposit and withdrawal require a customer savings account.',
+        ),
+      ),
+    );
+  }
+
+  void _showSavingsStatement(BuildContext context, _SavingsDetailData savings) {
+    final theme = Theme.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${savings.title} statement',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Current account activity and balance summary',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                ),
+              ),
+              const SizedBox(height: 18),
+              _SavingsSummaryRow(
+                label: 'Current balance',
+                value: savings.balance == null
+                    ? 'Unavailable'
+                    : 'GH₵${savings.balance!.toStringAsFixed(2)}',
+                icon: Icons.account_balance_wallet_outlined,
+              ),
+              _SavingsSummaryRow(
+                label: 'Interest earned',
+                value: savings.interest == null
+                    ? 'Unavailable'
+                    : 'GH₵${savings.interest!.toStringAsFixed(2)}',
+                icon: Icons.trending_up_rounded,
+              ),
+              _SavingsSummaryRow(
+                label: 'Monthly contribution',
+                value: savings.monthlyDeposit == null
+                    ? 'Unavailable'
+                    : 'GH₵${savings.monthlyDeposit!.toStringAsFixed(2)}',
+                icon: Icons.calendar_month_outlined,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Statement download is not available yet.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showTransactionHistory(
+    BuildContext context,
+    List<Map<String, dynamic>> transactions,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * 0.72,
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            itemCount: transactions.length,
+            separatorBuilder: (_, index) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final transaction = transactions[index];
+              final isCredit = transaction['positive'] == true;
+              final amount = (transaction['amount'] as num?)?.toDouble() ?? 0;
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  child: Icon(
+                    isCredit
+                        ? Icons.arrow_downward_rounded
+                        : Icons.arrow_upward_rounded,
+                  ),
+                ),
+                title: Text(
+                  transaction['type']?.toString() ?? 'Transaction',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  '${transaction['subtitle'] ?? 'Savings activity'} • ${transaction['date'] ?? ''}',
+                ),
+                trailing: Text(
+                  '${isCredit ? '+' : '-'}GH₵${amount.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    color: isCredit ? const Color(0xFF1FA66E) : Colors.red,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showMoreActions(BuildContext context, _SavingsDetailData savings) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.receipt_long_rounded),
+              title: const Text('Statement'),
+              subtitle: const Text('View your balance summary'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showSavingsStatement(context, savings);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   _SavingsDetailData _fromSavedGoal(Savings goal) {
     final accent = switch (goal.type) {
       SavingsType.memberSaving => const Color(0xFF43A047),
@@ -197,662 +197,599 @@ class _SavingsDetailScreenState extends State<SavingsDetailScreen> {
       SavingsType.fixedDeposit => const Color(0xFF9B59B6),
     };
 
-    final today = DateTime.now();
-    final createdLabel = 'Created ${today.day}/${today.month}/${today.year}';
-
     return _SavingsDetailData(
       id: goal.id,
       title: goal.title,
       icon: goal.type.icon,
       accent: accent,
-      target: goal.target,
-      balance: goal.balance,
-      interest: goal.interestRate ?? 0,
-      monthlyDeposit: (goal.target / 12).clamp(0, goal.target),
-      createdLabel: createdLabel,
+      balance: goal.balanceAvailable ? goal.balance : null,
+      interest: goal.interestRate,
+      monthlyDeposit: null,
+      createdLabel: 'Creation date unavailable',
       transactions: const [],
+      isRemote: goal.isRemote,
     );
+  }
+
+  Savings? _findLiveSavings() {
+    final records = ref.read(savingsProvider).valueOrNull ?? const [];
+    for (final record in records) {
+      final recordId =
+          (record['savings_id'] ?? record['id'] ?? record['product_id'])
+              ?.toString()
+              .trim();
+      if (recordId == widget.savingsId) {
+        final name =
+            (record['name'] ??
+                    record['product_name'] ??
+                    record['account_name'] ??
+                    'Savings Account')
+                .toString();
+        final balance = _toAmount(
+          record['balance'] ?? record['current_balance'] ?? record['amount'],
+        );
+        return Savings(
+          id: recordId!,
+          title: name,
+          balance: balance,
+          target: _toAmount(
+            record['target'] ?? record['target_amount'] ?? record['goal_amount'] ?? 0,
+          ),
+          type: SavingsType.memberSaving,
+          interestRate: _toOptionalAmount(
+            record['interest_rate'] ?? record['rate'],
+          ),
+          isRemote: true,
+          balanceAvailable:
+              record['balance'] != null ||
+              record['current_balance'] != null ||
+              record['amount'] != null,
+        );
+      }
+    }
+    return null;
+  }
+
+  double _toAmount(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString().replaceAll(',', '') ?? '') ?? 0;
+  }
+
+  double? _toOptionalAmount(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value == null) return null;
+    return double.tryParse(value.toString().replaceAll(',', ''));
+  }
+
+  String _maskedAccountNumber(String accountNumber) {
+    final digits = accountNumber.trim();
+    if (digits.isEmpty) return 'Unavailable';
+    final suffix = digits.length <= 4
+        ? digits
+        : digits.substring(digits.length - 4);
+    return '•••• $suffix';
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final savings = widget.savings != null
-        ? _fromSavedGoal(widget.savings!)
-        : _savingsCatalog[widget.savingsId] ??
-              _savingsCatalog['custom-savings'] ??
-              _fromSavedGoal(
-                Savings(
-                  id: widget.savingsId,
-                  title: 'Savings Goal',
-                  balance: 0,
-                  target: 1,
-                  type: SavingsType.memberSaving,
-                ),
-              );
+    final liveSavings = widget.savings ?? _findLiveSavings();
+    final savings = liveSavings != null
+        ? _fromSavedGoal(liveSavings)
+        : _SavingsDetailData(
+            id: widget.savingsId,
+            title: 'Savings Account',
+            icon: Icons.savings_rounded,
+            accent: const Color(0xFF2F7C52),
+            balance: null,
+            interest: null,
+            monthlyDeposit: null,
+            createdLabel: 'Account details unavailable',
+            transactions: const [],
+            isRemote: false,
+          );
+    final profile = ref.watch(userProfileProvider).valueOrNull;
+    final accountNumber =
+        (profile?['account_number'] ??
+                profile?['accountNumber'] ??
+                ref.read(authProvider).userId ??
+                '')
+            .toString();
 
     final title = savings.title;
-    final transactionRows = [
-      {
-        'type': 'Deposit',
-        'subtitle': 'Counter Deposit',
-        'amount': 1000.0,
-        'date': '23 Aug 2026',
-        'icon': Icons.arrow_downward,
-        'color': const Color(0xFF1FA66E),
-        'positive': true,
-      },
-      {
-        'type': 'Withdrawal',
-        'subtitle': 'Cash Withdrawal',
-        'amount': 500.0,
-        'date': '20 Aug 2026',
-        'icon': Icons.arrow_upward,
-        'color': const Color(0xFFE57373),
-        'positive': false,
-      },
-      {
-        'type': 'Deposit',
-        'subtitle': 'Mobile Deposit',
-        'amount': 2000.0,
-        'date': '18 Aug 2026',
-        'icon': Icons.arrow_downward,
-        'color': const Color(0xFF1FA66E),
-        'positive': true,
-      },
-      {
-        'type': 'Transfer In',
-        'subtitle': 'From Investments A/C',
-        'amount': 5000.0,
-        'date': '15 Aug 2026',
-        'icon': Icons.swap_horiz,
-        'color': const Color(0xFF5DA9E9),
-        'positive': true,
-      },
-      {
-        'type': 'Interest Credit',
-        'subtitle': 'Interest for Jul 2026',
-        'amount': 150.0,
-        'date': '08 Aug 2026',
-        'icon': Icons.account_balance_wallet_outlined,
-        'color': const Color(0xFFB4C4A6),
-        'positive': true,
-      },
-    ];
+    final transactionRows = savings.transactions;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F6F3),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () {
-                      if (context.canPop()) {
-                        context.pop();
-                      } else {
-                        context.go('/home');
-                      }
-                    },
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 26,
-                    ),
-                    splashRadius: 22,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+    return AppScaffold(
+      title: title,
+      backRoute: '/savings',
+      child: Container(
+        color: const Color(0xFFF5F6F3),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1B6845), Color(0xFF2E8B57)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 31,
-                        letterSpacing: -0.5,
-                        color: Colors.black87,
-                      ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2E8B57).withValues(alpha: 0.25),
+                      blurRadius: 24,
+                      offset: const Offset(0, 14),
                     ),
-                  ),
-                  Stack(
-                    alignment: Alignment.topRight,
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.notifications_none_rounded,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      Positioned(
-                        right: 3,
-                        top: 5,
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      right: -28,
+                      bottom: -38,
+                      child: Opacity(
+                        opacity: 0.15,
                         child: Container(
-                          width: 16,
-                          height: 16,
+                          width: 170,
+                          height: 170,
                           decoration: const BoxDecoration(
-                            color: Color(0xFF3D8B52),
+                            color: Colors.white,
                             shape: BoxShape.circle,
                           ),
-                          alignment: Alignment.center,
-                          child: const Text(
-                            '3',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
                         ),
                       ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF1B6845), Color(0xFF2E8B57)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(
-                              0xFF2E8B57,
-                            ).withValues(alpha: 0.25),
-                            blurRadius: 24,
-                            offset: const Offset(0, 14),
-                          ),
-                        ],
-                      ),
-                      child: Stack(
-                        children: [
-                          Positioned(
-                            right: -28,
-                            bottom: -38,
-                            child: Opacity(
-                              opacity: 0.15,
-                              child: Container(
-                                width: 170,
-                                height: 170,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const Text(
-                                        'Available Balance',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        width: 9,
-                                        height: 9,
-                                        decoration: const BoxDecoration(
-                                          color: Colors.white,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  Row(
-                                    children: const [
-                                      Icon(
-                                        Icons.star_rounded,
-                                        color: Colors.white,
-                                        size: 16,
-                                      ),
-                                      SizedBox(width: 6),
-                                      Text(
-                                        'Primary Account',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'GH₵ 45,000.00',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 42,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -1.2,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 18,
-                                    height: 18,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.18,
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(
-                                      Icons.arrow_upward_rounded,
-                                      size: 14,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    '8.4%',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'vs last month',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 18),
-                              Row(
-                                children: [
-                                  const Text(
-                                    'Account Number',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.white70,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.18,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Text(
-                                      '•••• 4839',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 1.6,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
                     ),
-                    const SizedBox(height: 18),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _ActionButton(
-                            icon: Icons.arrow_downward,
-                            label: 'Deposit',
-                            active: true,
-                            onTap: () => context.go('/savings/${widget.savingsId}/deposit'),
-                          ),
-                          _ActionButton(
-                            icon: Icons.arrow_upward,
-                            label: 'Withdraw',
-                            onTap: () {},
-                          ),
-                          _ActionButton(
-                            icon: Icons.swap_horiz,
-                            label: 'Transfer',
-                            onTap: () {},
-                          ),
-                          _ActionButton(
-                            icon: Icons.receipt_long_rounded,
-                            label: 'Statement',
-                            onTap: () {},
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Account Overview',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: _OverviewTile(
-                            icon: Icons.account_balance_wallet_outlined,
-                            iconColor: const Color(0xFF6E8A7A),
-                            label: 'Total Deposits',
-                            value: 'GH₵ 75,000.00',
-                            background: const Color(0xFFF0F7F3),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _OverviewTile(
-                            icon: Icons.arrow_upward_rounded,
-                            iconColor: const Color(0xFFDD7F7F),
-                            label: 'Total Withdrawals',
-                            value: 'GH₵ 30,000.00',
-                            background: const Color(0xFFF9F2F2),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _OverviewTile(
-                            icon: Icons.trending_up_rounded,
-                            iconColor: const Color(0xFF7DAE78),
-                            label: 'Interest Earned',
-                            value: 'GH₵ 1,250.00',
-                            background: const Color(0xFFF0F7EE),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Account Details',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Column(
-                        children: [
-                          _DetailRow(
-                            label: 'Account Type',
-                            value: 'Member Savings',
-                            icon: Icons.account_balance_rounded,
-                          ),
-                          _DetailRow(
-                            label: 'Opened On',
-                            value: '15 Jan 2022',
-                            icon: Icons.calendar_today_rounded,
-                          ),
-                          _DetailRow(
-                            label: 'Currency',
-                            value: 'Ghana Cedi (GH₵)',
-                            icon: Icons.currency_exchange_rounded,
-                          ),
-                          _DetailRow(
-                            label: 'Status',
-                            value: 'Active',
-                            icon: Icons.check_circle_rounded,
-                            valueColor: const Color(0xFF2E8B57),
-                          ),
-                          _DetailRow(
-                            label: 'Next Interest Payout',
-                            value: '30 Sep 2026',
-                            icon: Icons.schedule_rounded,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Recent Transactions',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {},
-                          style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                          child: const Text(
-                            'View All',
-                            style: TextStyle(
-                              color: Color(0xFF2E8B57),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            height: 52,
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: const Color(0xFFE5E7E5),
-                              ),
-                            ),
-                            child: Row(
-                              children: const [
-                                Icon(
-                                  Icons.search_rounded,
-                                  color: Colors.grey,
-                                  size: 20,
-                                ),
-                                SizedBox(width: 10),
-                                Text(
-                                  'Search transactions',
-                                  style: TextStyle(
-                                    color: Color(0xFF8A8F89),
-                                    fontSize: 15,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
-                          width: 54,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFE5E7E5)),
-                          ),
-                          child: const Icon(
-                            Icons.filter_list_rounded,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Today',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ...transactionRows.map((tx) {
-                      final isPositive = tx['positive'] as bool;
-                      final amount = (tx['amount'] as num).toDouble();
-                      final amountText =
-                          '${isPositive ? '+' : '-'}GH₵ ${amount.toStringAsFixed(2)}';
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Row(
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                color: (tx['color'] as Color).withValues(
-                                  alpha: 0.12,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                tx['icon'] as IconData,
-                                color: tx['color'] as Color,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    tx['type'] as String,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 15,
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                                  Text(
-                                    tx['subtitle'] as String,
-                                    style: const TextStyle(
-                                      color: Color(0xFF7B827D),
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  Text(
-                                    tx['date'] as String,
-                                    style: const TextStyle(
-                                      color: Color(0xFF8E9390),
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                             Row(
                               children: [
-                                Text(
-                                  amountText,
+                                const Text(
+                                  'Available Balance',
                                   style: TextStyle(
-                                    color: isPositive
-                                        ? const Color(0xFF2E8B57)
-                                        : const Color(0xFFDA5F5F),
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 15,
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                const Icon(
-                                  Icons.chevron_right,
-                                  color: Color(0xFF8A8F89),
-                                  size: 20,
+                                Container(
+                                  width: 9,
+                                  height: 9,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              children: const [
+                                Icon(
+                                  Icons.star_rounded,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Primary Account',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ],
                             ),
                           ],
                         ),
-                      );
-                    }),
-                    const SizedBox(height: 12),
+                        const SizedBox(height: 16),
+                        Text(
+                          savings.balance == null
+                              ? 'GH₵ —'
+                              : 'GH₵ ${savings.balance!.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 42,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Container(
+                              width: 18,
+                              height: 18,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.arrow_upward_rounded,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Change history unavailable',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            const Text(
+                              'Account Number',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                _maskedAccountNumber(accountNumber),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.6,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _ActionButton(
+                      icon: Icons.arrow_downward,
+                      label: 'Deposit',
+                      active: true,
+                      onTap: () => savings.isRemote
+                          ? context.go(
+                              '/savings/${widget.savingsId}/deposit',
+                              extra: widget.savings,
+                            )
+                          : _showLocalGoalMessage(),
+                    ),
+                    _ActionButton(
+                      icon: Icons.arrow_upward,
+                      label: 'Withdraw',
+                      onTap: () => savings.isRemote
+                          ? context.go('/savings/${widget.savingsId}/withdraw')
+                          : _showLocalGoalMessage(),
+                    ),
+                    _ActionButton(
+                      icon: Icons.swap_horiz,
+                      label: 'Transfer',
+                      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Savings transfers are unavailable until recipient verification and transfer processing are connected to the backend.',
+                          ),
+                        ),
+                      ),
+                    ),
+                    _ActionButton(
+                      icon: Icons.more_horiz_rounded,
+                      label: 'More',
+                      onTap: () => _showMoreActions(context, savings),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Account Overview',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _OverviewTile(
+                      icon: Icons.account_balance_wallet_outlined,
+                      iconColor: const Color(0xFF6E8A7A),
+                      label: 'Total Deposits',
+                      value: '—',
+                      background: const Color(0xFFF0F7F3),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _OverviewTile(
+                      icon: Icons.arrow_upward_rounded,
+                      iconColor: const Color(0xFFDD7F7F),
+                      label: 'Total Withdrawals',
+                      value: '—',
+                      background: const Color(0xFFF9F2F2),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _OverviewTile(
+                      icon: Icons.trending_up_rounded,
+                      iconColor: const Color(0xFF7DAE78),
+                      label: 'Interest Earned',
+                      value: savings.interest != null
+                          ? 'GH₵ ${savings.interest!.toStringAsFixed(2)}'
+                          : '—',
+                      background: const Color(0xFFF0F7EE),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Account Details',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Column(
+                  children: [
+                    _DetailRow(
+                      label: 'Account Type',
+                      value: savings.title,
+                      icon: Icons.account_balance_rounded,
+                    ),
+                    _DetailRow(
+                      label: 'Opened On',
+                      value: savings.isRemote
+                          ? 'Unavailable'
+                          : savings.createdLabel,
+                      icon: Icons.calendar_today_rounded,
+                    ),
+                    _DetailRow(
+                      label: 'Currency',
+                      value: 'Ghana Cedi (GH₵)',
+                      icon: Icons.currency_exchange_rounded,
+                    ),
+                    _DetailRow(
+                      label: 'Status',
+                      value: savings.isRemote ? 'Unavailable' : 'Local goal',
+                      icon: Icons.check_circle_rounded,
+                      valueColor: savings.isRemote
+                          ? null
+                          : const Color(0xFF2E8B57),
+                    ),
+                    _DetailRow(
+                      label: 'Next Interest Payout',
+                      value: 'Unavailable',
+                      icon: Icons.schedule_rounded,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Recent Transactions',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () =>
+                        _showTransactionHistory(context, transactionRows),
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                    child: const Text(
+                      'View All',
+                      style: TextStyle(
+                        color: Color(0xFF2E8B57),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 52,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE5E7E5)),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(
+                            Icons.search_rounded,
+                            color: Colors.grey,
+                            size: 20,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'Search transactions',
+                            style: TextStyle(
+                              color: Color(0xFF8A8F89),
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 54,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE5E7E5)),
+                    ),
+                    child: const Icon(
+                      Icons.filter_list_rounded,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Today',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...transactionRows.map((tx) {
+                final isPositive = tx['positive'] as bool;
+                final amount = (tx['amount'] as num).toDouble();
+                final amountText =
+                    '${isPositive ? '+' : '-'}GH₵ ${amount.toStringAsFixed(2)}';
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: (tx['color'] as Color).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          tx['icon'] as IconData,
+                          color: tx['color'] as Color,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              tx['type'] as String,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            Text(
+                              tx['subtitle'] as String,
+                              style: const TextStyle(
+                                color: Color(0xFF7B827D),
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              tx['date'] as String,
+                              style: const TextStyle(
+                                color: Color(0xFF8E9390),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          Text(
+                            amountText,
+                            style: TextStyle(
+                              color: isPositive
+                                  ? const Color(0xFF2E8B57)
+                                  : const Color(0xFFDA5F5F),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: Color(0xFF8A8F89),
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              const SizedBox(height: 12),
+            ],
+          ),
         ),
       ),
     );
@@ -885,8 +822,11 @@ class _ActionButton extends StatelessWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: active ? const Color(0xFFE9F5ED) : const Color(0xFFF4F5F4),
+                color: active
+                    ? const Color(0xFFE9F5ED)
+                    : const Color(0xFFF4F5F4),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFD9E6DE)),
               ),
               child: Icon(
                 icon,
@@ -897,8 +837,11 @@ class _ActionButton extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               label,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 color: active ? const Color(0xFF2E8B57) : Colors.black87,
                 fontWeight: FontWeight.w500,
               ),
@@ -1014,3 +957,30 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
+class _SavingsSummaryRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _SavingsSummaryRow({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: theme.colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(child: Text(label)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+}

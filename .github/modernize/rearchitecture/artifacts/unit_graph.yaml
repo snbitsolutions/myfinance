@@ -1,0 +1,263 @@
+units:
+  - name: app-startup
+    trigger: page
+    trigger_detail: "Application launch at lib/main.dart"
+    source_anchors:
+      - path: lib/main.dart
+        line: 15
+      - path: lib/screens/splash/splash_screen.dart
+        line: 1
+    exported_signature:
+      - method: "void main()"
+        source_loc: "lib/main.dart:15"
+        stability: must_preserve
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: authentication
+        via: "AppRouter redirect/session check"
+    shared_refs:
+      - module: app-router
+        used_fields: [router, redirectLoading]
+      - module: auth-session-storage
+        used_fields: [readAuthToken, hasSessionBoundToFingerprint]
+
+  - name: onboarding
+    trigger: page
+    trigger_detail: "Route /onboarding"
+    source_anchors:
+      - path: lib/screens/onboarding/onboarding_screen.dart
+        line: 1
+    exported_signature: []
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: authentication
+        via: "context.go('/login')"
+    shared_refs:
+      - module: app-router
+        used_fields: [router]
+
+  - name: authentication
+    trigger: page
+    trigger_detail: "Routes /login, /signup, /existing-member-enrollment, /otp, /set-pin"
+    source_anchors:
+      - path: lib/screens/auth/login_screen.dart
+        line: 15
+      - path: lib/screens/auth/otp_screen.dart
+        line: 12
+      - path: lib/screens/auth/signup_screen.dart
+        line: 1
+      - path: lib/screens/auth/existing_member_enrollment_screen.dart
+        line: 45
+      - path: lib/screens/auth/set_pin_screen.dart
+        line: 1
+    exported_signature:
+      - method: "Future<void> AuthNotifier.sendLoginOtp({required String phoneNumber, required String accountNumber})"
+        source_loc: "lib/core/providers/app_providers.dart:519"
+        stability: must_preserve
+      - method: "Future<void> AuthNotifier.loginWithOtp({required String phoneNumber, required String accountNumber, required String otp})"
+        source_loc: "lib/core/providers/app_providers.dart:699"
+        stability: must_preserve
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: app-startup
+        via: "router redirect and secure session restoration"
+      - unit: profile
+        via: "authProvider state"
+    shared_refs:
+      - module: auth-provider
+        used_fields: [authProvider, authServiceProvider, sendLoginOtp, loginWithOtp]
+      - module: auth-session-storage
+        used_fields: [storeSession, readAuthToken, storePin, hasSessionBoundToFingerprint]
+      - module: app-router
+        used_fields: [router]
+
+  - name: dashboard
+    trigger: route
+    trigger_detail: "Route /home"
+    source_anchors:
+      - path: lib/screens/dashboard/dashboard_screen.dart
+        line: 1
+      - path: lib/core/layout/main_shell.dart
+        line: 1
+    exported_signature: []
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: authentication
+        via: "authProvider and guarded shell access"
+      - unit: loans
+        via: "loan actions"
+      - unit: savings
+        via: "savings actions"
+      - unit: payments
+        via: "payment actions"
+    shared_refs:
+      - module: auth-provider
+        used_fields: [authProvider, userProfileProvider, loansProvider, savingsProvider, transactionsProvider]
+      - module: app-router
+        used_fields: [router]
+      - module: shared-ui
+        used_fields: [AppScaffold, AppCard]
+
+  - name: loans
+    trigger: route
+    trigger_detail: "Routes /loans, /apply-loan, /loan-status, /loan-detail, /repayment"
+    source_anchors:
+      - path: lib/screens/loans/loans_screen.dart
+        line: 1
+      - path: lib/screens/loans/apply_loan_screen.dart
+        line: 1
+      - path: lib/screens/loans/loan_status_screen.dart
+        line: 1
+      - path: lib/screens/loans/loan_detail_screen.dart
+        line: 1
+      - path: lib/screens/loans/repayment_screen.dart
+        line: 1
+    exported_signature: []
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: authentication
+        via: "member credentials and auth state"
+      - unit: payments
+        via: "repayment payment flow"
+    shared_refs:
+      - module: auth-provider
+        used_fields: [loansProvider, memberCredentialsProvider]
+      - module: app-router
+        used_fields: [router]
+      - module: shared-ui
+        used_fields: [AppScaffold, AppCard]
+
+  - name: savings
+    trigger: route
+    trigger_detail: "Routes /savings and /savings/:id/*"
+    source_anchors:
+      - path: lib/screens/savings/savings_screen.dart
+        line: 1
+      - path: lib/screens/savings/create_savings_screen.dart
+        line: 1
+      - path: lib/screens/savings/savings_detail_screen.dart
+        line: 1
+      - path: lib/screens/savings/savings_storage.dart
+        line: 1
+      - path: lib/screens/savings/transfer_flow/transfer_destination_screen.dart
+        line: 1
+      - path: lib/screens/savings/withdrawal_flow/withdrawal_screen.dart
+        line: 1
+    exported_signature: []
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: authentication
+        via: "member credentials"
+      - unit: payments
+        via: "deposit and withdrawal confirmation"
+    shared_refs:
+      - module: auth-provider
+        used_fields: [savingsProvider, withdrawalAccountProvider, memberCredentialsProvider]
+      - module: app-router
+        used_fields: [router]
+      - module: shared-ui
+        used_fields: [AppScaffold, AppCard]
+
+  - name: payments
+    trigger: route
+    trigger_detail: "Routes /payments-hub, /payment/*, /pay"
+    source_anchors:
+      - path: lib/screens/payment/payment_home_screen.dart
+        line: 1
+      - path: lib/screens/payment/payments_hub_screen.dart
+        line: 1
+      - path: lib/screens/payment/payment_screen.dart
+        line: 1
+      - path: lib/screens/payment/bills_payment_screen.dart
+        line: 1
+      - path: lib/screens/payment/mobile_purchase_screen.dart
+        line: 1
+      - path: lib/screens/payment/payment_success_screen.dart
+        line: 1
+      - path: lib/screens/payment/payment_failed_screen.dart
+        line: 1
+    exported_signature: []
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: authentication
+        via: "auth state and member credentials"
+    shared_refs:
+      - module: auth-provider
+        used_fields: [paymentServiceProvider, memberCredentialsProvider]
+      - module: app-router
+        used_fields: [router]
+      - module: shared-ui
+        used_fields: [AppScaffold, AppCard]
+
+  - name: investments-and-shares
+    trigger: route
+    trigger_detail: "Routes /investments/* and /shares/*"
+    source_anchors:
+      - path: lib/screens/investment/investments_screen.dart
+        line: 1
+      - path: lib/screens/investment/investment_detail_screen.dart
+        line: 1
+      - path: lib/screens/investment/investment_activity_screen.dart
+        line: 1
+      - path: lib/screens/shares/shares_screen.dart
+        line: 1
+      - path: lib/screens/shares/buy_shares_screen.dart
+        line: 1
+      - path: lib/screens/shares/sell_shares_screen.dart
+        line: 1
+    exported_signature: []
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: authentication
+        via: "member credentials and secure PIN for legacy endpoints"
+    shared_refs:
+      - module: auth-provider
+        used_fields: [investmentsApiProvider, sharesProvider, memberCredentialsProvider]
+      - module: app-router
+        used_fields: [router]
+
+  - name: profile-and-settings
+    trigger: route
+    trigger_detail: "Routes /profile/edit, /settings, /kyc"
+    source_anchors:
+      - path: lib/screens/profile/profile_screen.dart
+        line: 1
+      - path: lib/screens/profile/settings_screen.dart
+        line: 1
+      - path: lib/screens/profile/kyc_screen.dart
+        line: 1
+    exported_signature: []
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: authentication
+        via: "authProvider and logout"
+    shared_refs:
+      - module: auth-provider
+        used_fields: [authProvider, userProfileProvider]
+      - module: auth-session-storage
+        used_fields: [clearAuthSecrets, storePin, readPin]
+      - module: shared-ui
+        used_fields: [AppScaffold, AppCard]
+
+  - name: activity-and-notifications
+    trigger: route
+    trigger_detail: "Routes /transactions, /activity, /notifications"
+    source_anchors:
+      - path: lib/screens/transactions/transactions_screen.dart
+        line: 1
+      - path: lib/screens/notifications/notifications_screen.dart
+        line: 1
+      - path: lib/core/services/notification_service.dart
+        line: 1
+    exported_signature: []
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: authentication
+        via: "authenticated member context"
+    shared_refs:
+      - module: auth-provider
+        used_fields: [transactionsProvider]
+      - module: notification-store
+        used_fields: [addNotification, getNotifications, markAsRead]
+      - module: app-router
+        used_fields: [router]

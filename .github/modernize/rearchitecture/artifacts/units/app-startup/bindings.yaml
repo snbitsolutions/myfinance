@@ -1,0 +1,15 @@
+unit: app-startup
+bindings:
+  - type: route-declaration
+    name: "GoRouter initialLocation '/' with async redirect"
+    source_loc: "lib/router/app_router.dart:299"
+    target: "AppRouter.router"
+    must_appear_in_target: true
+    notes: "Startup routing is guarded by onboarding and bound-session state."
+runtime_config:
+  - key: "DEBUG_AUTH_BYPASS"
+    source_loc: "lib/router/app_router.dart:150"
+    source: annotation
+    default_value: "false"
+    must_appear_in_target: true
+    notes: "Debug-only bypass must never be enabled implicitly in release behavior."

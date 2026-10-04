@@ -1,0 +1,9 @@
+unit: loans
+bindings:
+  - type: route-declaration
+    name: "Loan routes and nested loan detail route"
+    source_loc: "lib/router/app_router.dart:820"
+    target: "Loan screens"
+    must_appear_in_target: true
+    notes: "Routes are reachable from authenticated shell and dashboard actions."
+runtime_config: []

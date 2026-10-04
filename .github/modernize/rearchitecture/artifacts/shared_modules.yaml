@@ -1,0 +1,100 @@
+modules:
+  - name: app-router
+    kind: config
+    source_loc: "lib/router/app_router.dart:87"
+    used_by_units: [app-startup, onboarding, authentication, dashboard, loans, savings, payments, investments-and-shares, activity-and-notifications]
+    fields:
+      - name: router
+        type: "GoRouter"
+      - name: redirectLoading
+        type: "ValueNotifier<bool>"
+    god_class: true
+    split_candidate: true
+    migration_strategy: split
+    notes: "One router owns startup redirects, auth protection, shell navigation, and feature route declarations."
+
+  - name: auth-provider
+    kind: store
+    source_loc: "lib/core/providers/app_providers.dart:183"
+    used_by_units: [authentication, dashboard, loans, savings, payments, investments-and-shares, profile-and-settings, activity-and-notifications]
+    fields:
+      - name: authProvider
+        type: "StateNotifierProvider<AuthNotifier, AuthState>"
+      - name: userProfileProvider
+        type: "FutureProvider<Map<String, dynamic>>"
+      - name: memberCredentialsProvider
+        type: "Provider<Map<String, String>>"
+      - name: loansProvider
+        type: "FutureProvider<List<Map<String, dynamic>>>"
+      - name: savingsProvider
+        type: "FutureProvider<List<Map<String, dynamic>>>"
+      - name: sharesProvider
+        type: "FutureProvider<List<Map<String, dynamic>>>"
+      - name: investmentsApiProvider
+        type: "FutureProvider<List<Map<String, dynamic>>>"
+      - name: transactionsProvider
+        type: "FutureProvider<List<Map<String, dynamic>>>"
+      - name: withdrawalAccountProvider
+        type: "FutureProvider.family<Map<String, dynamic>, String>"
+      - name: sendLoginOtp
+        type: "AuthNotifier.sendLoginOtp"
+      - name: loginWithOtp
+        type: "AuthNotifier.loginWithOtp"
+      - name: paymentServiceProvider
+        type: "Provider<PaymentService>"
+    god_class: true
+    split_candidate: true
+    migration_strategy: split
+    notes: "Provider file combines dependency registration, auth state transitions, credential derivation, data providers, and backend diagnostics."
+
+  - name: auth-session-storage
+    kind: store
+    source_loc: "lib/core/services/secure_auth_storage.dart:5"
+    used_by_units: [app-startup, authentication, profile-and-settings]
+    fields:
+      - name: storeSession
+        type: "Future<void>"
+      - name: readAuthToken
+        type: "Future<String?>"
+      - name: storePin
+        type: "Future<void>"
+      - name: readPin
+        type: "Future<String?>"
+      - name: hasSessionBoundToFingerprint
+        type: "Future<bool>"
+      - name: clearAuthSecrets
+        type: "Future<void>"
+    god_class: false
+    split_candidate: false
+    migration_strategy: wrap
+    notes: "Secure storage is the source of truth for session tokens, refresh tokens, PIN, and device binding."
+
+  - name: shared-ui
+    kind: base-class
+    source_loc: "lib/core/app_scaffold.dart:1"
+    used_by_units: [dashboard, loans, savings, payments, profile-and-settings]
+    fields:
+      - name: AppScaffold
+        type: "Widget"
+      - name: AppCard
+        type: "Widget"
+    god_class: false
+    split_candidate: false
+    migration_strategy: copy
+    notes: "Shared visual conventions used across authenticated feature screens."
+
+  - name: notification-store
+    kind: store
+    source_loc: "lib/core/services/notification_service.dart:1"
+    used_by_units: [activity-and-notifications, authentication]
+    fields:
+      - name: addNotification
+        type: "Future<void>"
+      - name: getNotifications
+        type: "Future<List<AppNotification>>"
+      - name: markAsRead
+        type: "Future<void>"
+    god_class: false
+    split_candidate: false
+    migration_strategy: wrap
+    notes: "Shared notification persistence and read-state behavior."

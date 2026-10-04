@@ -1,0 +1,9 @@
+version: "Apple Swift version 6.0 (swiftlang-6.0.0.9.10 clang-1600.0.26.2)"
+options: "e3dd79dda0d4b839cfb6508192d4aa265f1856bdfd3d5f680749a0950102e3d9"
+build_start_time: [1789486838, 440403000]
+build_end_time: [1789486868, 701434000]
+inputs:
+  ? "/Users/apple/.pub-cache/hosted/pub.dev/flutter_secure_storage_darwin-0.2.0/darwin/flutter_secure_storage_darwin/Sources/flutter_secure_storage_darwin/FlutterSecureStorage.swift"
+  : [1777152473, 490985943]
+  ? "/Users/apple/.pub-cache/hosted/pub.dev/flutter_secure_storage_darwin-0.2.0/darwin/flutter_secure_storage_darwin/Sources/flutter_secure_storage_darwin/FlutterSecureStorageDarwinPlugin.swift"
+  : [1777152473, 492248414]

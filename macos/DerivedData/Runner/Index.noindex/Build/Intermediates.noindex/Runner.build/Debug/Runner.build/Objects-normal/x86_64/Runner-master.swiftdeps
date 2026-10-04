@@ -1,0 +1,10 @@
+version: "Apple Swift version 6.0 (swiftlang-6.0.0.9.10 clang-1600.0.26.2)"
+options: "220eeac928964b7cf20072e332f909169e5b738cb581cb0ac367fcb547cd34e8"
+build_start_time: [1789486854, 309395000]
+build_end_time: [1789486868, 705551000]
+inputs:
+  ? "/Users/apple/Desktop/myfinance/macos/DerivedData/Runner/Index.noindex/Build/Intermediates.noindex/Runner.build/Debug/Runner.build/DerivedSources/GeneratedAssetSymbols.swift"
+  : [1789486854, 270414663]
+  "/Users/apple/Desktop/myfinance/macos/Flutter/GeneratedPluginRegistrant.swift": [1777152475, 892076168]
+  "/Users/apple/Desktop/myfinance/macos/Runner/AppDelegate.swift": [1765555860, 926970124]
+  "/Users/apple/Desktop/myfinance/macos/Runner/MainFlutterWindow.swift": [1765555860, 926970124]

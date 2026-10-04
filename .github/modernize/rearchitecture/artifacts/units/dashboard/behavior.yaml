@@ -1,0 +1,20 @@
+unit: dashboard
+side_effects: []
+branches:
+  - source_loc: "lib/router/app_router.dart:683"
+    condition: "Authenticated shell navigation."
+    behavior: "Shows the main home/product dashboard inside MainShell."
+    must_preserve: true
+error_paths:
+  - source_loc: "lib/core/providers/app_providers.dart:1023"
+    trigger: "Incomplete authenticated identity or unavailable savings data."
+    outcome: "Raises a validation error for incomplete sessions and logs savings unavailability."
+    contract: "Provider exposes an error/loading state to the dashboard."
+    must_preserve: true
+concurrency:
+  model: async
+  tx_boundary:
+    source_loc: "lib/core/providers/app_providers.dart:1023"
+    scope: "Profile and dashboard data providers load independently from the API."
+    isolation: "not specified"
+    must_preserve: true

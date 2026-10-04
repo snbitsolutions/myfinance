@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/app_card.dart';
 import '../../../core/app_scaffold.dart';
 import '../../../core/color_ext.dart';
 import 'withdrawal_model.dart';
@@ -34,13 +33,16 @@ class ReviewWithdrawalScreen extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle_rounded, color: theme.colorScheme.primary),
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Please review the details below before you continue.',
+                      'Withdrawal submission is unavailable until backend processing is ready.',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.primary,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -49,7 +51,7 @@ class ReviewWithdrawalScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             // From Account
-            AppCard(
+            _ReviewCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -62,18 +64,24 @@ class ReviewWithdrawalScreen extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     data.fromAccount,
-                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   Text(
-                    'GH₵ 45,000.00',
-                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    data.availableBalance == null
+                        ? 'Balance unavailable'
+                        : 'GH₵ ${data.availableBalance!.toStringAsFixed(2)}',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 12),
             // To Account
-            AppCard(
+            _ReviewCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -87,7 +95,7 @@ class ReviewWithdrawalScreen extends StatelessWidget {
                   Row(
                     children: [
                       Icon(
-                        data.method == 'Mobile Money'
+                        data.method.startsWith('Mobile Money')
                             ? Icons.phone_rounded
                             : Icons.account_balance_rounded,
                         color: theme.colorScheme.primary,
@@ -100,7 +108,8 @@ class ReviewWithdrawalScreen extends StatelessWidget {
                             Text(
                               data.method,
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                                color: theme.colorScheme.onSurface
+                                    .withOpacitySafe(0.6),
                               ),
                             ),
                             Text(
@@ -119,7 +128,7 @@ class ReviewWithdrawalScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             // Withdrawal Amount
-            AppCard(
+            _ReviewCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -142,38 +151,66 @@ class ReviewWithdrawalScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             // Summary
-            AppCard(
+            _ReviewCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _SummaryRow('Transaction Fee', 'GH₵ 0.00', theme),
+                  _SummaryRow(
+                    'Transaction Fee',
+                    'Unavailable',
+                    theme,
+                  ),
                   const Divider(height: 16),
-                  _SummaryRow('Total Amount', 'GH₵ ${data.amount.toStringAsFixed(2)}', theme,
-                      isBold: true),
+                  _SummaryRow(
+                    'Total Amount',
+                    'Unavailable',
+                    theme,
+                    isBold: true,
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 12),
             // Limits
-            AppCard(
+            _ReviewCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _SummaryRow('Daily Limit', 'GH₵ 5,000.00', theme),
-                  Text(
-                    'Used: GH₵ 1,000.00 | Remaining: GH₵ 4,000.00',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                  if (data.dailyLimit != null) ...[
+                    _SummaryRow(
+                      'Daily Limit',
+                      'GH₵ ${data.dailyLimit!.toStringAsFixed(2)}',
+                      theme,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  _SummaryRow('Monthly Limit', 'GH₵ 20,000.00', theme),
-                  Text(
-                    'Used: GH₵ 5,000.00 | Remaining: GH₵ 15,000.00',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                    Text(
+                      'Used: GH₵ ${data.usedDailyLimit.toStringAsFixed(2)} | Remaining: GH₵ ${(data.dailyLimit! - data.usedDailyLimit).toStringAsFixed(2)}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                      ),
                     ),
-                  ),
+                  ],
+                  if (data.dailyLimit != null && data.monthlyLimit != null)
+                    const SizedBox(height: 12),
+                  if (data.monthlyLimit != null) ...[
+                    _SummaryRow(
+                      'Monthly Limit',
+                      'GH₵ ${data.monthlyLimit!.toStringAsFixed(2)}',
+                      theme,
+                    ),
+                    Text(
+                      'Used: GH₵ ${data.usedMonthlyLimit.toStringAsFixed(2)} | Remaining: GH₵ ${(data.monthlyLimit! - data.usedMonthlyLimit).toStringAsFixed(2)}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                      ),
+                    ),
+                  ],
+                  if (data.dailyLimit == null && data.monthlyLimit == null)
+                    Text(
+                      'Withdrawal limits are not available for this account.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -183,12 +220,14 @@ class ReviewWithdrawalScreen extends StatelessWidget {
               width: double.infinity,
               height: 50,
               child: FilledButton(
-                onPressed: () => context.push('/withdrawal/authenticate', extra: data),
+                onPressed: null,
                 style: FilledButton.styleFrom(
                   backgroundColor: theme.colorScheme.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: const Text('Confirm Withdrawal'),
+                child: const Text('Withdrawal unavailable'),
               ),
             ),
             const SizedBox(height: 12),
@@ -198,7 +237,9 @@ class ReviewWithdrawalScreen extends StatelessWidget {
               child: OutlinedButton(
                 onPressed: () => context.pop(),
                 style: OutlinedButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: const Text('Edit Details'),
               ),
@@ -239,6 +280,43 @@ class _SummaryRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ReviewCard extends StatelessWidget {
+  final Widget child;
+
+  const _ReviewCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: theme.colorScheme.outline.withOpacitySafe(0.16),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacitySafe(0.12),
+            blurRadius: 18,
+            spreadRadius: 1,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: theme.colorScheme.primary.withOpacitySafe(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 }

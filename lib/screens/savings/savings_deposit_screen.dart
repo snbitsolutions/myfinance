@@ -1,16 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class SavingsDepositScreen extends StatefulWidget {
-  final String savingsId;
+import '../../core/providers/app_providers.dart';
+import 'savings_model.dart';
 
-  const SavingsDepositScreen({super.key, required this.savingsId});
+class SavingsDepositScreen extends ConsumerStatefulWidget {
+  final String savingsId;
+  final Savings? savings;
+
+  const SavingsDepositScreen({
+    super.key,
+    required this.savingsId,
+    this.savings,
+  });
 
   @override
-  State<SavingsDepositScreen> createState() => _SavingsDepositScreenState();
+  ConsumerState<SavingsDepositScreen> createState() =>
+      _SavingsDepositScreenState();
 }
 
-class _SavingsDepositScreenState extends State<SavingsDepositScreen> {
+class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
   static const List<int> _quickAmounts = [50, 100, 200, 500, 1000];
 
   final TextEditingController _amountController = TextEditingController();
@@ -21,40 +31,40 @@ class _SavingsDepositScreenState extends State<SavingsDepositScreen> {
     return double.tryParse(cleaned) ?? 0;
   }
 
-  double get _fee => _amount > 0 ? _amount * 0.01 : 0;
-  double get _total => _amount + _fee;
   bool get _canContinue => _amount > 0;
 
-  String _accountTitle() {
-    switch (widget.savingsId) {
-      case 'member-savings':
-        return 'Member Savings';
-      case 'current-savings':
-        return 'Current Savings';
-      case 'kiddy-savings':
-        return 'Kiddy Savings';
-      case 'fixed-savings':
-        return 'Fixed Savings';
-      case 'emergency-fund':
-        return 'Emergency Fund';
-      case 'goal-savings':
-        return 'Goal Savings';
-      case 'vacation-savings':
-        return 'Vacation Savings';
-      case 'education-savings':
-        return 'Education Savings';
-      default:
-        return 'Custom Savings';
+  Map<String, dynamic>? _selectedAccount(Map<String, dynamic>? profile) {
+    final savings = profile?['savings'];
+    if (savings is! List) return null;
+
+    for (final item in savings) {
+      if (item is! Map) continue;
+      final account = <String, dynamic>{
+        for (final entry in item.entries) entry.key.toString(): entry.value,
+      };
+      final id =
+          (account['id'] ??
+                  account['product_id'] ??
+                  account['savings_id'] ??
+                  '')
+              .toString();
+      if (id == widget.savingsId) return account;
     }
+    return null;
   }
 
-  String _accountNumber() {
-    final seed = widget.savingsId.replaceAll(RegExp(r'[^0-9]'), '');
-    if (seed.isEmpty) {
-      return '3345678901';
-    }
-    final value = seed.padLeft(10, '3');
-    return value.substring(0, 10);
+  String _readName(Map<String, dynamic>? profile) {
+    final direct = profile?['name']?.toString().trim() ?? '';
+    if (direct.isNotEmpty) return direct;
+
+    final first = profile?['first_name']?.toString().trim() ?? '';
+    final last = profile?['last_name']?.toString().trim() ?? '';
+    return [first, last].where((value) => value.isNotEmpty).join(' ');
+  }
+
+  double _readAmount(Object? value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString().replaceAll(',', '') ?? '') ?? 0;
   }
 
   void _applyQuickAmount(int value) {
@@ -75,52 +85,74 @@ class _SavingsDepositScreenState extends State<SavingsDepositScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final balance = 45000.00;
+    final profileAsync = ref.watch(userProfileProvider);
+    final profile = profileAsync.valueOrNull;
+    final account = _selectedAccount(profile);
+    final accountTitle =
+        (account?['pro_name'] ??
+                account?['name'] ??
+                account?['product_name'] ??
+                'Savings Account')
+            .toString()
+            .trim();
+    final accountNumber =
+        (profile?['account_number'] ?? profile?['accountNumber'] ?? '')
+            .toString()
+            .trim();
+    final balance = _readAmount(
+      account?['balance'] ?? account?['current_balance'],
+    );
+    final customerName = _readName(profile);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6F3),
-      body: SafeArea(
-        child: Column(
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () {
-                      if (context.canPop()) {
-                        context.pop();
-                      } else {
-                        context.go('/home');
-                      }
-                    },
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 24),
-                    padding: EdgeInsets.zero,
-                    splashRadius: 20,
-                    constraints: const BoxConstraints(),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Deposit',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 30,
-                        color: Colors.black87,
-                        letterSpacing: -0.6,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.help_outline_rounded, size: 24),
-                    padding: EdgeInsets.zero,
-                    splashRadius: 20,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
+            const Text(
+              'Deposit',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF2E8B57),
               ),
             ),
+            if (customerName.isNotEmpty)
+              Text(
+                customerName,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black54,
+                ),
+              ),
+          ],
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: theme.colorScheme.primary,
+        elevation: 0.5,
+        leading: IconButton(
+          onPressed: () => context.go(
+            '/savings/${widget.savingsId}',
+            extra: widget.savings,
+          ),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          tooltip: 'Back',
+        ),
+        actions: [
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.help_outline_rounded),
+            tooltip: 'Help',
+          ),
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
@@ -128,7 +160,9 @@ class _SavingsDepositScreenState extends State<SavingsDepositScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Savings Account',
+                      customerName.isEmpty
+                          ? 'Savings Account'
+                          : 'Deposit for $customerName',
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: Colors.black54,
                         fontWeight: FontWeight.w600,
@@ -170,7 +204,7 @@ class _SavingsDepositScreenState extends State<SavingsDepositScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _accountTitle(),
+                                  accountTitle,
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
@@ -179,7 +213,9 @@ class _SavingsDepositScreenState extends State<SavingsDepositScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'A/C ${_accountNumber()}',
+                                  accountNumber.isEmpty
+                                      ? 'Account number unavailable'
+                                      : 'A/C $accountNumber',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey.shade600,
@@ -248,7 +284,10 @@ class _SavingsDepositScreenState extends State<SavingsDepositScreen> {
                     ),
                     const SizedBox(height: 12),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(18),
@@ -275,7 +314,10 @@ class _SavingsDepositScreenState extends State<SavingsDepositScreen> {
                           Expanded(
                             child: TextField(
                               controller: _amountController,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
                               style: const TextStyle(
                                 fontSize: 30,
                                 fontWeight: FontWeight.w700,
@@ -352,14 +394,23 @@ class _SavingsDepositScreenState extends State<SavingsDepositScreen> {
                             title: 'Mobile Money',
                             subtitle: 'MTN / Telecel / AirtelTigo',
                             selected: _selectedMethod == 'Mobile Money',
-                            onTap: () => setState(() => _selectedMethod = 'Mobile Money'),
+                            onTap: () => setState(
+                              () => _selectedMethod = 'Mobile Money',
+                            ),
                           ),
                           const Divider(height: 1),
                           _FundingOption(
                             title: 'Bank Account',
-                            subtitle: 'Direct bank transfer',
+                            subtitle:
+                                'Unavailable until bank deposits are connected',
                             selected: _selectedMethod == 'Bank Account',
-                            onTap: () => setState(() => _selectedMethod = 'Bank Account'),
+                            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Bank-account deposits are not available yet. Use Mobile Money.',
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -374,13 +425,23 @@ class _SavingsDepositScreenState extends State<SavingsDepositScreen> {
                       ),
                       child: Column(
                         children: [
-                          _SummaryRow(label: 'Deposit amount', value: 'GH₵ ${_amount.toStringAsFixed(2)}'),
+                          _SummaryRow(
+                            label: 'Deposit amount',
+                            value: 'GH₵ ${_amount.toStringAsFixed(2)}',
+                          ),
                           const SizedBox(height: 8),
-                          _SummaryRow(label: 'Processing fee', value: 'GH₵ ${_fee.toStringAsFixed(2)}'),
+                          _SummaryRow(
+                            label: 'Processing fee',
+                            value: 'Shown by payment provider',
+                          ),
                           const SizedBox(height: 10),
                           const Divider(),
                           const SizedBox(height: 10),
-                          _SummaryRow(label: 'Total', value: 'GH₵ ${_total.toStringAsFixed(2)}', isTotal: true),
+                          _SummaryRow(
+                            label: 'Total charged',
+                            value: 'Shown before provider confirmation',
+                            isTotal: true,
+                          ),
                         ],
                       ),
                     ),
@@ -395,11 +456,14 @@ class _SavingsDepositScreenState extends State<SavingsDepositScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.shield_rounded, color: Color(0xFF2E8B57)),
+                          const Icon(
+                            Icons.shield_rounded,
+                            color: Color(0xFF2E8B57),
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'Your money is protected with secure 256-bit encryption and instant verification.',
+                              'The payment provider will confirm any fees and the final transaction status.',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey.shade700,
@@ -417,12 +481,18 @@ class _SavingsDepositScreenState extends State<SavingsDepositScreen> {
                       child: FilledButton(
                         onPressed: _canContinue
                             ? () {
-                                final returnRoute = '/savings/${widget.savingsId}';
+                                final returnRoute =
+                                    '/savings/${widget.savingsId}';
                                 final destination = Uri(
                                   path: '/payment',
                                   queryParameters: {
                                     'returnRoute': returnRoute,
                                     'sourceLabel': 'Deposit',
+                                    'amount': _amount.toStringAsFixed(2),
+                                    'method': _selectedMethod == 'Mobile Money'
+                                        ? 'MoMo'
+                                        : 'Account',
+                                    'savingsId': widget.savingsId,
                                   },
                                 ).toString();
                                 context.go(destination);
@@ -482,7 +552,9 @@ class _FundingOption extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: selected ? const Color(0xFF2E8B57) : Colors.grey.shade400,
+                  color: selected
+                      ? const Color(0xFF2E8B57)
+                      : Colors.grey.shade400,
                   width: 2,
                 ),
               ),
@@ -514,10 +586,7 @@ class _FundingOption extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                 ],
               ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
@@ -9,6 +10,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/layout/responsive.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/services/device_identity_service.dart';
+import '../../core/services/biometric_auth_service.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/services/secure_auth_storage.dart';
 
@@ -27,12 +29,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _language = 'English';
   late final Future<_DeviceSecurityDetails> _deviceSecurityFuture;
   final _notificationService = NotificationService.instance;
+  final _biometricAuthService = BiometricAuthService();
 
   @override
   void initState() {
     super.initState();
     _deviceSecurityFuture = _loadDeviceSecurityDetails();
     _loadNotificationPreferences();
+    _loadBiometricPreference();
   }
 
   @override
@@ -58,8 +62,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       context,
                       icon: Icons.email,
                       title: 'Email',
-                      subtitle: 'steven@email.com',
-                      onTap: () => _showEditDialog(context, 'Email Address'),
+                      subtitle: 'Unavailable from the customer API',
+                      onTap: () => _showUnavailableProfileEditDialog(context),
                     ),
                     Divider(
                       height: 1,
@@ -69,8 +73,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       context,
                       icon: Icons.phone,
                       title: 'Phone Number',
-                      subtitle: '0241234567',
-                      onTap: () => _showEditDialog(context, 'Phone Number'),
+                      subtitle: 'Managed by account registration',
+                      onTap: () => _showUnavailableProfileEditDialog(context),
                     ),
                     Divider(
                       height: 1,
@@ -80,8 +84,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       context,
                       icon: Icons.person_outline,
                       title: 'Full Name',
-                      subtitle: 'Steven Boadu',
-                      onTap: () => _showEditDialog(context, 'Full Name'),
+                      subtitle: 'Unavailable from the customer API',
+                      onTap: () => _showUnavailableProfileEditDialog(context),
                     ),
                   ],
                 ),
@@ -103,7 +107,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       icon: Icons.lock,
                       title: 'PIN',
                       subtitle: 'Change your PIN',
-                      onTap: () => context.go('/set-pin'),
+                      onTap: () => context.go('/set-pin?mode=change'),
                     ),
                     Divider(
                       height: 1,
@@ -113,8 +117,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       context,
                       icon: Icons.password,
                       title: 'Password',
-                      subtitle: 'Change your password',
-                      onTap: () => _showEditDialog(context, 'Password'),
+                      subtitle: 'Unavailable until the API adds support',
+                      onTap: () => _showUnavailablePasswordDialog(context),
                     ),
                     Divider(
                       height: 1,
@@ -126,9 +130,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       title: 'Biometric Authentication',
                       subtitle: 'Use fingerprint or face ID',
                       value: _bioAuth,
-                      onChanged: (value) {
-                        setState(() => _bioAuth = value);
-                      },
+                      onChanged: _handleBiometricToggle,
                     ),
                   ],
                 ),
@@ -266,16 +268,76 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
           );
 
-          final dangerSection = AppCard(
-            margin: EdgeInsets.zero,
-            backgroundColor: theme.colorScheme.error.withOpacitySafe(0.1),
-            child: _buildSettingTile(
-              context,
-              icon: Icons.delete_forever,
-              title: 'Delete Account',
-              subtitle: 'Permanently delete your account',
-              titleColor: theme.colorScheme.error,
-              onTap: () => _showDeleteAccountDialog(context),
+          final dangerSection = Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  theme.colorScheme.error.withOpacitySafe(0.1),
+                  theme.colorScheme.error.withOpacitySafe(0.04),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: theme.colorScheme.error.withOpacitySafe(0.22),
+                width: 1,
+              ),
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.error.withOpacitySafe(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.delete_forever_rounded,
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Delete Account',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.error,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Account deletion is unavailable from this app',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacitySafe(
+                            0.7,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _showDeleteAccountDialog(context),
+                  style: TextButton.styleFrom(
+                    foregroundColor: theme.colorScheme.error,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Delete'),
+                ),
+              ],
             ),
           );
 
@@ -611,37 +673,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _showEditDialog(BuildContext context, String fieldName) {
-    final theme = Theme.of(context);
-    final controller = TextEditingController();
-
-    showDialog(
+  void _showUnavailableProfileEditDialog(BuildContext context) {
+    showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Edit $fieldName'),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: 'Enter your $fieldName',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Profile editing unavailable'),
+        content: const Text(
+          'The current customer API does not document profile update endpoints. No account details were changed.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('$fieldName updated successfully'),
-                  backgroundColor: theme.colorScheme.primary,
-                ),
-              );
-            },
-            child: const Text('Save'),
+        ],
+      ),
+    );
+  }
+
+  void _showUnavailablePasswordDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Password change unavailable'),
+        content: const Text(
+          'The current customer API does not document a password-change endpoint. Your password was not changed.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
           ),
         ],
       ),
@@ -785,31 +846,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _showDeleteAccountDialog(BuildContext context) {
-    final theme = Theme.of(context);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Account'),
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
         content: Text(
-          'Are you sure you want to permanently delete your account? This action cannot be undone.',
-          style: theme.textTheme.bodyMedium,
+          'Account deletion is unavailable because the backend does not provide a delete endpoint. No account changes were made.',
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: theme.colorScheme.error,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
       ),
     );
   }
+
 
   void _showComingSoon(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -824,6 +869,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final preferences = await _notificationService.getPreferences();
     if (!mounted) return;
     setState(() => _notificationsEnabled = preferences.enabled);
+  }
+
+  Future<void> _loadBiometricPreference() async {
+    final preferences = await SharedPreferences.getInstance();
+    final enabled =
+        preferences.getBool(AppConstants.sharedPrefKeyBiometricAuth) ?? false;
+    if (!mounted) return;
+    setState(() => _bioAuth = enabled);
+  }
+
+  Future<void> _handleBiometricToggle(bool value) async {
+    if (value && !await _biometricAuthService.isAvailable()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Biometric authentication is not available on this device.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(AppConstants.sharedPrefKeyBiometricAuth, value);
+    if (!mounted) return;
+    setState(() => _bioAuth = value);
   }
 
   Future<void> _handleNotificationToggle(bool value) async {

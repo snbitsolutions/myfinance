@@ -1,0 +1,9 @@
+unit: investments-and-shares
+bindings:
+  - type: route-declaration
+    name: "Investment and share routes with nested buy/sell/activity/statement pages"
+    source_loc: "lib/router/app_router.dart:526"
+    target: "Investment and share screens"
+    must_appear_in_target: true
+    notes: "Nested IDs and transaction paths are route-level contracts."
+runtime_config: []

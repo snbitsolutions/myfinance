@@ -15,16 +15,87 @@ class ProfileScreen extends ConsumerWidget {
     final isLoading = userProfileAsync.isLoading;
     final hasError = userProfileAsync.hasError;
     final profile = userProfileAsync.valueOrNull;
-    final authState = ref.watch(authProvider);
-
     final user = AppUser(
-      name: _readProfileString(profile, 'name', 'Steven Boadu'),
-      // Phone comes from auth state (stored at sign-in), not from profile API
-      email: authState.userEmail ?? _readProfileString(profile, 'email', ''),
-      phone: authState.userEmail ?? _readProfileString(profile, 'phone', '024XXXXXXX'),
-      accountNumber: _readProfileString(profile, 'account_number', authState.userId ?? ''),
+      name: _readProfileName(profile),
+      email: _readProfileString(profile, 'email', ''),
+      phone: _readProfileString(profile, 'phone', ''),
+      accountNumber: _readProfileString(profile, 'account_number', ''),
       kycStatus: _parseKycStatus(profile?['kyc_status']),
     );
+
+    Future<void> handleLogout() async {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Sign Out'),
+          content: const Text(
+            'Are you sure you want to sign out of your account?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              ),
+              child: const Text('Sign Out'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true || !context.mounted) return;
+
+      try {
+        await ref.read(authProvider.notifier).logout();
+        if (!context.mounted) return;
+        context.go('/login');
+      } catch (_) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sign out failed. Please try again.')),
+        );
+      }
+    }
+
+    void showSupportDialog() {
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Help & Support'),
+          content: const Text(
+            'Call support: +233 20 000 0000\n\nEmail: support@adepateachers.app',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    void showAboutDialog() {
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('About Adepa Teachers'),
+          content: const Text(
+            'Version 1.0.0\n\nSecure personal finance management for everyday money decisions.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       body: Container(
@@ -84,12 +155,24 @@ class ProfileScreen extends ConsumerWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Profile',
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'More',
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Account & preferences',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.85),
+                              ),
+                            ),
+                          ],
                         ),
                         IconButton(
                           onPressed: () => context.go('/settings'),
@@ -107,141 +190,257 @@ class ProfileScreen extends ConsumerWidget {
                       alignment: Alignment.topRight,
                       children: [
                         Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Stack(
-                            alignment: Alignment.center,
-                            children: [
-                          Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  theme.colorScheme.primary,
-                                  theme.colorScheme.secondary,
-                                ],
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 20,
+                                offset: const Offset(0, 10),
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: theme.colorScheme.primary.withValues(
-                                    alpha: 0.3,
-                                  ),
-                                  blurRadius: 15,
-                                  offset: const Offset(0, 5),
-                                ),
-                              ],
-                            ),
-                            child: Center(
-                              child: isLoading
-                                  ? const SizedBox(
-                                      width: 32,
-                                      height: 32,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : Text(
-                                      user.name
-                                          .split(' ')
-                                          .map((s) => s[0])
-                                          .take(2)
-                                          .join(),
-                                      style: theme.textTheme.headlineMedium
-                                          ?.copyWith(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                    ),
-                            ),
-                          ),
                             ],
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            user.name,
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            user.phone,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          if (user.accountNumber.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              'Acc: ${user.accountNumber}',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.grey.shade500,
-                                fontFamily: 'monospace',
+                          child: Column(
+                            children: [
+                              Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Container(
+                                    width: 100,
+                                    height: 100,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          theme.colorScheme.primary,
+                                          theme.colorScheme.secondary,
+                                        ],
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: theme.colorScheme.primary
+                                              .withValues(alpha: 0.3),
+                                          blurRadius: 15,
+                                          offset: const Offset(0, 5),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Center(
+                                      child: isLoading
+                                          ? const SizedBox(
+                                              width: 32,
+                                              height: 32,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2.5,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : Text(
+                                              _initialsFor(user.name),
+                                              style: theme
+                                                  .textTheme
+                                                  .headlineMedium
+                                                  ?.copyWith(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                            ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: () => context.go('/profile/edit'),
-                              icon: const Icon(Icons.edit_outlined, size: 18),
-                              label: const Text('Edit Profile'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: theme.colorScheme.primary,
-                                side: BorderSide(
-                                  color: theme.colorScheme.primary,
-                                ),
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                              const SizedBox(height: 16),
+                              Text(
+                                user.name.isEmpty
+                                    ? 'Name unavailable'
+                                    : user.name,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            ),
+                              const SizedBox(height: 4),
+                              Text(
+                                user.phone.isEmpty
+                                    ? 'Phone unavailable'
+                                    : user.phone,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              if (user.accountNumber.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Acc: ${user.accountNumber}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: Colors.grey.shade500,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: () => context.go('/profile/edit'),
+                                  icon: const Icon(
+                                    Icons.edit_outlined,
+                                    size: 18,
+                                  ),
+                                  label: const Text('Profile Details'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: theme.colorScheme.primary,
+                                    side: BorderSide(
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],   // closes outer Stack.children
-                ),    // closes outer Stack
-                  ],  // closes header Column.children
-                ),    // closes header Column
-              ),      // closes Padding
-
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _QuickActionCard(
+                            icon: Icons.wallet_outlined,
+                            label: 'Wallet',
+                            value: '—',
+                            accent: theme.colorScheme.primary,
+                            onTap: () {},
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _QuickActionCard(
+                            icon: Icons.shield_outlined,
+                            label: 'Security',
+                            value: 'Protected',
+                            accent: const Color(0xFF0F8E5D),
+                            onTap: () => context.go('/set-pin'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
               // Content
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final isTablet = constraints.maxWidth >= 900;
 
-                    final accountActions = Column(
+                    final accountSection = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Text(
+                          'Account',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.8,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
                         _KYCStatusCard(user: user),
                         const SizedBox(height: 16),
                         _MenuCard(
                           items: [
                             _MenuItem(
+                              icon: Icons.person_outline,
+                              title: 'Profile Details',
+                              subtitle: 'View your account information',
+                              onTap: () => context.go('/profile/edit'),
+                            ),
+                            _MenuItem(
+                              icon: Icons.badge_outlined,
+                              title: 'KYC Verification',
+                              subtitle: 'Complete your verification',
+                              onTap: () => context.go('/kyc'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+
+                    final securitySection = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Security',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.8,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        _MenuCard(
+                          items: [
+                            _MenuItem(
+                              icon: Icons.lock_outline,
+                              title: 'Security & PIN',
+                              subtitle: 'Manage your security settings',
+                              onTap: () => context.go('/set-pin'),
+                            ),
+                            _MenuItem(
+                              icon: Icons.notifications_outlined,
+                              title: 'Notifications',
+                              subtitle: 'Manage your alerts',
+                              onTap: () => context.go('/notifications'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+
+                    final supportSection = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Support',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.8,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        _MenuCard(
+                          items: [
+                            _MenuItem(
+                              icon: Icons.help_outline,
+                              title: 'Help & Support',
+                              subtitle: 'Get help when you need it',
+                              onTap: showSupportDialog,
+                            ),
+                            _MenuItem(
+                              icon: Icons.info_outline,
+                              title: 'About',
+                              subtitle: 'Version 1.0.0',
+                              onTap: showAboutDialog,
+                            ),
+                            _MenuItem(
                               icon: Icons.logout,
                               title: 'Logout',
                               subtitle: 'Sign out of your account',
-                              onTap: () => context.go('/login'),
+                              onTap: handleLogout,
                               isDestructive: true,
                             ),
                           ],
@@ -249,60 +448,31 @@ class ProfileScreen extends ConsumerWidget {
                       ],
                     );
 
-                    final mainMenu = _MenuCard(
-                      items: [
-                        _MenuItem(
-                          icon: Icons.verified_user_outlined,
-                          title: 'KYC Verification',
-                          subtitle: 'Complete your verification',
-                          onTap: () => context.go('/kyc'),
-                        ),
-                        _MenuItem(
-                          icon: Icons.lock_outline,
-                          title: 'Security & PIN',
-                          subtitle: 'Manage your security settings',
-                          onTap: () => context.go('/set-pin'),
-                        ),
-                        _MenuItem(
-                          icon: Icons.notifications_outlined,
-                          title: 'Notifications',
-                          subtitle: 'Manage your notifications',
-                          onTap: () => context.go('/notifications'),
-                        ),
-                        _MenuItem(
-                          icon: Icons.help_outline,
-                          title: 'Help & Support',
-                          subtitle: 'Get help when you need it',
-                          onTap: () {},
-                        ),
-                        _MenuItem(
-                          icon: Icons.info_outline,
-                          title: 'About',
-                          subtitle: 'Version 1.0.0',
-                          onTap: () {},
-                        ),
-                      ],
-                    );
+                    final moreSections = isTablet
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(flex: 4, child: accountSection),
+                              const SizedBox(width: 16),
+                              Expanded(flex: 3, child: securitySection),
+                              const SizedBox(width: 16),
+                              Expanded(flex: 3, child: supportSection),
+                            ],
+                          )
+                        : Column(
+                            children: [
+                              accountSection,
+                              const SizedBox(height: 22),
+                              securitySection,
+                              const SizedBox(height: 22),
+                              supportSection,
+                              const SizedBox(height: 24),
+                            ],
+                          );
 
                     return SingleChildScrollView(
                       padding: const EdgeInsets.all(20),
-                      child: isTablet
-                          ? Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(flex: 4, child: accountActions),
-                                const SizedBox(width: 16),
-                                Expanded(flex: 6, child: mainMenu),
-                              ],
-                            )
-                          : Column(
-                              children: [
-                                accountActions,
-                                const SizedBox(height: 16),
-                                mainMenu,
-                                const SizedBox(height: 24),
-                              ],
-                            ),
+                      child: moreSections,
                     );
                   },
                 ),
@@ -313,6 +483,16 @@ class ProfileScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _initialsFor(String name) {
+  final parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) return 'U';
+  return parts.take(2).map((part) => part.substring(0, 1)).join().toUpperCase();
 }
 
 String _readProfileString(
@@ -327,15 +507,49 @@ String _readProfileString(
   return fallback;
 }
 
+String _readProfileName(Map<String, dynamic>? profile) {
+  final firstName = _readProfileString(profile, 'first_name', '');
+  final lastName = _readProfileString(profile, 'last_name', '');
+  final combined = [
+    firstName,
+    lastName,
+  ].where((value) => value.isNotEmpty).join(' ').trim();
+  if (combined.isNotEmpty) return combined;
+
+  for (final key in const [
+    'name',
+    'full_name',
+    'fullName',
+    'account_name',
+    'accountName',
+    'member_name',
+    'memberName',
+    'customer_name',
+    'customerName',
+    'display_name',
+    'displayName',
+  ]) {
+    final value = _readProfileString(profile, key, '');
+    if (value.isNotEmpty) return value;
+  }
+  return '';
+}
+
 KycStatus _parseKycStatus(Object? value) {
-  final status = (value as String?)?.toLowerCase().trim();
+  final status = value?.toString().toLowerCase().trim();
   switch (status) {
     case 'verified':
       return KycStatus.verified;
     case 'pending':
+    case 'in_review':
+    case 'review':
       return KycStatus.pending;
-    default:
+    case 'not_started':
+    case 'not-started':
+    case 'unverified':
       return KycStatus.notStarted;
+    default:
+      return KycStatus.unavailable;
   }
 }
 
@@ -351,7 +565,15 @@ class _KYCStatusCard extends StatelessWidget {
     final isVerified = user.kycStatus == KycStatus.verified;
     final statusColor = isVerified
         ? theme.colorScheme.primary
+        : user.kycStatus == KycStatus.unavailable
+        ? theme.colorScheme.outline
         : theme.colorScheme.error;
+    final statusLabel = switch (user.kycStatus) {
+      KycStatus.verified => 'Verified',
+      KycStatus.pending => 'Pending',
+      KycStatus.notStarted => 'Not started',
+      KycStatus.unavailable => 'Unavailable',
+    };
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -393,7 +615,7 @@ class _KYCStatusCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  isVerified ? 'Verified' : 'Not Verified',
+                  statusLabel,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: statusColor,
@@ -416,6 +638,80 @@ class _KYCStatusCard extends StatelessWidget {
               child: const Text('Verify'),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _QuickActionCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color accent;
+  final VoidCallback onTap;
+
+  const _QuickActionCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.accent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: accent, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

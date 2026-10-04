@@ -1,0 +1,8 @@
+unit: investments-and-shares
+commit: false
+candidate_splits:
+  - id: "lib/screens/investment/investments_screen.dart:1"
+    drivers: [data_ownership_split, change_cadence_split]
+    rationale: "Investment products and cooperative share transactions use separate service/provider contracts and may evolve independently."
+    source_slice: {file: lib/screens/investment/investments_screen.dart, lines: [1, 1]}
+

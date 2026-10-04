@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/app_scaffold.dart';
 import '../../../core/color_ext.dart';
+import '../../../core/providers/app_providers.dart';
 import 'withdrawal_model.dart';
 
-class ProcessingWithdrawalScreen extends StatefulWidget {
+class ProcessingWithdrawalScreen extends ConsumerStatefulWidget {
   final WithdrawalData data;
 
   const ProcessingWithdrawalScreen({super.key, required this.data});
 
   @override
-  State<ProcessingWithdrawalScreen> createState() => _ProcessingWithdrawalScreenState();
+  ConsumerState<ProcessingWithdrawalScreen> createState() =>
+      _ProcessingWithdrawalScreenState();
 }
 
-class _ProcessingWithdrawalScreenState extends State<ProcessingWithdrawalScreen>
+class _ProcessingWithdrawalScreenState
+    extends ConsumerState<ProcessingWithdrawalScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
@@ -25,16 +29,60 @@ class _ProcessingWithdrawalScreenState extends State<ProcessingWithdrawalScreen>
       vsync: this,
     )..repeat();
 
-    // Simulate processing delay
-    Future.delayed(const Duration(seconds: 3), () {
+    _processWithdrawal();
+  }
+
+  Future<void> _processWithdrawal() async {
+    try {
+      final pin = widget.data.pin;
+      if (pin == null || pin.isEmpty) {
+        throw StateError("Withdrawal authentication is missing.");
+      }
+      final authState = ref.read(authProvider);
+      final response = await ref
+          .read(savingsServiceProvider)
+          .withdrawSavings(
+            phoneNumber: _toInternationalPhone(widget.data.phoneNumber),
+            accountNumber: authState.userId ?? "",
+            pin: pin,
+            amount: widget.data.amount,
+            savingsId: widget.data.savingsId,
+            channel: widget.data.channel,
+            username:
+                ref.read(userProfileProvider).valueOrNull?['name']?.toString() ??
+                'Member',
+          );
       if (!mounted) return;
+      final transactionId = response['transaction_id']?.toString();
+      final newBalanceValue = response['new_balance'];
+      final newBalance = newBalanceValue is num
+          ? newBalanceValue.toDouble()
+          : double.tryParse(newBalanceValue?.toString() ?? '');
       final updatedData = widget.data.copyWith(
-        reference: 'ADEPA-${DateTime.now().millisecondsSinceEpoch}',
-        processedAt: DateTime.now(),
-        newBalance: 44000,
+        reference: transactionId,
+        isPending: response['is_pending'] == true,
+        processedAt: DateTime.tryParse(
+          response['processed_at']?.toString() ?? '',
+        ),
+        newBalance: newBalance,
       );
-      context.push('/withdrawal/success', extra: updatedData);
-    });
+      ref.invalidate(savingsProvider);
+      ref.invalidate(transactionsProvider);
+      ref.invalidate(userProfileProvider);
+      context.push("/withdrawal/success", extra: updatedData);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Withdrawal failed: $error")));
+      context.pop();
+    }
+  }
+
+  String _toInternationalPhone(String value) {
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('0')) return '233${digits.substring(1)}';
+    return digits;
   }
 
   @override
@@ -48,7 +96,7 @@ class _ProcessingWithdrawalScreenState extends State<ProcessingWithdrawalScreen>
     final theme = Theme.of(context);
 
     return AppScaffold(
-      title: 'Processing',
+      title: 'Processing Withdrawal',
       showBack: false,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

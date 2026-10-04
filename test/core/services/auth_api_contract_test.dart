@@ -11,11 +11,19 @@ void main() {
         ApiEndpoints.register,
         'https://adepaye.com/mobileapp-api/register',
       );
-      expect(ApiEndpoints.confirmPin, '/verifyPin');
+      expect(
+        ApiEndpoints.login,
+        'https://adepaye.com/api/mobileapp-api/login',
+      );
+      expect(
+        ApiEndpoints.createMember,
+        'https://adepaye.com/api/mobileapp-api/create',
+      );
+      expect(ApiEndpoints.confirmPin, 'https://adepaye.com/api/mobileapp-api/verifyPin');
       expect(ApiEndpoints.sendLoginOtp, 'https://adepaye.com/api/mobileapp-api/sendOtp');
       expect(ApiEndpoints.verifyLoginOtp, 'https://adepaye.com/api/mobileapp-api/verifyOtp');
-      expect(ApiEndpoints.setPin, '/mobileapp-api/setPin');
-      expect(ApiEndpoints.changePin, '/mobileapp-api/changePin');
+      expect(ApiEndpoints.setPin, 'https://adepaye.com/api/mobileapp-api/setPin');
+      expect(ApiEndpoints.changePin, 'https://adepaye.com/api/mobileapp-api/changePin');
     });
 
     test('uses the public payment-service routes', () {
@@ -23,8 +31,8 @@ void main() {
         ApiEndpoints.paymentServiceBaseUrl,
         'https://adepaye.com/api/payment-services',
       );
-      expect(ApiEndpoints.initiatePayment, '/api/payment-services/initiate');
-      expect(ApiEndpoints.verifyPayment, '/api/payment-services/verify');
+      expect(ApiEndpoints.initiatePayment, '/initiate');
+      expect(ApiEndpoints.verifyPayment, '/verify');
     });
 
     test('keeps a default shared secret for the documented API requests', () {

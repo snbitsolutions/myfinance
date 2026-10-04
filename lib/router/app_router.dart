@@ -13,7 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 // Splash & Onboarding
 import '../core/layout/main_shell.dart';
 import '../core/app_scaffold.dart';
-import '../core/app_card.dart';
+import '../core/app_card.dart' as core_app_card;
 import '../screens/splash/splash_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
 
@@ -22,20 +22,20 @@ import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
 import '../screens/auth/existing_member_enrollment_screen.dart';
 import '../screens/auth/otp_screen.dart';
+import '../screens/auth/registration_success_screen.dart';
 import '../screens/auth/set_pin_screen.dart';
 
 // Starter app shell only. All feature code has been cleared to allow a clean rebuild.
 import '../screens/error/app_error_screen.dart';
-import '../screens/investment/investment_activity_screen.dart';
 import '../screens/investment/investments_screen.dart';
 import '../screens/investment/investment_detail_screen.dart';
 import '../screens/loans/apply_loan_screen.dart';
 import '../screens/loans/loan_detail_screen.dart';
 import '../screens/loans/loan_status_screen.dart';
-import '../screens/loans/loans_screen.dart';
+import '../screens/loans/loans_screen.dart' as loans_screen;
 import '../screens/loans/repayment_screen.dart';
 import '../screens/notifications/notifications_screen.dart';
-import '../screens/payment/airtime_purchase_screen.dart';
+import '../screens/payment/mobile_purchase_screen.dart';
 import '../screens/payment/bills_payment_screen.dart';
 import '../screens/payment/payment_failed_screen.dart';
 import '../screens/payment/payment_receipt_screen.dart';
@@ -51,9 +51,9 @@ import '../screens/savings/savings_detail_screen.dart';
 import '../screens/savings/products_screen.dart';
 import '../screens/savings/savings_model.dart';
 import '../screens/savings/savings_screen.dart';
+import '../screens/savings/savings_success_screen.dart';
 import '../screens/savings/savings_types_screen.dart';
 import '../screens/savings/transfer_screen.dart';
-import '../screens/savings/withdraw_savings_screen.dart';
 import '../screens/savings/withdrawal_flow/withdrawal_screen.dart';
 import '../screens/savings/withdrawal_flow/review_withdrawal_screen.dart';
 import '../screens/savings/withdrawal_flow/authenticate_withdrawal_screen.dart';
@@ -69,8 +69,6 @@ import '../screens/savings/transfer_flow/enter_transfer_amount_screen.dart';
 import '../screens/savings/transfer_flow/review_transfer_screen.dart';
 import '../screens/savings/transfer_flow/authenticate_transfer_screen.dart';
 import '../screens/savings/transfer_flow/processing_transfer_screen.dart';
-import '../screens/savings/transfer_flow/success_transfer_screen.dart';
-import '../screens/savings/transfer_flow/receipt_transfer_screen.dart';
 import '../screens/savings/transfer_flow/transfer_model.dart';
 import '../screens/transactions/transactions_screen.dart';
 import '../screens/shares/shares_screen.dart';
@@ -96,6 +94,11 @@ class AppRouter {
   /// Resets the session cache. Intended for use in tests only.
   @visibleForTesting
   static void resetSessionCache() {
+    invalidateSessionCache();
+  }
+
+  /// Invalidates cached authentication results after a session is restored.
+  static void invalidateSessionCache() {
     _cachedHasBoundSession = null;
     _cachedHasBoundSessionAt = null;
     _sessionCheckInFlight = null;
@@ -240,10 +243,8 @@ class AppRouter {
     });
   }
 
-  // TEMPORARY DEV BYPASS: When true, the login/auth flow is skipped entirely
-  // so the app opens straight to /home. Set back to `false` to restore the
-  // normal login requirement.
-  static const bool _temporarilyBypassLoginForDev = true;
+  // Keep the splash and normal authentication flow active on startup.
+  static const bool _temporarilyBypassLoginForDev = false;
 
   static Future<String?> _computeRedirect(GoRouterState state) async {
     final path = state.uri.path;
@@ -349,6 +350,19 @@ class AppRouter {
                   extra?['accountNumber'] as String? ??
                   query['accountNumber'] ??
                   '',
+              isRegistration: extra?['isRegistration'] as bool? ?? false,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/registration-success',
+          builder: (context, state) {
+            final extra = state.extra is Map<String, dynamic>
+                ? state.extra! as Map<String, dynamic>
+                : const <String, dynamic>{};
+            return RegistrationSuccessScreen(
+              accountNumber: extra['accountNumber'] as String? ?? '',
+              phoneNumber: extra['phoneNumber'] as String? ?? '',
             );
           },
         ),
@@ -395,10 +409,10 @@ class AppRouter {
               return const BillsPaymentScreen();
             }
             if (type == 'airtime') {
-              return const AirtimePurchaseScreen();
+              return const MobilePurchaseScreen();
             }
             if (type == 'data') {
-              return const AirtimePurchaseScreen(isData: true);
+              return const MobilePurchaseScreen(isData: true);
             }
 
             return PaymentScreen(
@@ -406,6 +420,9 @@ class AppRouter {
                   extra?['sourceLabel'] as String? ?? query['sourceLabel'],
               returnRoute:
                   extra?['returnRoute'] as String? ?? query['returnRoute'],
+              initialAmount: double.tryParse(query['amount'] ?? ''),
+              initialMethod: query['method'],
+              savingsId: query['savingsId'],
             );
           },
         ),
@@ -419,6 +436,7 @@ class AppRouter {
               queryParameters: {
                 'sourceLabel': 'Deposit',
                 'returnRoute': returnRoute,
+                'savingsId': query['savingsId'] ?? 'member-savings',
               },
             ).toString();
           },
@@ -442,6 +460,7 @@ class AppRouter {
               account: extra['account'] as String?,
               paymentMethod: extra['paymentMethod'] as String?,
               newBalance: (extra['newBalance'] as num?)?.toDouble(),
+              isPending: extra['isPending'] as bool? ?? false,
             );
           },
         ),
@@ -481,6 +500,7 @@ class AppRouter {
               account: extra['account'] as String?,
               paymentMethod: extra['paymentMethod'] as String?,
               newBalance: (extra['newBalance'] as num?)?.toDouble(),
+              isPending: extra['isPending'] as bool? ?? false,
             );
           },
         ),
@@ -497,10 +517,7 @@ class AppRouter {
           builder: (context, state) => const SettingsScreen(),
         ),
         GoRoute(path: '/kyc', builder: (context, state) => const KycScreen()),
-        GoRoute(
-          path: '/profile/edit',
-          builder: (context, state) => const ProfileScreen(),
-        ),
+        GoRoute(path: '/profile/edit', redirect: (context, state) => '/more'),
         GoRoute(
           path: '/investment',
           redirect: (context, state) => '/investments',
@@ -536,7 +553,7 @@ class AppRouter {
         ),
         GoRoute(
           path: '/investment/activity',
-          builder: (context, state) => const InvestmentActivityScreen(),
+          redirect: (context, state) => '/investments',
         ),
         // Withdrawal flow routes
         GoRoute(
@@ -628,31 +645,19 @@ class AppRouter {
         ),
         GoRoute(
           path: '/transfer/authenticate',
-          builder: (context, state) {
-            final data = state.extra as TransferData;
-            return AuthenticateTransferScreen(initialData: data);
-          },
+          builder: (context, state) => const AuthenticateTransferScreen(),
         ),
         GoRoute(
           path: '/transfer/processing',
-          builder: (context, state) {
-            final data = state.extra as TransferData;
-            return ProcessingTransferScreen(initialData: data);
-          },
+          builder: (context, state) => const ProcessingTransferScreen(),
         ),
         GoRoute(
           path: '/transfer/success',
-          builder: (context, state) {
-            final data = state.extra as TransferData;
-            return SuccessTransferScreen(initialData: data);
-          },
+          builder: (context, state) => const SavingsScreen(),
         ),
         GoRoute(
           path: '/transfer/receipt',
-          builder: (context, state) {
-            final data = state.extra as TransferData;
-            return ReceiptTransferScreen(initialData: data);
-          },
+          builder: (context, state) => const SavingsScreen(),
         ),
         ShellRoute(
           builder: (context, state, child) {
@@ -685,8 +690,19 @@ class AppRouter {
               builder: (context, state) => const SavingsTypesScreen(),
             ),
             GoRoute(
+              name: 'savings-success',
+              path: '/savings/success',
+              builder: (context, state) {
+                final savings = state.extra;
+                if (savings is! Savings) {
+                  return const SavingsScreen();
+                }
+                return SavingsSuccessScreen(savings: savings);
+              },
+            ),
+            GoRoute(
               path: '/savings/withdraw',
-              builder: (context, state) => const WithdrawSavingsScreen(),
+              builder: (context, state) => const WithdrawalScreen(),
             ),
             GoRoute(
               path: '/savings/transfer',
@@ -696,14 +712,22 @@ class AppRouter {
               path: '/savings/:id',
               builder: (context, state) {
                 final id = state.pathParameters['id'] ?? 'custom-savings';
-                return SavingsDetailScreen(savingsId: id);
+                final savings = state.extra;
+                return SavingsDetailScreen(
+                  savingsId: id,
+                  savings: savings is Savings ? savings : null,
+                );
               },
             ),
             GoRoute(
               path: '/savings/:id/deposit',
               builder: (context, state) {
                 final id = state.pathParameters['id'] ?? 'custom-savings';
-                return SavingsDepositScreen(savingsId: id);
+                final savings = state.extra;
+                return SavingsDepositScreen(
+                  savingsId: id,
+                  savings: savings is Savings ? savings : null,
+                );
               },
             ),
             GoRoute(
@@ -758,7 +782,11 @@ class AppRouter {
               path: '/savings/:id/statement',
               builder: (context, state) {
                 final id = state.pathParameters['id'] ?? 'custom-savings';
-                return SavingsDetailScreen(savingsId: id);
+                final savings = state.extra;
+                return SavingsDetailScreen(
+                  savingsId: id,
+                  savings: savings is Savings ? savings : null,
+                );
               },
             ),
             GoRoute(
@@ -779,7 +807,7 @@ class AppRouter {
             ),
             GoRoute(
               path: '/loans',
-              builder: (context, state) => const LoansScreen(),
+              builder: (context, state) => const loans_screen.LoansScreen(),
               routes: [
                 GoRoute(
                   path: ':id',
@@ -861,7 +889,7 @@ class _ReviewBuySharesScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppCard(
+              core_app_card.AppCard(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -962,7 +990,7 @@ class _ReviewSellSharesScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppCard(
+              core_app_card.AppCard(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(

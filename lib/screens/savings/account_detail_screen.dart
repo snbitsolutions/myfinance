@@ -8,14 +8,17 @@ class AccountDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Account Detail')),
+      appBar: AppBar(title: const Text('Account Details')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Account: $accountId', style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                'Account: $accountId',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 12),
               const Text('Details about this account will appear here.'),
               const SizedBox(height: 20),

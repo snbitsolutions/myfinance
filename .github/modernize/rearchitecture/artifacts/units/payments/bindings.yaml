@@ -1,0 +1,9 @@
+unit: payments
+bindings:
+  - type: route-declaration
+    name: "Payment hub, payment, success, failed, and receipt routes"
+    source_loc: "lib/router/app_router.dart:394"
+    target: "Payment screens"
+    must_appear_in_target: true
+    notes: "Payment can be entered from loans, savings, or the payment hub."
+runtime_config: []

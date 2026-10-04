@@ -76,14 +76,14 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
 
     // Calculate totals
     final totalIncome = allTransactions
-        .where((tx) => tx.type == TransactionType.deposit)
-        .fold<double>(0, (sum, tx) => sum + tx.amount);
+        .where((tx) => tx.amount != null && tx.type == TransactionType.deposit)
+        .fold<double>(0, (sum, tx) => sum + (tx.amount ?? 0));
     final totalExpense = allTransactions
-        .where((tx) => tx.type == TransactionType.withdrawal)
-        .fold<double>(0, (sum, tx) => sum + tx.amount);
+        .where((tx) => tx.amount != null && tx.type == TransactionType.withdrawal)
+        .fold<double>(0, (sum, tx) => sum + (tx.amount ?? 0));
     final totalRepayment = allTransactions
-        .where((tx) => tx.type == TransactionType.repayment)
-        .fold<double>(0, (sum, tx) => sum + tx.amount);
+        .where((tx) => tx.amount != null && tx.type == TransactionType.repayment)
+        .fold<double>(0, (sum, tx) => sum + (tx.amount ?? 0));
     final netBalance = totalIncome - totalExpense - totalRepayment;
 
     // Group transactions by date
@@ -520,36 +520,39 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   List<AppTransaction> _normalizeApiTransactions(
     List<Map<String, dynamic>> raw,
   ) {
-    return raw.asMap().entries.map((entry) {
-      final i = entry.key;
-      final txn = entry.value;
-      final typeStr = (txn['type'] as String? ?? 'debit').toLowerCase();
-      final type = switch (typeStr) {
-        'credit' => TransactionType.deposit,
-        'repayment' => TransactionType.repayment,
-        _ => TransactionType.withdrawal,
-      };
-      final amount =
-          (txn['amount'] as num?)?.toDouble() ??
-          double.tryParse(txn['amount']?.toString() ?? '') ??
-          0.0;
-      final description =
-          txn['description'] as String? ?? txn['narration'] as String? ?? '';
-      final dateStr = txn['date'] as String? ?? '';
-      DateTime date = DateTime.now();
-      try {
-        date = DateTime.parse(dateStr);
-      } catch (_) {}
-      return AppTransaction(
-        id: txn['transaction_id'] as String? ?? '$i',
-        title: description.isEmpty ? 'Transaction' : description,
-        description: description,
-        amount: amount,
-        type: type,
-        date: date,
-        category: typeStr == 'credit' ? 'Income' : 'Expense',
-      );
-    }).toList();
+    return raw
+        .map((txn) {
+          final typeStr = txn['type']?.toString().toLowerCase() ?? 'unknown';
+          final type = switch (typeStr) {
+            'credit' => TransactionType.deposit,
+            'repayment' => TransactionType.repayment,
+            'debit' || 'withdraw' || 'withdrawal' =>
+              TransactionType.withdrawal,
+            _ => TransactionType.unknown,
+          };
+          final amount =
+              (txn['amount'] as num?)?.toDouble() ??
+              double.tryParse(txn['amount']?.toString() ?? '');
+          final description =
+              txn['description'] as String? ??
+              txn['narration'] as String? ??
+              '';
+          final dateStr = txn['date']?.toString() ?? '';
+          final date = DateTime.tryParse(dateStr);
+          final id = txn['transaction_id']?.toString().trim() ?? '';
+          if (date == null || id.isEmpty) return null;
+          return AppTransaction(
+            id: id,
+            title: description.isEmpty ? 'Transaction' : description,
+            description: description,
+            amount: amount,
+            type: type,
+            date: date,
+            category: typeStr == 'credit' ? 'Income' : 'Expense',
+          );
+        })
+        .whereType<AppTransaction>()
+        .toList();
   }
 
   List<AppTransaction> _buildSavingsTransactions(
@@ -570,13 +573,14 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
       final type = switch (rawType) {
         'withdraw' || 'withdrawal' => TransactionType.withdrawal,
         'repayment' => TransactionType.repayment,
-        _ => TransactionType.deposit,
+        'deposit' || 'credit' => TransactionType.deposit,
+        _ => TransactionType.unknown,
       };
 
       final rawAmount = tx['amount'];
       final amount = rawAmount is num
           ? rawAmount.toDouble()
-          : double.tryParse(rawAmount?.toString() ?? '') ?? 0;
+          : double.tryParse(rawAmount?.toString() ?? '');
 
       DateTime parsedDate = DateTime.now();
       final rawDate = tx['date'];
@@ -758,16 +762,22 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   Widget _buildTransactionTile(ThemeData theme, AppTransaction transaction) {
     final isCredit = transaction.type == TransactionType.deposit;
     final isRepayment = transaction.type == TransactionType.repayment;
+    final isDebit = transaction.type == TransactionType.withdrawal;
+    final amountLabel = transaction.amount == null
+        ? 'GH₵ —'
+        : '${isCredit ? '+' : isDebit || isRepayment ? '-' : ''}GH₵${transaction.amount!.toStringAsFixed(2)}';
 
     Color getColor() {
       if (isCredit) return Colors.green;
       if (isRepayment) return Colors.orange;
+      if (!isDebit) return theme.colorScheme.outline;
       return Colors.red;
     }
 
     IconData getIcon() {
       if (isCredit) return Icons.arrow_downward;
       if (isRepayment) return Icons.credit_card;
+      if (!isDebit) return Icons.receipt_long_outlined;
       return Icons.arrow_upward;
     }
 
@@ -851,7 +861,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '${isCredit ? '+' : '-'}GH₵${transaction.amount.toStringAsFixed(2)}',
+                    amountLabel,
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: getColor(),
@@ -895,6 +905,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     final theme = Theme.of(context);
     final isCredit = transaction.type == TransactionType.deposit;
     final isRepayment = transaction.type == TransactionType.repayment;
+    final isDebit = transaction.type == TransactionType.withdrawal;
+    final amountLabel = transaction.amount == null
+        ? 'GH₵ —'
+        : '${isCredit ? '+' : isDebit || isRepayment ? '-' : ''}GH₵${transaction.amount!.toStringAsFixed(2)}';
 
     showModalBottomSheet(
       context: context,
@@ -1009,7 +1023,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      '${isCredit ? '+' : '-'}GH₵${transaction.amount.toStringAsFixed(2)}',
+                      amountLabel,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleLarge?.copyWith(

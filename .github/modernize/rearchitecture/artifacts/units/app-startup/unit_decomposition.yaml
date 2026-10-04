@@ -1,0 +1,8 @@
+unit: app-startup
+commit: false
+candidate_splits:
+  - id: "lib/main.dart:28-55"
+    drivers: [lifecycle_split, concern_split]
+    rationale: "Core service initialization, debug identity seeding, and application boot have separate lifecycle responsibilities."
+    source_slice: {file: lib/main.dart, lines: [28, 55]}
+
