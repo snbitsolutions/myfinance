@@ -11,19 +11,31 @@ void main() {
         ApiEndpoints.register,
         'https://adepaye.com/mobileapp-api/register',
       );
-      expect(
-        ApiEndpoints.login,
-        'https://adepaye.com/api/mobileapp-api/login',
-      );
+      expect(ApiEndpoints.login, 'https://adepaye.com/api/mobileapp-api/login');
       expect(
         ApiEndpoints.createMember,
         'https://adepaye.com/api/mobileapp-api/create',
       );
-      expect(ApiEndpoints.confirmPin, 'https://adepaye.com/api/mobileapp-api/verifyPin');
-      expect(ApiEndpoints.sendLoginOtp, 'https://adepaye.com/api/mobileapp-api/sendOtp');
-      expect(ApiEndpoints.verifyLoginOtp, 'https://adepaye.com/api/mobileapp-api/verifyOtp');
-      expect(ApiEndpoints.setPin, 'https://adepaye.com/api/mobileapp-api/setPin');
-      expect(ApiEndpoints.changePin, 'https://adepaye.com/api/mobileapp-api/changePin');
+      expect(
+        ApiEndpoints.confirmPin,
+        'https://adepaye.com/api/mobileapp-api/verifyPin',
+      );
+      expect(
+        ApiEndpoints.sendLoginOtp,
+        'https://adepaye.com/api/mobileapp-api/sendOtp',
+      );
+      expect(
+        ApiEndpoints.verifyLoginOtp,
+        'https://adepaye.com/api/mobileapp-api/verifyOtp',
+      );
+      expect(
+        ApiEndpoints.setPin,
+        'https://adepaye.com/api/mobileapp-api/setPin',
+      );
+      expect(
+        ApiEndpoints.changePin,
+        'https://adepaye.com/api/mobileapp-api/changePin',
+      );
     });
 
     test('uses the public payment-service routes', () {
@@ -46,6 +58,19 @@ void main() {
       expect(AuthSession.isSuccessStatus('SUCCESS'), isTrue);
       expect(AuthSession.isSuccessStatus('ok'), isTrue);
       expect(AuthSession.isSuccessStatus(0), isFalse);
+    });
+
+    test('treats the documented invalid-PIN login response as a failure', () {
+      final service = AuthService();
+
+      expect(
+        service.hasExplicitFailure({'status': 0, 'message': 'Invalid Pin'}),
+        isTrue,
+      );
+      expect(
+        service.hasExplicitFailure({'status': 1, 'message': 'Valid Pin'}),
+        isFalse,
+      );
     });
 
     test('detects legacy empty payloads from STCCU OTP endpoints', () {

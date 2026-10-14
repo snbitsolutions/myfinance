@@ -51,7 +51,7 @@ class _SelectRecipientScreenState extends State<SelectRecipientScreen> {
               ),
               const SizedBox(height: 24),
               Text(
-                'Recipient lookup is not connected to the backend yet. Enter the recipient name, then provide and confirm their phone number.',
+                'Enter the member’s name and phone number. These details are for preparing the transfer only and are not checked against an account.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurface.withOpacitySafe(0.7),
                 ),

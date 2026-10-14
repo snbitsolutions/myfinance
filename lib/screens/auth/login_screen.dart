@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,6 +12,8 @@ import '../../core/constants/app_constants.dart';
 import '../../core/exceptions/app_exceptions.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/services/biometric_auth_service.dart';
+import '../../core/services/login_attempt_tracker.dart';
+import '../../core/utils/logger.dart';
 import '../../router/app_router.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -20,13 +25,15 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _pinController = TextEditingController();
   bool _showSnbReveal = false;
   int _snbTapCount = 0;
   bool _isSubmitting = false;
   bool _biometricEnabled = false;
-  bool _obscurePassword = true;
+  bool _obscurePin = true;
+  int _failedLoginAttempts = 0;
   final _biometricAuthService = BiometricAuthService();
+  final _loginAttemptTracker = LoginAttemptTracker();
 
   @override
   void initState() {
@@ -37,8 +44,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool get _isValid {
     final phoneDigits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
     return phoneDigits.length >= 9 &&
-        _passwordController.text.trim().isNotEmpty;
+        RegExp(r'^\d{4}$').hasMatch(_pinController.text);
   }
+
+  bool get _isLoginLocked =>
+      _failedLoginAttempts >= AppConstants.maxFailedLoginAttempts;
 
   String get _normalizedPhoneNumber {
     final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
@@ -47,6 +57,85 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return '233${digits.substring(1)}';
     }
     return digits;
+  }
+
+  void _onPhoneChanged(String _) {
+    setState(() {});
+    final phoneNumber = _normalizedPhoneNumber;
+    if (phoneNumber.replaceAll(RegExp(r'\D'), '').length < 9) {
+      setState(() => _failedLoginAttempts = 0);
+      return;
+    }
+    unawaited(_loadFailedLoginAttempts(phoneNumber));
+  }
+
+  Future<void> _loadFailedLoginAttempts(String phoneNumber) async {
+    try {
+      final attempts = await _loginAttemptTracker.getFailedAttempts(
+        phoneNumber,
+      );
+      if (!mounted || phoneNumber != _normalizedPhoneNumber) return;
+      setState(() => _failedLoginAttempts = attempts);
+    } on Exception catch (error) {
+      AppLogger.error('Failed to load login attempt state', error);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to check sign-in status. Please try again.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showLoginAttemptsLockedDialog(String phoneNumber) async {
+    final pinResetConfirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sign-in blocked'),
+        content: const Text(
+          '${AppConstants.loginAttemptsLockedMessage}\n\n'
+          "If support has reset your PIN, confirm below to clear this device's "
+          'local sign-in block. This will not reset or verify your PIN.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('PIN reset by support'),
+          ),
+        ],
+      ),
+    );
+    if (pinResetConfirmed != true || !mounted) return;
+
+    try {
+      await _loginAttemptTracker.resetFailedAttempts(phoneNumber);
+      if (!mounted) return;
+      if (phoneNumber == _normalizedPhoneNumber) {
+        setState(() => _failedLoginAttempts = 0);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'The local sign-in block was cleared. Your PIN will be verified '
+            'by the server when you sign in.',
+          ),
+        ),
+      );
+    } on Exception catch (error) {
+      AppLogger.error('Failed to clear login attempt state', error);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to clear the local sign-in block. Please try again.',
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _showSnbSheet() async {
@@ -75,6 +164,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (_isSubmitting || !_isValid) return;
 
     setState(() => _isSubmitting = true);
+    final phoneNumber = _normalizedPhoneNumber;
+    var canContinue = false;
+    try {
+      final failedAttempts = await _loginAttemptTracker.getFailedAttempts(
+        phoneNumber,
+      );
+      if (!mounted) return;
+      if (failedAttempts >= AppConstants.maxFailedLoginAttempts) {
+        setState(() => _failedLoginAttempts = failedAttempts);
+        await _showLoginAttemptsLockedDialog(phoneNumber);
+        return;
+      }
+      setState(() => _failedLoginAttempts = failedAttempts);
+      canContinue = true;
+    } on Exception catch (error) {
+      AppLogger.error('Failed to check login attempt state', error);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to check sign-in status. Please try again.'),
+        ),
+      );
+    } finally {
+      if (!canContinue && mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+
+    if (!canContinue) return;
+
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(AppConstants.sharedPrefKeyDebugBypassAuth, false);
@@ -82,16 +201,58 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           .read(authProvider.notifier)
           .login(
             phoneNumber: _normalizedPhoneNumber,
-            password: _passwordController.text,
+            pin: _pinController.text,
           );
       if (!mounted) return;
 
+      try {
+        await _loginAttemptTracker.resetFailedAttempts(phoneNumber);
+      } on Exception catch (error) {
+        AppLogger.error('Failed to reset login attempt state', error);
+      }
+      if (!mounted) return;
       AppRouter.invalidateSessionCache();
       context.go('/home');
     } on AppException catch (e) {
       if (!mounted) return;
       if (shouldRedirectToSignup(e.message)) {
         context.go('/signup?reason=not_registered');
+        return;
+      }
+
+      if (e is AuthException &&
+          e.code == AppConstants.invalidCredentialsErrorCode) {
+        try {
+          final attempts = await _loginAttemptTracker.recordFailedAttempt(
+            phoneNumber,
+          );
+          if (!mounted) return;
+          setState(() => _failedLoginAttempts = attempts);
+          if (attempts >= AppConstants.maxFailedLoginAttempts) {
+            await _showLoginAttemptsLockedDialog(phoneNumber);
+          } else {
+            final remaining = AppConstants.maxFailedLoginAttempts - attempts;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Invalid PIN. $remaining '
+                  '${remaining == 1 ? 'attempt' : 'attempts'} remaining.',
+                ),
+              ),
+            );
+          }
+        } on Exception catch (error) {
+          AppLogger.error('Failed to save login attempt state', error);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Sign-in failed and the attempt limit could not be saved. '
+                'Please contact support before trying again.',
+              ),
+            ),
+          );
+        }
         return;
       }
 
@@ -112,15 +273,45 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _handleBiometricSignIn() async {
     if (_isSubmitting) return;
-    final prefs = await SharedPreferences.getInstance();
-    final enabled =
-        prefs.getBool(AppConstants.sharedPrefKeyBiometricAuth) ?? false;
-    if (!enabled) {
-      return;
-    }
-
     setState(() => _isSubmitting = true);
     try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      final enabled =
+          prefs.getBool(AppConstants.sharedPrefKeyBiometricAuth) ?? false;
+      if (!enabled) return;
+
+      final savedPhoneNumber = prefs.getString(
+        AppConstants.sharedPrefKeyUserEmail,
+      );
+      if (savedPhoneNumber != null && savedPhoneNumber.isNotEmpty) {
+        try {
+          final failedAttempts = await _loginAttemptTracker.getFailedAttempts(
+            savedPhoneNumber,
+          );
+          if (failedAttempts >= AppConstants.maxFailedLoginAttempts) {
+            if (!mounted) return;
+            setState(() => _failedLoginAttempts = failedAttempts);
+            await _showLoginAttemptsLockedDialog(savedPhoneNumber);
+            return;
+          }
+        } on Exception catch (error) {
+          AppLogger.error(
+            'Failed to check biometric login attempt state',
+            error,
+          );
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Unable to check sign-in status. Please try again.',
+              ),
+            ),
+          );
+          return;
+        }
+      }
+
       if (!await _biometricAuthService.authenticate()) return;
       if (!await ref
           .read(authProvider.notifier)
@@ -134,6 +325,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         );
         return;
+      }
+      if (!mounted) return;
+      if (savedPhoneNumber != null && savedPhoneNumber.isNotEmpty) {
+        try {
+          await _loginAttemptTracker.resetFailedAttempts(savedPhoneNumber);
+        } on Exception catch (error) {
+          AppLogger.error(
+            'Failed to reset biometric login attempt state',
+            error,
+          );
+        }
       }
       if (!mounted) return;
       // The router may have cached the unauthenticated result while this
@@ -157,7 +359,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   void dispose() {
     _phoneController.dispose();
-    _passwordController.dispose();
+    _pinController.dispose();
     super.dispose();
   }
 
@@ -313,7 +515,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   TextField(
                                     controller: _phoneController,
                                     keyboardType: TextInputType.phone,
-                                    onChanged: (_) => setState(() {}),
+                                    onChanged: _onPhoneChanged,
                                     decoration: InputDecoration(
                                       prefixIcon: const Icon(
                                         Icons.phone_outlined,
@@ -359,7 +561,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
-                                    'Password',
+                                    '4-digit PIN',
                                     style: theme.textTheme.bodyLarge?.copyWith(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w500,
@@ -367,31 +569,45 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   TextField(
-                                    controller: _passwordController,
-                                    obscureText: _obscurePassword,
+                                    controller: _pinController,
+                                    obscureText: _obscurePin,
                                     onChanged: (_) => setState(() {}),
+                                    keyboardType: TextInputType.number,
+                                    autofillHints: const [
+                                      AutofillHints.password,
+                                    ],
+                                    maxLength: AppConstants.pinLength,
+                                    buildCounter:
+                                        (
+                                          context, {
+                                          required currentLength,
+                                          required isFocused,
+                                          maxLength,
+                                        }) => null,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                    ],
                                     decoration: InputDecoration(
                                       prefixIcon: const Icon(
                                         Icons.lock_outline,
                                         color: Colors.white70,
                                       ),
-                                      hintText: 'Enter your password',
+                                      hintText: 'Enter your 4-digit PIN',
                                       hintStyle: theme.textTheme.bodyMedium
                                           ?.copyWith(color: Colors.white54),
                                       suffixIcon: IconButton(
                                         onPressed: () => setState(
-                                          () => _obscurePassword =
-                                              !_obscurePassword,
+                                          () => _obscurePin = !_obscurePin,
                                         ),
                                         icon: Icon(
-                                          _obscurePassword
+                                          _obscurePin
                                               ? Icons.visibility_outlined
                                               : Icons.visibility_off_outlined,
                                           color: Colors.white70,
                                         ),
-                                        tooltip: _obscurePassword
-                                            ? 'Show password'
-                                            : 'Hide password',
+                                        tooltip: _obscurePin
+                                            ? 'Show PIN'
+                                            : 'Hide PIN',
                                       ),
                                       filled: true,
                                       fillColor: Colors.white.withOpacitySafe(
@@ -431,15 +647,42 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ],
                               ),
                               const SizedBox(height: 28),
+                              if (_isLoginLocked) ...[
+                                Text(
+                                  AppConstants.loginAttemptsLockedMessage,
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: _isSubmitting
+                                      ? null
+                                      : () => _showLoginAttemptsLockedDialog(
+                                          _normalizedPhoneNumber,
+                                        ),
+                                  child: const Text(
+                                    'I have reset my PIN with support',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
                               SizedBox(
                                 width: double.infinity,
                                 height: 52,
                                 child: ElevatedButton(
-                                  onPressed: _isValid && !_isSubmitting
+                                  onPressed:
+                                      _isValid &&
+                                          !_isSubmitting &&
+                                          !_isLoginLocked
                                       ? _handleLogin
                                       : null,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: _isValid && !_isSubmitting
+                                    backgroundColor:
+                                        _isValid &&
+                                            !_isSubmitting &&
+                                            !_isLoginLocked
                                         ? Colors.white
                                         : Colors.white.withOpacitySafe(0.3),
                                   ),

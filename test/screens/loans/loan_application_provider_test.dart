@@ -8,9 +8,9 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('persists and restores submitted loan state', () async {
+  test('persists and restores a draft without implying submission', () async {
     final notifier = LoanApplicationNotifier();
-    notifier.submit(
+    await notifier.prepareDraft(
       amount: 1500,
       purpose: 'Stock purchase',
       repaymentPlan: '6 months',
@@ -20,28 +20,41 @@ void main() {
 
     final restored = LoanApplicationNotifier();
     await Future<void>.delayed(const Duration(milliseconds: 20));
-
     expect(restored.state, isNotNull);
     expect(restored.state!.amount, 1500);
     expect(restored.state!.purpose, 'Stock purchase');
     expect(restored.state!.repaymentPlan, '6 months');
+    expect(restored.state!.toJson().containsKey('referenceNumber'), isFalse);
+    expect(restored.state!.toJson().containsKey('effectiveRate'), isFalse);
   });
 
-  test('persists repayment progress updates', () async {
+  test('clears the saved loan application draft', () async {
     final notifier = LoanApplicationNotifier();
-    notifier.submit(
+    await notifier.prepareDraft(
       amount: 1200,
       purpose: 'School fees',
       repaymentPlan: '3 months',
     );
-    notifier.recordPayment(200);
-
+    await notifier.clear();
+    final restored = LoanApplicationNotifier();
     await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    expect(restored.state, isNull);
+  });
+
+  test('persists submission state separately from an unsubmitted draft', () async {
+    final notifier = LoanApplicationNotifier();
+    await notifier.prepareDraft(
+      amount: 1200,
+      purpose: 'School fees',
+      repaymentPlan: '3 months',
+    );
+    await notifier.markSubmitted(message: 'Application received');
 
     final restored = LoanApplicationNotifier();
     await Future<void>.delayed(const Duration(milliseconds: 20));
 
-    expect(restored.state, isNotNull);
-    expect(restored.state!.repaidAmount, 200);
+    expect(restored.state!.isSubmitted, isTrue);
+    expect(restored.state!.submissionMessage, 'Application received');
   });
 }

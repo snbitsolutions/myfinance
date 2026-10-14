@@ -1,6 +1,7 @@
 import 'package:adepa_teachers/core/constants/app_constants.dart';
 import 'package:adepa_teachers/core/services/device_identity_service.dart';
 import 'package:adepa_teachers/core/services/secure_auth_storage.dart';
+import 'package:adepa_teachers/core/providers/app_providers.dart';
 import 'package:adepa_teachers/main.dart';
 import 'package:adepa_teachers/router/app_router.dart';
 import 'package:adepa_teachers/screens/payment/payment_screen.dart';
@@ -20,31 +21,31 @@ void main() {
   void installSecureStorageMock() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (methodCall) async {
-      switch (methodCall.method) {
-        case 'write':
-          final key = methodCall.arguments['key'] as String;
-          final value = methodCall.arguments['value'] as String?;
-          secureStore[key] = value;
-          return null;
-        case 'read':
-          final key = methodCall.arguments['key'] as String;
-          return secureStore[key];
-        case 'delete':
-          final key = methodCall.arguments['key'] as String;
-          secureStore.remove(key);
-          return null;
-        case 'deleteAll':
-          secureStore.clear();
-          return null;
-        case 'readAll':
-          return Map<String, dynamic>.from(secureStore);
-        case 'containsKey':
-          final key = methodCall.arguments['key'] as String;
-          return secureStore.containsKey(key);
-        default:
-          return null;
-      }
-    });
+          switch (methodCall.method) {
+            case 'write':
+              final key = methodCall.arguments['key'] as String;
+              final value = methodCall.arguments['value'] as String?;
+              secureStore[key] = value;
+              return null;
+            case 'read':
+              final key = methodCall.arguments['key'] as String;
+              return secureStore[key];
+            case 'delete':
+              final key = methodCall.arguments['key'] as String;
+              secureStore.remove(key);
+              return null;
+            case 'deleteAll':
+              secureStore.clear();
+              return null;
+            case 'readAll':
+              return Map<String, dynamic>.from(secureStore);
+            case 'containsKey':
+              final key = methodCall.arguments['key'] as String;
+              return secureStore.containsKey(key);
+            default:
+              return null;
+          }
+        });
   }
 
   installSecureStorageMock();
@@ -57,7 +58,8 @@ void main() {
       AppConstants.sharedPrefKeyUserId: '123456',
     });
     installSecureStorageMock();
-    final fingerprint = await DeviceIdentityService().getInstallationFingerprint();
+    final fingerprint = await DeviceIdentityService()
+        .getInstallationFingerprint();
     await SecureAuthStorage.instance.initialize();
     await SecureAuthStorage.instance.writeAuthToken('secure-token');
     await SecureAuthStorage.instance.writeSessionDeviceFingerprint(fingerprint);
@@ -69,19 +71,73 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
-  testWidgets('deposit flow opens payment screen without throwing layout errors', (tester) async {
-    await tester.pumpWidget(const ProviderScope(child: AdepaTeachersApp()));
+  testWidgets(
+    'deposit flow opens payment screen without throwing layout errors',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            savingsProvider.overrideWith(
+              (ref) async => [
+                {'savings_id': '59656', 'name': 'Test Savings'},
+              ],
+            ),
+            userProfileProvider.overrideWith(
+              (ref) async => {'name': 'Test Member', 'phone': '0241234567'},
+            ),
+          ],
+          child: const AdepaTeachersApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      AppRouter.router.go(
+        '/payment?sourceLabel=Deposit&returnRoute=/savings/custom-savings',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PaymentScreen), findsOneWidget);
+      expect(find.text('Deposit'), findsWidgets);
+      expect(find.text('Secure Checkout'), findsOneWidget);
+      expect(find.text('Test Savings'), findsOneWidget);
+    },
+  );
+
+  testWidgets('receive money starts a savings MoMo deposit request', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          savingsProvider.overrideWith(
+            (ref) async => [
+              {'savings_id': '59656', 'name': 'Test Savings'},
+            ],
+          ),
+          userProfileProvider.overrideWith(
+            (ref) async => {'name': 'Test Member', 'phone': '0241234567'},
+          ),
+        ],
+        child: const AdepaTeachersApp(),
+      ),
+    );
     await tester.pumpAndSettle();
 
-    AppRouter.router.go('/payment?sourceLabel=Deposit&returnRoute=/savings/custom-savings');
+    AppRouter.router.go('/payments-hub');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Receive Money').first);
     await tester.pumpAndSettle();
 
     expect(find.byType(PaymentScreen), findsOneWidget);
-    expect(find.text('Deposit'), findsWidgets);
-    expect(find.text('Secure Checkout'), findsOneWidget);
+    expect(find.text('Amount to Receive'), findsWidgets);
+    expect(find.text('Payer’s MoMo Number'), findsOneWidget);
+    expect(find.text('Test Savings'), findsOneWidget);
+    expect(find.text('Request MoMo Deposit'), findsOneWidget);
   });
 
-  testWidgets('deposit flow still works when sourceLabel is lowercase', (tester) async {
+  testWidgets('deposit flow still works when sourceLabel is lowercase', (
+    tester,
+  ) async {
     final router = GoRouter(
       routes: [
         GoRoute(
@@ -95,16 +151,12 @@ void main() {
     );
 
     await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp.router(
-          routerConfig: router,
-        ),
-      ),
+      ProviderScope(child: MaterialApp.router(routerConfig: router)),
     );
     await tester.pumpAndSettle();
 
     expect(find.byType(PaymentScreen), findsOneWidget);
-    expect(find.text('Make Deposit'), findsOneWidget);
+    expect(find.text('Deposit now'), findsOneWidget);
     expect(find.text('Deposit Amount'), findsOneWidget);
   });
 }

@@ -9,7 +9,6 @@ import '../../core/exceptions/app_exceptions.dart';
 import '../../core/layout/responsive.dart';
 import '../../core/modern_input.dart';
 import '../../core/providers/app_providers.dart';
-import '../../core/services/secure_auth_storage.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
   final String? sourceLabel;
@@ -51,6 +50,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   String _selectedShareAccount = _shareSourceAccounts.first;
   String _selectedInternalAccount = _shareSourceAccounts.first;
   String _selectedMomoProvider = _momoProviders.first;
+  String? _selectedSavingsId;
 
   @override
   void initState() {
@@ -65,14 +65,47 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         _method = widget.initialMethod!;
       }
     }
+    final savingsId = widget.savingsId?.trim();
+    if (savingsId != null &&
+        savingsId.isNotEmpty &&
+        savingsId != 'member-savings') {
+      _selectedSavingsId = savingsId;
+    }
   }
 
+  bool get _isReceiveMoneyFlow =>
+      (widget.sourceLabel ?? '').trim().toLowerCase() == 'receive money';
+
   bool get _isDepositFlow =>
+      _isReceiveMoneyFlow ||
       (widget.sourceLabel ?? '').trim().toLowerCase() == 'deposit';
 
   bool _isValidMomoNumber(String value) {
     final phone = value.trim();
     return RegExp(r'^0\d{9}$').hasMatch(phone);
+  }
+
+  String _toInternationalPhone(String value) {
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('0')) return '233${digits.substring(1)}';
+    if (digits.startsWith('233')) return digits;
+    return digits;
+  }
+
+  String? _accountProductId(Map<String, dynamic> account) {
+    final value =
+        account['savings_id'] ?? account['product_id'] ?? account['id'];
+    final id = value?.toString().trim();
+    return id == null || id.isEmpty ? null : id;
+  }
+
+  String? _resolvedSavingsId(List<Map<String, dynamic>> accounts) {
+    final routeId = widget.savingsId?.trim();
+    if (routeId != null && routeId.isNotEmpty && routeId != 'member-savings') {
+      return routeId;
+    }
+    if (_selectedSavingsId != null) return _selectedSavingsId;
+    return accounts.length == 1 ? _accountProductId(accounts.single) : null;
   }
 
   Future<void> _handleProceed() async {
@@ -92,10 +125,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   Future<void> _submitDeposit() async {
     final amount =
         double.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
-    final phone = ref.read(authProvider).userEmail ?? '';
+    final phone = _toInternationalPhone(_momoPhoneController.text.trim());
     final account = ref.read(authProvider).userId ?? '';
-    final savingsId = widget.savingsId ?? 'member-savings';
-    final pin = await SecureAuthStorage.instance.readPin() ?? '';
+    final savingsAccounts = ref.read(savingsProvider).valueOrNull ?? const [];
+    final savingsId = _resolvedSavingsId(savingsAccounts);
 
     if (amount <= 0) {
       if (!mounted) return;
@@ -105,7 +138,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       return;
     }
 
-    if (phone.isEmpty || account.isEmpty) {
+    if (!_isValidMomoNumber(_momoPhoneController.text.trim())) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid Ghana MoMo number.')),
+      );
+      return;
+    }
+
+    if (account.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -115,15 +156,25 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       return;
     }
 
-    if (pin.isEmpty) {
+    if (savingsId == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Your PIN is required to complete this deposit.'),
+          content: Text('Select the savings account you want to deposit into.'),
         ),
       );
       return;
     }
+
+    final savingsAccountName =
+        savingsAccounts
+            .where((item) => _accountProductId(item) == savingsId)
+            .map(
+              (item) => (item['name'] ?? item['product_name'] ?? 'Savings')
+                  .toString(),
+            )
+            .firstOrNull ??
+        'Savings';
 
     try {
       if (!mounted) return;
@@ -131,11 +182,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           .read(savingsServiceProvider)
           .depositSavings(
             phoneNumber: phone,
-            accountNumber: account,
-            pin: pin,
             amount: amount,
             savingsId: savingsId,
-            channel: 'mtn-gh',
+            channel: _depositChannel,
             username:
                 ref
                     .read(userProfileProvider)
@@ -157,20 +206,27 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       ref.invalidate(transactionsProvider);
       ref.invalidate(userProfileProvider);
 
-      final route = isPending ? '/payment-success' : '/payment-success';
       context.push(
-        route,
+        '/payment-success',
         extra: {
           'amount': amount,
           'reference': reference,
-          'account': 'Member Savings',
+          'account': savingsAccountName,
           'paymentMethod': 'MoMo',
           'newBalance': newBalance,
           'processedAt': DateTime.now().toIso8601String(),
           'message':
-              response['message']?.toString() ??
-              'Deposit submitted successfully.',
-          'title': isPending ? 'Deposit Pending' : 'Deposit Successful',
+            response['message']?.toString() ??
+            (_isReceiveMoneyFlow
+                ? 'The MoMo deposit request has been submitted.'
+                : 'Deposit submitted successfully.'),
+          'title': _isReceiveMoneyFlow
+            ? isPending
+                  ? 'Payment Request Pending'
+                  : 'Deposit Submitted'
+            : isPending
+            ? 'Deposit Pending'
+            : 'Deposit Successful',
           'isPending': isPending,
           'primaryActionLabel': 'Back to Savings',
           'primaryActionRoute': widget.returnRoute ?? '/savings',
@@ -209,6 +265,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
   }
 
+  String get _depositChannel {
+    return switch (_selectedMomoProvider) {
+      'Telecel Cash' => 'telecel-gh',
+      'AirtelTigo Money' => 'airteltigo-gh',
+      _ => 'mtn-gh',
+    };
+  }
+
   @override
   void dispose() {
     _amountController.dispose();
@@ -225,12 +289,19 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final isInvestment = widget.sourceLabel == 'Investment';
     final isMomo = !useExistingAccount && _method == 'MoMo';
     final isAccountMethod = !useExistingAccount && _method == 'Account';
+    final savingsAccountsAsync = isDepositFlow
+        ? ref.watch(savingsProvider)
+        : null;
+    final savingsAccounts = savingsAccountsAsync?.valueOrNull ?? const [];
+    final selectedSavingsId = _resolvedSavingsId(savingsAccounts);
     final momoPhone = _momoPhoneController.text.trim();
     final isMomoPhoneValid = _isValidMomoNumber(momoPhone);
     final showMomoPhoneError =
         isMomo && momoPhone.isNotEmpty && !isMomoPhoneValid;
     final canProceed =
-        amt > 0 && (!isMomo || isMomoPhoneValid) && (!isDepositFlow || isMomo);
+        amt > 0 &&
+        (!isMomo || isMomoPhoneValid) &&
+        (!isDepositFlow || (isMomo && selectedSavingsId != null));
     final selectedSource = useExistingAccount
         ? _selectedShareAccount
         : _method == 'Account'
@@ -239,7 +310,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
     return AppScaffold(
       title: isDepositFlow
-          ? 'Deposit'
+          ? _isReceiveMoneyFlow
+                ? 'Receive Money'
+                : 'Deposit'
           : useExistingAccount
           ? 'Buy Shares'
           : isInvestment
@@ -274,9 +347,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _PaymentSectionHeader(
-                          title: isDepositFlow ? 'Deposit Amount' : 'Amount',
+                          title: isDepositFlow
+                              ? _isReceiveMoneyFlow
+                                    ? 'Amount to Receive'
+                                    : 'Deposit Amount'
+                              : 'Amount',
                           subtitle: isDepositFlow
-                              ? 'Enter how much you want to deposit'
+                              ? _isReceiveMoneyFlow
+                                    ? 'Enter the amount to be paid into your savings.'
+                                    : 'Enter how much you want to deposit'
                               : 'Enter how much you want to pay',
                           icon: Icons.payments_rounded,
                           theme: theme,
@@ -284,7 +363,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         const SizedBox(height: 10),
                         ModernInput(
                           label: isDepositFlow
-                              ? 'Amount to Deposit'
+                              ? _isReceiveMoneyFlow
+                                    ? 'Amount to Receive'
+                                    : 'Amount to Deposit'
                               : 'Amount to Pay',
                           hintText: 'e.g., 500',
                           controller: _amountController,
@@ -292,6 +373,83 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                           prefixText: 'GH₵ ',
                           onChanged: (_) => setState(() {}),
                         ),
+                        if (isDepositFlow) ...[
+                          const SizedBox(height: 16),
+                          _PaymentSectionHeader(
+                            title: _isReceiveMoneyFlow
+                                ? 'Receive Into'
+                                : 'Deposit To',
+                            subtitle: 'Choose the savings account to credit.',
+                            icon: Icons.savings_rounded,
+                            theme: theme,
+                          ),
+                          const SizedBox(height: 8),
+                          savingsAccountsAsync!.when(
+                            loading: () => const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(12),
+                                child: CircularProgressIndicator(),
+                              ),
+                            ),
+                            error: (error, stackTrace) => ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text(
+                                'Could not load savings accounts.',
+                              ),
+                              trailing: TextButton(
+                                onPressed: () =>
+                                    ref.invalidate(savingsProvider),
+                                child: const Text('Retry'),
+                              ),
+                            ),
+                            data: (accounts) {
+                              final selectableAccounts = accounts
+                                  .map((account) {
+                                    final id = _accountProductId(account);
+                                    if (id == null) return null;
+                                    final name =
+                                        (account['name'] ??
+                                                account['product_name'] ??
+                                                'Savings account')
+                                            .toString();
+                                    return (id: id, name: name);
+                                  })
+                                  .whereType<({String id, String name})>()
+                                  .toList();
+                              final dropdownValue =
+                                  selectableAccounts.any(
+                                    (item) => item.id == selectedSavingsId,
+                                  )
+                                  ? selectedSavingsId
+                                  : null;
+                              if (selectableAccounts.isEmpty) {
+                                return const Text(
+                                  'No savings accounts are available for deposits.',
+                                );
+                              }
+                              return _PaymentDropdownShell(
+                                theme: theme,
+                                child: DropdownButton<String>(
+                                  value: dropdownValue,
+                                  isExpanded: true,
+                                  underline: const SizedBox(),
+                                  hint: const Text('Select savings account'),
+                                  items: selectableAccounts
+                                      .map(
+                                        (item) => DropdownMenuItem(
+                                          value: item.id,
+                                          child: Text(item.name),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (value) => setState(
+                                    () => _selectedSavingsId = value,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         _PaymentSectionHeader(
                           title: useExistingAccount
@@ -438,9 +596,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         if (isMomo) ...[
                           const SizedBox(height: 12),
                           _PaymentSectionHeader(
-                            title: 'MoMo Details',
-                            subtitle:
-                                'Select provider and enter recipient number.',
+                            title: _isReceiveMoneyFlow
+                                ? 'Payer MoMo Details'
+                                : 'MoMo Details',
+                            subtitle: _isReceiveMoneyFlow
+                                ? 'Select the payer’s network and enter their number.'
+                                : 'Select provider and enter recipient number.',
                             icon: Icons.phone_android_rounded,
                             theme: theme,
                           ),
@@ -480,7 +641,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                           ),
                           const SizedBox(height: 10),
                           ModernInput(
-                            label: 'MoMo Number',
+                            label: _isReceiveMoneyFlow
+                                ? 'Payer’s MoMo Number'
+                                : 'MoMo Number',
                             hintText: 'e.g., 0241234567',
                             controller: _momoPhoneController,
                             keyboardType: TextInputType.phone,
@@ -540,7 +703,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                     const SizedBox(width: 8),
                                     Text(
                                       isDepositFlow
-                                          ? 'Deposit Summary'
+                                          ? _isReceiveMoneyFlow
+                                                ? 'Receive Money Summary'
+                                                : 'Deposit Summary'
                                           : 'Payment Summary',
                                       style: theme.textTheme.bodyMedium
                                           ?.copyWith(
@@ -556,7 +721,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                   children: [
                                     Text(
                                       isDepositFlow
-                                          ? 'Amount entered'
+                                          ? _isReceiveMoneyFlow
+                                                ? 'Amount requested'
+                                                : 'Amount entered'
                                           : 'Total',
                                       style: theme.textTheme.bodyMedium,
                                     ),
@@ -612,7 +779,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                             : Icons.info_outline_rounded,
                       ),
                       label: Text(
-                        isDepositFlow ? 'Deposit now' : 'Payment unavailable',
+                        isDepositFlow
+                            ? _isReceiveMoneyFlow
+                                  ? 'Request MoMo Deposit'
+                                  : 'Deposit now'
+                            : 'Payment unavailable',
                       ),
                       style: FilledButton.styleFrom(
                         elevation: 0,

@@ -671,6 +671,10 @@ class _ShareCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = theme.colorScheme.primary;
+    final sharesOwned = share['shares_owned'] as int?;
+    final currentPrice = share['current_price'] as double?;
+    final totalValue = share['total_value'] as double?;
+    final change = share['change_24h'] as double?;
     final changeColor = (share['change_color'] as bool)
         ? Colors.green
         : Colors.red;
@@ -731,7 +735,11 @@ class _ShareCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${share['shares_owned']} shares @ GH₵ ${(share['current_price'] as double).toStringAsFixed(2)}',
+                      sharesOwned == null
+                          ? 'Units held: Unavailable'
+                          : currentPrice == null
+                          ? '$sharesOwned shares'
+                          : '$sharesOwned shares @ GH₵ ${currentPrice.toStringAsFixed(2)}',
                       style: theme.textTheme.labelSmall?.copyWith(
                         fontSize: 11,
                         color: theme.textTheme.bodySmall?.color,
@@ -744,30 +752,34 @@ class _ShareCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    'GH₵ ${(share['total_value'] as double).toStringAsFixed(2)}',
+                    totalValue == null
+                        ? 'Value unavailable'
+                        : 'GH₵ ${totalValue.toStringAsFixed(2)}',
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: changeColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '${share['change_24h'] > 0 ? '+' : ''}${(share['change_24h'] as double).toStringAsFixed(1)}%',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontSize: 10,
-                        color: changeColor,
-                        fontWeight: FontWeight.bold,
+                  if (change != null) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: changeColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '${change > 0 ? '+' : ''}${change.toStringAsFixed(1)}%',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontSize: 10,
+                          color: changeColor,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
               const SizedBox(width: 10),

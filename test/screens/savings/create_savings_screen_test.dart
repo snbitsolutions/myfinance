@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +7,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:adepa_teachers/screens/savings/create_savings_screen.dart';
 import 'package:adepa_teachers/screens/savings/savings_detail_screen.dart';
 import 'package:adepa_teachers/screens/savings/savings_model.dart';
+import 'package:adepa_teachers/core/providers/app_providers.dart';
+
+Widget _detailApp(Savings savings) {
+  final router = GoRouter(
+    initialLocation: '/savings/${savings.id}',
+    routes: [
+      GoRoute(
+        path: '/savings/:id',
+        builder: (context, state) => SavingsDetailScreen(
+          savingsId: state.pathParameters['id']!,
+          savings: savings,
+        ),
+      ),
+    ],
+  );
+
+  return MaterialApp.router(routerConfig: router);
+}
 
 void main() {
   setUp(() {
@@ -135,17 +154,18 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SavingsDetailScreen(
-            savingsId: 'local-goal-1',
-            savings: Savings(
-              id: 'local-goal-1',
-              title: 'Weekend Escape',
-              balance: 0,
-              target: 1500,
-              type: SavingsType.memberSaving,
-            ),
+      ProviderScope(
+        overrides: [
+          userProfileProvider.overrideWith((ref) async => <String, dynamic>{}),
+          savingsProvider.overrideWith((ref) async => []),
+        ],
+        child: _detailApp(
+          Savings(
+            id: 'local-goal-1',
+            title: 'Weekend Escape',
+            balance: 0,
+            target: 1500,
+            type: SavingsType.memberSaving,
           ),
         ),
       ),
@@ -167,17 +187,18 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SavingsDetailScreen(
-            savingsId: 'local-goal-2',
-            savings: Savings(
-              id: 'local-goal-2',
-              title: 'School Fees',
-              balance: 1000,
-              target: 2000,
-              type: SavingsType.currentSaving,
-            ),
+      ProviderScope(
+        overrides: [
+          userProfileProvider.overrideWith((ref) async => <String, dynamic>{}),
+          savingsProvider.overrideWith((ref) async => []),
+        ],
+        child: _detailApp(
+          Savings(
+            id: 'local-goal-2',
+            title: 'School Fees',
+            balance: 1000,
+            target: 2000,
+            type: SavingsType.currentSaving,
           ),
         ),
       ),
@@ -195,21 +216,22 @@ void main() {
     );
   });
 
-  testWidgets('local savings goals show a warning before transfer action', (
+  testWidgets('transfer action explains its backend limitation', (
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SavingsDetailScreen(
-            savingsId: 'local-goal-3',
-            savings: Savings(
-              id: 'local-goal-3',
-              title: 'Emergency Fund',
-              balance: 500,
-              target: 3000,
-              type: SavingsType.fixedDeposit,
-            ),
+      ProviderScope(
+        overrides: [
+          userProfileProvider.overrideWith((ref) async => <String, dynamic>{}),
+          savingsProvider.overrideWith((ref) async => []),
+        ],
+        child: _detailApp(
+          Savings(
+            id: 'local-goal-3',
+            title: 'Emergency Fund',
+            balance: 500,
+            target: 3000,
+            type: SavingsType.fixedDeposit,
           ),
         ),
       ),
@@ -221,7 +243,7 @@ void main() {
 
     expect(
       find.text(
-        'This local goal is not a backend account. Deposit and withdrawal require a customer savings account.',
+        'Savings transfers are unavailable until recipient verification and transfer processing are connected to the backend.',
       ),
       findsOneWidget,
     );

@@ -157,8 +157,10 @@ class AppRouter {
         return false;
       }
 
-      final token = await SecureAuthStorage.instance.readAuthToken() ?? '';
-      if (token.isNotEmpty) {
+      final currentFingerprint = await DeviceIdentityService()
+          .getInstallationFingerprint();
+      if (await SecureAuthStorage.instance
+          .hasAuthenticatedSessionBoundToFingerprint(currentFingerprint)) {
         return true;
       }
 
@@ -187,18 +189,20 @@ class AppRouter {
 
   static Future<bool> _computeHasBoundSession() async {
     final secureAuthStorage = SecureAuthStorage.instance;
-    final token = await secureAuthStorage.readAuthToken() ?? '';
-    if (token.isEmpty) {
-      return false;
-    }
-
     final currentFingerprint = await DeviceIdentityService()
         .getInstallationFingerprint();
     final isBoundToCurrentDevice = await secureAuthStorage
-        .hasSessionBoundToFingerprint(currentFingerprint);
+        .hasAuthenticatedSessionBoundToFingerprint(currentFingerprint);
 
     if (isBoundToCurrentDevice) {
-      return true;
+      final prefs = await SharedPreferences.getInstance();
+      final accountNumber =
+          prefs.getString(AppConstants.sharedPrefKeyUserId)?.trim() ?? '';
+      final phoneNumber =
+          prefs.getString(AppConstants.sharedPrefKeyUserEmail)?.trim() ?? '';
+      if (accountNumber.isNotEmpty && phoneNumber.isNotEmpty) {
+        return true;
+      }
     }
 
     final prefs = await SharedPreferences.getInstance();
@@ -209,11 +213,6 @@ class AppRouter {
   }
 
   static Future<bool> _hasUsableSession() async {
-    final token = await SecureAuthStorage.instance.readAuthToken() ?? '';
-    if (token.isEmpty) {
-      return false;
-    }
-
     return _hasBoundSession();
   }
 
@@ -351,6 +350,7 @@ class AppRouter {
                   query['accountNumber'] ??
                   '',
               isRegistration: extra?['isRegistration'] as bool? ?? false,
+              transactionPin: extra?['transactionPin'] as String?,
             );
           },
         ),
@@ -436,7 +436,24 @@ class AppRouter {
               queryParameters: {
                 'sourceLabel': 'Deposit',
                 'returnRoute': returnRoute,
-                'savingsId': query['savingsId'] ?? 'member-savings',
+                if (query['savingsId']?.trim().isNotEmpty == true)
+                  'savingsId': query['savingsId'],
+              },
+            ).toString();
+          },
+        ),
+        GoRoute(
+          path: '/payment/receive',
+          redirect: (context, state) {
+            final query = state.uri.queryParameters;
+            final returnRoute = query['returnRoute'] ?? '/savings';
+            return Uri(
+              path: '/payment',
+              queryParameters: {
+                'sourceLabel': 'Receive Money',
+                'returnRoute': returnRoute,
+                if (query['savingsId']?.trim().isNotEmpty == true)
+                  'savingsId': query['savingsId'],
               },
             ).toString();
           },
@@ -649,15 +666,21 @@ class AppRouter {
         ),
         GoRoute(
           path: '/transfer/processing',
-          builder: (context, state) => const ProcessingTransferScreen(),
+          builder: (context, state) => ProcessingTransferScreen(
+            initialData: state.extra as TransferData?,
+          ),
         ),
         GoRoute(
           path: '/transfer/success',
-          builder: (context, state) => const SavingsScreen(),
+          builder: (context, state) => ProcessingTransferScreen(
+            initialData: state.extra as TransferData?,
+          ),
         ),
         GoRoute(
           path: '/transfer/receipt',
-          builder: (context, state) => const SavingsScreen(),
+          builder: (context, state) => ProcessingTransferScreen(
+            initialData: state.extra as TransferData?,
+          ),
         ),
         ShellRoute(
           builder: (context, state, child) {

@@ -70,7 +70,7 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
     // Local application drafts are not backend loan records and cannot be
     // used as repayment identifiers.
     final LoanApplicationState? loan = null;
-    final outstanding = loan?.outstandingBalance ?? 0.0;
+    const outstanding = 0.0;
     final amountError = _amountError(outstanding);
     final phoneText = _phoneController.text.trim();
     final showPhoneError = phoneText.isNotEmpty && !_isValidPhone(phoneText);
@@ -205,7 +205,7 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Text(
-                          'Ref: ${loan.referenceNumber} • Plan: ${loan.repaymentPlan}',
+                          'Plan: ${loan.repaymentPlan}',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w600,

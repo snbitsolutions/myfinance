@@ -12,10 +12,11 @@ class LoanStatusScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final localDraft = ref.watch(loanApplicationProvider);
+    final draft = ref.watch(loanApplicationProvider);
+    final isSubmitted = draft?.isSubmitted ?? false;
 
     return AppScaffold(
-      title: 'Application Status',
+      title: 'Loan Application',
       backRoute: '/loans',
       child: Center(
         child: ConstrainedBox(
@@ -27,13 +28,21 @@ class LoanStatusScreen extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.cloud_off_rounded,
+                    draft == null
+                        ? Icons.edit_note_rounded
+                        : isSubmitted
+                        ? Icons.check_circle_outline_rounded
+                        : Icons.info_outline_rounded,
                     size: 52,
-                    color: theme.colorScheme.outline,
+                    color: theme.colorScheme.primary,
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Application status unavailable',
+                    draft == null
+                        ? 'No saved draft'
+                        : isSubmitted
+                        ? 'Application submitted'
+                        : 'Draft saved locally',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
@@ -41,30 +50,61 @@ class LoanStatusScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    localDraft == null
-                        ? 'The backend does not provide a loan application or status endpoint yet.'
-                        : 'A local draft for GH₵${localDraft.amount.toStringAsFixed(2)} is saved on this device, but it was not submitted. The backend does not provide a loan application or status endpoint yet.',
+                    draft == null
+                        ? 'You can prepare your loan details in the application form.'
+                        : isSubmitted
+                        ? draft.submissionMessage?.isNotEmpty == true
+                              ? draft.submissionMessage!
+                              : 'Your application was received by the loan service. Submission does not mean the loan is approved.'
+                        : 'This is only a draft on this device. Your loan application has not been submitted, and no application status or approval is available.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
+                  if (draft != null) ...[
+                    const SizedBox(height: 20),
+                    _DraftDetail(
+                      label: 'Requested amount',
+                      value: 'GH₵${draft.amount.toStringAsFixed(2)}',
+                    ),
+                    const SizedBox(height: 10),
+                    _DraftDetail(label: 'Purpose', value: draft.purpose),
+                    if (!isSubmitted) ...[
+                      const SizedBox(height: 10),
+                      _DraftDetail(
+                        label: 'Planning duration',
+                        value: draft.repaymentPlan,
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    _DraftDetail(
+                      label: 'Prepared',
+                      value: MaterialLocalizations.of(
+                        context,
+                      ).formatMediumDate(draft.preparedAt),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   Row(
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: () => context.go('/home'),
-                          child: const Text('Go Home'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton(
                           onPressed: () => context.go('/loans'),
                           child: const Text('Back to Loans'),
                         ),
                       ),
+                      if (!isSubmitted) ...[
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () => context.go('/apply-loan'),
+                            child: Text(
+                              draft == null ? 'Apply for Loan' : 'Edit Draft',
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],
@@ -73,6 +113,41 @@ class LoanStatusScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _DraftDetail extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _DraftDetail({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

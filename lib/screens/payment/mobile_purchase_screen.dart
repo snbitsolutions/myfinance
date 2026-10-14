@@ -31,7 +31,6 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
 
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _pinController = TextEditingController();
 
   String _selectedNetwork = _networks.first;
   int _currentStep = 0;
@@ -60,11 +59,10 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
       case 2:
         return true;
       case 3:
-        return _pinController.text.length >= 4;
+        return false;
       case 4:
+        return true;
       case 5:
-        return _transactionReference != null;
-      case 6:
         return false;
       default:
         return true;
@@ -77,8 +75,11 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
   Future<void> _advance() async {
     if (!_canProceed) return;
 
-    if (_currentStep == 3) {
-      setState(() => _isProcessing = true);
+    if (_currentStep == 2) {
+      setState(() {
+        _isProcessing = true;
+        _currentStep = 3;
+      });
       try {
         final profile = ref.read(userProfileProvider).valueOrNull;
         final phone = _toInternationalPhone(_phoneController.text);
@@ -110,7 +111,7 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
         _transactionReference =
             (result['reference'] ?? result['transaction_id'])?.toString();
         ref.invalidate(transactionsProvider);
-        setState(() => _currentStep = 5);
+        setState(() => _currentStep = 4);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -120,16 +121,19 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
         );
       } on AppException catch (error) {
         if (!mounted) return;
+        setState(() => _currentStep = 2);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(error.message)));
       } on StateError catch (error) {
         if (!mounted) return;
+        setState(() => _currentStep = 2);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(error.message)));
       } catch (_) {
         if (!mounted) return;
+        setState(() => _currentStep = 2);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -143,12 +147,12 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
       return;
     }
 
-    if (_currentStep == 5) {
-      setState(() => _currentStep = 6);
+    if (_currentStep == 4) {
+      setState(() => _currentStep = 5);
       return;
     }
 
-    if (_currentStep < 6) {
+    if (_currentStep < 5) {
       setState(() => _currentStep += 1);
     }
   }
@@ -166,6 +170,11 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
   }
 
   void _goBack() {
+    if (_isProcessing) return;
+    if (_currentStep >= 4) {
+      context.go('/payments-hub');
+      return;
+    }
     if (_currentStep == 0) {
       if (context.canPop()) {
         context.pop();
@@ -182,12 +191,11 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
   void dispose() {
     _phoneController.dispose();
     _amountController.dispose();
-    _pinController.dispose();
     super.dispose();
   }
 
   Widget _buildStepHeader() {
-    final steps = ['1', '2', '3', '4', '5', '6', '7'];
+    final steps = ['1', '2', '3', '4', '5', '6'];
 
     return Column(
       children: [
@@ -203,7 +211,6 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
                   'Network',
                   'Amount',
                   'Review',
-                  'PIN',
                   'Processing',
                   'Success',
                   'Receipt',
@@ -399,67 +406,6 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
     );
   }
 
-  Widget _buildPinStep() {
-    return Column(
-      children: [
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            color: const Color(0xFFEAF5EE),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Icon(
-            Icons.lock_outline_rounded,
-            size: 32,
-            color: Color(0xFF2E8B57),
-          ),
-        ),
-        const SizedBox(height: 18),
-        Text(
-          'Enter your PIN',
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Please authorize this $_serviceName purchase.',
-          textAlign: TextAlign.center,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF5A625D)),
-        ),
-        const SizedBox(height: 18),
-        TextField(
-          controller: _pinController,
-          keyboardType: TextInputType.number,
-          obscureText: true,
-          maxLength: 6,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 22, letterSpacing: 8),
-          decoration: InputDecoration(
-            counterText: '',
-            hintText: '••••••',
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
-              borderSide: const BorderSide(color: Color(0xFFE3EAE6)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
-              borderSide: const BorderSide(
-                color: Color(0xFF2E8B57),
-                width: 1.5,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildProcessingStep() {
     return Center(
       child: Column(
@@ -620,13 +566,12 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
       _buildNetworkStep(),
       _buildAmountStep(),
       _buildReviewStep(),
-      _buildPinStep(),
       _buildProcessingStep(),
       _buildSuccessStep(),
       _buildReceiptStep(),
     ];
 
-    final isLastStep = _currentStep == 6;
+    final isLastStep = _currentStep == 5;
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
@@ -685,7 +630,7 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  if (_currentStep != 4 && !isLastStep)
+                  if (_currentStep != 3 && !isLastStep)
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -701,7 +646,7 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
                           ),
                         ),
                         child: Text(
-                          _currentStep == 5
+                          _currentStep == 4
                               ? 'View Receipt'
                               : 'Continue',
                           style: const TextStyle(fontWeight: FontWeight.w700),

@@ -907,6 +907,7 @@ class _CreateSavingsScreenState extends ConsumerState<CreateSavingsScreen> {
                               );
 
                               await SavingsStorage.addGoal(newSavings);
+                              ref.invalidate(localSavingsGoalsProvider);
                               try {
                                 await NotificationService.instance.addNotification(
                                   AppNotification(

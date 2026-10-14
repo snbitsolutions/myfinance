@@ -143,8 +143,8 @@ class HttpClient {
           requestHeader: false,
           requestBody: false,
           responseHeader: false,
-          responseBody: true,
-          error: true,
+          responseBody: false,
+          error: false,
           compact: true,
           maxWidth: 90,
         ),
@@ -325,6 +325,7 @@ class HttpClient {
               message:
                   _extractErrorMessage(responseData) ??
                   AppConstants.invalidCredentialsMessage,
+              code: AppConstants.invalidCredentialsErrorCode,
               originalException: error,
             );
 

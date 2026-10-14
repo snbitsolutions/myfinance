@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/app_constants.dart';
+import 'secure_auth_storage.dart';
 import '../utils/logger.dart';
 
 class DeviceIdentityService {
@@ -17,6 +18,22 @@ class DeviceIdentityService {
 
   Future<void> primeInstallationId() async {
     await _getOrCreateInstallationId();
+  }
+
+  Future<String> getInstallationId() => _getOrCreateInstallationId();
+
+  Future<int> getBackendDeviceNumber() async {
+    final installationId = await _getOrCreateInstallationId();
+    return backendDeviceNumber(installationId);
+  }
+
+  @visibleForTesting
+  static int backendDeviceNumber(String installationId) {
+    const minimum = 100000000000000;
+    const range = 900000000000000;
+    final digest = sha256.convert(utf8.encode(installationId)).toString();
+    final value = BigInt.parse(digest.substring(0, 13), radix: 16);
+    return minimum + (value % BigInt.from(range)).toInt();
   }
 
   Future<Map<String, dynamic>> getSecurityPayload({
@@ -158,7 +175,6 @@ class DeviceIdentityService {
       if (defaultTargetPlatform == TargetPlatform.android) {
         final info = await _deviceInfoPlugin.androidInfo;
         return resolveDeviceIdentifier({
-          'imei_number': info.id,
           'android_id': info.id,
           'installation_id': await _getOrCreateInstallationId(),
         });
@@ -181,18 +197,11 @@ class DeviceIdentityService {
   @visibleForTesting
   static String? resolveDeviceIdentifier(Map<String, dynamic> values) {
     for (final key in [
-      'imei_number',
-      'imei',
+      'installation_id',
+      'installationId',
       'android_id',
       'device_identifier',
     ]) {
-      final value = values[key];
-      if (value is String && value.trim().isNotEmpty) {
-        return value.trim();
-      }
-    }
-
-    for (final key in ['installation_id', 'installationId']) {
       final value = values[key];
       if (value is String && value.trim().isNotEmpty) {
         return value.trim();
@@ -203,19 +212,22 @@ class DeviceIdentityService {
   }
 
   Future<String> _getOrCreateInstallationId() async {
-    final prefs = await SharedPreferences.getInstance();
-    final existing = prefs.getString(AppConstants.sharedPrefKeyDeviceInstallId);
+    final secureStorage = SecureAuthStorage.instance;
+    final existing = await secureStorage.readDeviceInstallationId();
 
     if (existing != null && existing.isNotEmpty) {
       return existing;
     }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(AppConstants.sharedPrefKeyDeviceInstallId);
 
     final random = kIsWeb ? Random() : Random.secure();
     const max32BitExclusive = 0x100000000; // 2^32
     final value =
         'dev_${DateTime.now().microsecondsSinceEpoch}_${random.nextInt(max32BitExclusive).toRadixString(16)}';
 
-    await prefs.setString(AppConstants.sharedPrefKeyDeviceInstallId, value);
+    await secureStorage.writeDeviceInstallationId(value);
     return value;
   }
 

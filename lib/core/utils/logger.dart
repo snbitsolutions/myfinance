@@ -18,6 +18,7 @@ class AppLogger {
     'pin',
     'otp',
     'secret',
+    'device_id',
     'installation_id',
     'fingerprint',
     'imei',

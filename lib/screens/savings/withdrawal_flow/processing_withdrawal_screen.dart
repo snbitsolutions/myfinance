@@ -46,10 +46,16 @@ class _ProcessingWithdrawalScreenState
             accountNumber: authState.userId ?? "",
             pin: pin,
             amount: widget.data.amount,
+            imeiNumber: await ref
+                .read(deviceIdentityServiceProvider)
+                .getBackendDeviceNumber(),
             savingsId: widget.data.savingsId,
             channel: widget.data.channel,
             username:
-                ref.read(userProfileProvider).valueOrNull?['name']?.toString() ??
+                ref
+                    .read(userProfileProvider)
+                    .valueOrNull?['name']
+                    ?.toString() ??
                 'Member',
           );
       if (!mounted) return;

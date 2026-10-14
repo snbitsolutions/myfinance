@@ -26,6 +26,15 @@ String _firstNonEmpty(Iterable<dynamic> values) {
   return '';
 }
 
+String _normalizePhoneNumber(String value) {
+  final digits = value.replaceAll(RegExp(r'\D'), '');
+  if (digits.startsWith('233')) return digits;
+  if (digits.startsWith('0') && digits.length == 10) {
+    return '233${digits.substring(1)}';
+  }
+  return digits;
+}
+
 String _findAccountNumber(dynamic value) {
   const keys = {
     'account_number',
@@ -253,16 +262,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return;
     }
 
-    final token = await SecureAuthStorage.instance.readAuthToken();
     final userId = prefs.getString(AppConstants.sharedPrefKeyUserId);
     final email = prefs.getString(AppConstants.sharedPrefKeyUserEmail);
 
-    if (token == null || token.isEmpty || userId == null || email == null) {
+    if (userId == null || email == null) {
       return;
     }
 
     final currentFingerprint = await deviceIdentityService
         .getInstallationFingerprint();
+    final token = await SecureAuthStorage.instance.readAuthToken();
+    if (token == null || token.isEmpty) {
+      if (await SecureAuthStorage.instance
+          .hasDeviceVerifiedSessionBoundToFingerprint(currentFingerprint)) {
+        if (!mounted) return;
+        state = AuthState.authenticated(userId: userId, userEmail: email);
+        AppLogger.info('Loaded device-bound PIN-verified authentication');
+      }
+      return;
+    }
+
     final isBoundToCurrentDevice = await SecureAuthStorage.instance
         .hasSessionBoundToFingerprint(currentFingerprint);
 
@@ -289,23 +308,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Login user
-  Future<void> login({
-    required String phoneNumber,
-    required String password,
-  }) async {
+  Future<void> login({required String phoneNumber, required String pin}) async {
     state = AuthState.loading();
 
     try {
+      final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
+      final deviceFingerprint = await deviceIdentityService
+          .getInstallationFingerprint();
       final response = await authService.login(
         phoneNumber: phoneNumber,
-        password: password,
+        pin: pin,
+        imeiNumber: imeiNumber,
       );
 
       final session = AuthSession.fromResponse(response);
       final status = response['status'];
       final isSuccess =
-          status == 0 ||
-          status == '0' ||
           AuthSession.isSuccessStatus(status) ||
           AuthSession.isSuccessStatus(response['success']) ||
           session != null;
@@ -314,46 +332,55 @@ class AuthNotifier extends StateNotifier<AuthState> {
         throw AuthException(
           message:
               response['message']?.toString() ??
-              'Invalid phone number or password.',
+              AppConstants.invalidCredentialsMessage,
         );
       }
 
-      if (session == null) {
+      final prefs = await _getPrefs();
+      final storedPhoneNumber =
+          prefs.getString(AppConstants.sharedPrefKeyUserEmail)?.trim() ?? '';
+      final storedAccountNumber =
+          _normalizePhoneNumber(storedPhoneNumber) ==
+              _normalizePhoneNumber(phoneNumber)
+          ? prefs.getString(AppConstants.sharedPrefKeyUserId)?.trim() ?? ''
+          : '';
+      final userId = _firstNonEmpty([
+        _findAccountNumber(response),
+        storedAccountNumber,
+      ]).replaceAll(RegExp(r'\D'), '');
+      if (userId.length < 6) {
         throw AuthException(
           message:
-              'Sign-in succeeded, but no session token was returned by the server.',
+              'Your PIN was verified, but this device has no linked account number. '
+              'Choose Sign up > I have an account to link your account first.',
         );
       }
 
-      final data = response['data'] is Map
-          ? Map<String, dynamic>.from(response['data'] as Map)
-          : <String, dynamic>{};
-      final token = session.accessToken;
-      final refreshToken = session.refreshToken;
-      final userId =
-          (data['user_id'] as String?) ??
-          (data['account_number'] as String?) ??
-          phoneNumber;
-      final prefs = await _getPrefs();
-      final currentFingerprint = await deviceIdentityService
-          .getInstallationFingerprint();
-
-      await SecureAuthStorage.instance.storeSession(
-        authToken: token,
-        refreshToken: refreshToken,
-        deviceFingerprint: currentFingerprint,
-      );
-
+      await SecureAuthStorage.instance.storePin(pin);
+      if (session != null) {
+        await SecureAuthStorage.instance.storeSession(
+          authToken: session.accessToken,
+          refreshToken: session.refreshToken,
+          deviceFingerprint: deviceFingerprint,
+        );
+      } else {
+        await SecureAuthStorage.instance.storeDeviceVerifiedSession(
+          deviceFingerprint: deviceFingerprint,
+        );
+      }
       await prefs.setString(AppConstants.sharedPrefKeyUserId, userId);
       await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
 
       state = AuthState.authenticated(
         userId: userId,
         userEmail: phoneNumber,
-        authToken: token,
+        authToken: session?.accessToken,
       );
 
-      AppLogger.info('User logged in successfully: $userId');
+      AppLogger.info(
+        'User PIN verified successfully; server session token returned: '
+        '${session != null}',
+      );
     } on AppException catch (e) {
       state = AuthState.error(e.message);
       AppLogger.error('Login failed', e);
@@ -368,15 +395,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = AuthState.loading();
 
     try {
+      final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
+      final fingerprint = await deviceIdentityService
+          .getInstallationFingerprint();
       final response = await authService.loginWithPhonePin(
         phoneNumber: phoneNumber,
         pin: pin,
+        imeiNumber: imeiNumber,
       );
       final session = AuthSession.fromResponse(response);
       final status = response['status'];
       final isSuccess =
-          status == 0 ||
-          status == '0' ||
           AuthSession.isSuccessStatus(status) ||
           AuthSession.isSuccessStatus(response['success']) ||
           AuthSession.isSuccessStatus(response['is_success']) ||
@@ -390,28 +419,42 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
       }
 
-      final accountNumber = _findAccountNumber(response);
-      final userId = accountNumber.isNotEmpty ? accountNumber : phoneNumber;
-      final token =
-          session?.accessToken ??
-          'phone-pin-session-${DateTime.now().millisecondsSinceEpoch}';
       final prefs = await _getPrefs();
-      final fingerprint = await deviceIdentityService
-          .getInstallationFingerprint();
-
-      await SecureAuthStorage.instance.storeSession(
-        authToken: token,
-        refreshToken: session?.refreshToken,
-        deviceFingerprint: fingerprint,
-      );
+      final storedPhoneNumber =
+          prefs.getString(AppConstants.sharedPrefKeyUserEmail)?.trim() ?? '';
+      final accountNumber = _firstNonEmpty([
+        _findAccountNumber(response),
+        if (_normalizePhoneNumber(storedPhoneNumber) ==
+            _normalizePhoneNumber(phoneNumber))
+          prefs.getString(AppConstants.sharedPrefKeyUserId),
+      ]).replaceAll(RegExp(r'\D'), '');
+      if (accountNumber.length < 6) {
+        throw AuthException(
+          message:
+              'Your PIN was verified, but this device has no linked account number. '
+              'Enroll your existing account before signing in.',
+        );
+      }
+      final userId = accountNumber;
       await SecureAuthStorage.instance.storePin(pin);
+      if (session != null) {
+        await SecureAuthStorage.instance.storeSession(
+          authToken: session.accessToken,
+          refreshToken: session.refreshToken,
+          deviceFingerprint: fingerprint,
+        );
+      } else {
+        await SecureAuthStorage.instance.storeDeviceVerifiedSession(
+          deviceFingerprint: fingerprint,
+        );
+      }
       await prefs.setString(AppConstants.sharedPrefKeyUserId, userId);
       await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
 
       state = AuthState.authenticated(
         userId: userId,
         userEmail: phoneNumber,
-        authToken: token,
+        authToken: session?.accessToken,
       );
       AppLogger.info('User logged in with phone and PIN');
     } on AppException catch (e) {
@@ -426,22 +469,28 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final token = await SecureAuthStorage.instance.readAuthToken();
     final userId = prefs.getString(AppConstants.sharedPrefKeyUserId);
     final userEmail = prefs.getString(AppConstants.sharedPrefKeyUserEmail);
-    if (token == null || token.isEmpty || userId == null || userEmail == null) {
+    if (userId == null || userEmail == null) {
       return false;
     }
 
     final fingerprint = await deviceIdentityService
         .getInstallationFingerprint();
-    if (!await SecureAuthStorage.instance.hasSessionBoundToFingerprint(
-      fingerprint,
-    )) {
+    final hasBoundTokenSession =
+        token != null &&
+        token.isNotEmpty &&
+        await SecureAuthStorage.instance.hasSessionBoundToFingerprint(
+          fingerprint,
+        );
+    final hasBoundPinSession = await SecureAuthStorage.instance
+        .hasDeviceVerifiedSessionBoundToFingerprint(fingerprint);
+    if (!hasBoundTokenSession && !hasBoundPinSession) {
       return false;
     }
 
     state = AuthState.authenticated(
       userId: userId,
       userEmail: userEmail,
-      authToken: token,
+      authToken: hasBoundTokenSession ? token : null,
     );
     return true;
   }
@@ -451,9 +500,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String pin,
   }) async {
     try {
+      final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
       final response = await authService.loginWithPhonePin(
         phoneNumber: phoneNumber,
         pin: pin,
+        imeiNumber: imeiNumber,
       );
       final status = response['status'];
       final accountNumber = _findAccountNumber(response).trim();
@@ -585,6 +636,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       final session = AuthSession.fromResponse(response);
       final prefs = await _getPrefs();
+      await SecureAuthStorage.instance.storePin(pin);
       if (session != null) {
         final currentFingerprint = await deviceIdentityService
             .getInstallationFingerprint();
@@ -594,7 +646,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
           deviceFingerprint: currentFingerprint,
         );
       }
-      await SecureAuthStorage.instance.storePin(pin);
       await prefs.setString(AppConstants.sharedPrefKeyUserId, accountNumber);
       await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
       final memberName = _findMemberName(response);
@@ -658,7 +709,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Set PIN
   Future<void> setPin({required String userId, required String pin}) async {
     try {
-      final response = await authService.setPin(userId: userId, pin: pin);
+      final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
+      final response = await authService.setPin(
+        userId: userId,
+        pin: pin,
+        imeiNumber: imeiNumber,
+      );
       final status = response['status'];
       final isSuccess =
           AuthSession.isSuccessStatus(status) ||
@@ -687,16 +743,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final prefs = await _getPrefs();
     final accountNumber =
         prefs.getString(AppConstants.sharedPrefKeyUserId)?.trim() ?? '';
-    if (accountNumber.isEmpty) {
+    final normalizedAccountNumber = accountNumber.replaceAll(RegExp(r'\D'), '');
+    if (normalizedAccountNumber.length < 6) {
       throw AuthException(
-        message: 'Your account session is incomplete. Please sign in again.',
+        message:
+            'Your full account number is unavailable. Enroll or link your account before changing your PIN.',
       );
     }
 
+    final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
     final response = await authService.changePin(
-      accountNumber: accountNumber,
+      accountNumber: normalizedAccountNumber,
       currentPin: currentPin,
       newPin: newPin,
+      imeiNumber: imeiNumber,
     );
     final succeeded =
         AuthSession.isSuccessStatus(response['status']) ||
@@ -719,6 +779,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String phoneNumber,
     required String accountNumber,
     required String otp,
+    String? transactionPin,
   }) async {
     state = AuthState.loading();
 
@@ -792,17 +853,28 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
       }
 
+      if (transactionPin != null) {
+        if (!RegExp(r'^\d{4}$').hasMatch(transactionPin)) {
+          throw ValidationException(
+            message: 'Transaction PIN must be exactly 4 digits.',
+          );
+        }
+        await SecureAuthStorage.instance.storePin(transactionPin);
+      }
+
       final currentFingerprint = await deviceIdentityService
           .getInstallationFingerprint();
-      final storedAuthToken =
-          session?.accessToken ??
-          'otp-session-${DateTime.now().millisecondsSinceEpoch}';
-
-      await SecureAuthStorage.instance.storeSession(
-        authToken: storedAuthToken,
-        refreshToken: session?.refreshToken,
-        deviceFingerprint: currentFingerprint,
-      );
+      if (session != null) {
+        await SecureAuthStorage.instance.storeSession(
+          authToken: session.accessToken,
+          refreshToken: session.refreshToken,
+          deviceFingerprint: currentFingerprint,
+        );
+      } else {
+        await SecureAuthStorage.instance.storeDeviceVerifiedSession(
+          deviceFingerprint: currentFingerprint,
+        );
+      }
       await prefs.setString(
         AppConstants.sharedPrefKeyUserId,
         accountForSession,
@@ -819,7 +891,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthState.authenticated(
         userId: accountForSession,
         userEmail: phoneNumber,
-        authToken: storedAuthToken,
+        authToken: session?.accessToken,
       );
 
       AppLogger.info(
@@ -845,10 +917,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String accountNumber,
     required String phoneNumber,
     required String birthDate,
-    required String imeiNumber,
     required String phoneMake,
   }) async {
     try {
+      final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
       final response = await authService.register(
         accountNumber: accountNumber,
         phoneNumber: phoneNumber,
@@ -899,9 +971,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required int sharesProduct,
     required String password,
     required String transactionPin,
-    required String imeiNumber,
     required String phoneMake,
   }) async {
+    final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
     final response = await authService.createMember(
       fullName: fullName,
       ghanaCard: ghanaCard,
@@ -924,14 +996,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         : const <String, dynamic>{};
     final successStatus = responseData['status'];
     final success =
-        status == 0 ||
-        status == '0' ||
         AuthSession.isSuccessStatus(status) ||
         (status == null && response['_http_success'] == true) ||
         AuthSession.isSuccessStatus(response['success']) ||
         AuthSession.isSuccessStatus(response['is_success']) ||
-        successStatus == 0 ||
-        successStatus == '0' ||
         AuthSession.isSuccessStatus(successStatus) ||
         AuthSession.isSuccessStatus(responseData['success']) ||
         AuthSession.isSuccessStatus(responseData['is_success']);
@@ -1058,6 +1126,9 @@ final userProfileProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   }
 
   final pin = await SecureAuthStorage.instance.readPin() ?? '';
+  final imeiNumber = await ref
+      .watch(deviceIdentityServiceProvider)
+      .getBackendDeviceNumber();
   List<Map<String, dynamic>> savings = const [];
   var savingsDataAvailable = true;
   try {
@@ -1065,6 +1136,7 @@ final userProfileProvider = FutureProvider<Map<String, dynamic>>((ref) async {
       phoneNumber: phone,
       accountNumber: account,
       pin: pin,
+      imeiNumber: imeiNumber,
     );
     savings = savingsResponse['data'] is List
         ? (savingsResponse['data'] as List)
@@ -1131,6 +1203,9 @@ final loansProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final loanService = ref.watch(loanServiceProvider);
 
   final pin = await SecureAuthStorage.instance.readPin() ?? '';
+  final imeiNumber = await ref
+      .watch(deviceIdentityServiceProvider)
+      .getBackendDeviceNumber();
   final phone = credentials['phone']!;
   final account = credentials['account']!;
 
@@ -1139,10 +1214,41 @@ final loansProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       phoneNumber: phone,
       accountNumber: account,
       pin: pin,
+      imeiNumber: imeiNumber,
     );
     final data = response['data'];
     if (data is List) {
-      return data.whereType<Map<String, dynamic>>().toList();
+      final loans = data.whereType<Map<String, dynamic>>().toList();
+      return await Future.wait(
+        loans.map((loan) async {
+          final loanId = (loan['loan_id'] ?? loan['id'] ?? loan['product_id'])
+              ?.toString()
+              .trim();
+          final hasBalance =
+              loan['outstanding_balance'] != null || loan['balance'] != null;
+          if (loanId == null || loanId.isEmpty || hasBalance) {
+            return loan;
+          }
+
+          try {
+            final balanceResponse = await loanService.getLoanBalance(
+              accountNumber: account,
+              loanId: loanId,
+            );
+            return {
+              ...loan,
+              'outstanding_balance': balanceResponse['balance'],
+              'balance_source': 'getLoanBalance',
+            };
+          } on AppException catch (error) {
+            AppLogger.warning(
+              'Exact loan balance unavailable for loan $loanId; keeping the list balance.',
+              error,
+            );
+            return loan;
+          }
+        }),
+      );
     }
 
     return [];
@@ -1156,20 +1262,30 @@ final savingsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final credentials = ref.watch(memberCredentialsProvider);
   final savingsService = ref.watch(savingsServiceProvider);
 
+  final phone = credentials['phone']?.trim() ?? '';
+  final account = credentials['account']?.trim() ?? '';
+  if (phone.isEmpty || account.isEmpty) {
+    throw ValidationException(
+      message: 'Your account details are missing. Please sign in again.',
+    );
+  }
+
   final pin = await SecureAuthStorage.instance.readPin() ?? '';
-  final phone = credentials['phone']!;
-  final account = credentials['account']!;
+  final imeiNumber = await ref
+      .watch(deviceIdentityServiceProvider)
+      .getBackendDeviceNumber();
 
   try {
     final response = await savingsService.getSavingsList(
       phoneNumber: phone,
       accountNumber: account,
       pin: pin,
+      imeiNumber: imeiNumber,
     );
     final data = response['data'];
     if (data is List) {
       final accounts = data.whereType<Map<String, dynamic>>().toList();
-      return Future.wait(
+      return await Future.wait(
         accounts.map((accountData) async {
           final productId =
               (accountData['savings_id'] ??
@@ -1177,7 +1293,11 @@ final savingsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
                       accountData['id'])
                   ?.toString()
                   .trim();
-          if (productId == null || productId.isEmpty) {
+          final hasBalance =
+              accountData['balance'] != null ||
+              accountData['current_balance'] != null ||
+              accountData['amount'] != null;
+          if (productId == null || productId.isEmpty || hasBalance) {
             return accountData;
           }
 
@@ -1211,11 +1331,19 @@ final savingsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 final sharesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final credentials = ref.watch(memberCredentialsProvider);
   final pin = await SecureAuthStorage.instance.readPin() ?? '';
+  final imeiNumber = await ref
+      .watch(deviceIdentityServiceProvider)
+      .getBackendDeviceNumber();
   final phone = credentials['phone']!;
   final account = credentials['account']!;
   final response = await ref
       .watch(sharesServiceProvider)
-      .getShares(phoneNumber: phone, accountNumber: account, pin: pin);
+      .getShares(
+        phoneNumber: phone,
+        accountNumber: account,
+        pin: pin,
+        imeiNumber: imeiNumber,
+      );
   final data = response['data'];
   return data is List ? data.whereType<Map<String, dynamic>>().toList() : [];
 });
@@ -1253,9 +1381,17 @@ final withdrawalAccountProvider =
         );
       }
 
+      final imeiNumber = await ref
+          .watch(deviceIdentityServiceProvider)
+          .getBackendDeviceNumber();
       final response = await ref
           .watch(savingsServiceProvider)
-          .getSavingsList(phoneNumber: phone, accountNumber: account, pin: '');
+          .getSavingsList(
+            phoneNumber: phone,
+            accountNumber: account,
+            pin: '',
+            imeiNumber: imeiNumber,
+          );
       final data = response['data'];
       final accounts = data is List
           ? data.whereType<Map<String, dynamic>>()
@@ -1281,9 +1417,15 @@ final transactionsProvider = FutureProvider<List<Map<String, dynamic>>>((
   final credentials = ref.watch(memberCredentialsProvider);
   final transactionService = ref.watch(transactionServiceProvider);
 
+  final phone = credentials['phone']?.trim() ?? '';
+  final account = credentials['account']?.trim() ?? '';
+  if (phone.isEmpty || account.isEmpty) {
+    throw ValidationException(
+      message: 'Your account details are missing. Please sign in again.',
+    );
+  }
+
   final pin = await SecureAuthStorage.instance.readPin() ?? '';
-  final phone = credentials['phone']!;
-  final account = credentials['account']!;
 
   try {
     final response = await transactionService.getTransactions(
@@ -1362,6 +1504,9 @@ final backendDiagnosticsProvider =
       final phone = credentials['phone']!;
       final account = credentials['account']!;
       final pin = await SecureAuthStorage.instance.readPin() ?? '';
+      final imeiNumber = await ref
+          .watch(deviceIdentityServiceProvider)
+          .getBackendDeviceNumber();
 
       final userService = ref.watch(userServiceProvider);
       final loanService = ref.watch(loanServiceProvider);
@@ -1385,6 +1530,7 @@ final backendDiagnosticsProvider =
             phoneNumber: phone,
             accountNumber: account,
             pin: pin,
+            imeiNumber: imeiNumber,
           );
         },
       );
@@ -1395,6 +1541,7 @@ final backendDiagnosticsProvider =
             phoneNumber: phone,
             accountNumber: account,
             pin: pin,
+            imeiNumber: imeiNumber,
           );
         },
       );
@@ -1415,6 +1562,7 @@ final backendDiagnosticsProvider =
             phoneNumber: phone,
             accountNumber: account,
             pin: pin,
+            imeiNumber: imeiNumber,
           );
           final data = response['data'];
           return data is List
@@ -1455,11 +1603,14 @@ final debugRegistrationProbeProvider = FutureProvider<Map<String, String>>((
 
   try {
     final authService = ref.watch(authServiceProvider);
+    final imeiNumber = await ref
+        .watch(deviceIdentityServiceProvider)
+        .getBackendDeviceNumber();
     final response = await authService.register(
       accountNumber: auth.userId!,
       phoneNumber: auth.userEmail!,
       birthDate: '',
-      imeiNumber: '0',
+      imeiNumber: imeiNumber,
       phoneMake: 'Flutter mobile app',
     );
 

@@ -2,6 +2,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/app_constants.dart';
+import '../exceptions/app_exceptions.dart';
 
 class SecureAuthStorage {
   SecureAuthStorage({FlutterSecureStorage? storage})
@@ -24,6 +25,9 @@ class SecureAuthStorage {
     String? refreshToken,
   }) async {
     await initialize();
+    await _storage.delete(
+      key: AppConstants.secureStorageKeyDeviceVerifiedSession,
+    );
     await _storage.write(
       key: AppConstants.secureStorageKeyUserToken,
       value: authToken,
@@ -39,6 +43,46 @@ class SecureAuthStorage {
         value: refreshToken,
       );
     }
+  }
+
+  Future<void> storeDeviceVerifiedSession({
+    required String deviceFingerprint,
+  }) async {
+    await initialize();
+    await _storage.delete(key: AppConstants.secureStorageKeyUserToken);
+    await _storage.delete(key: AppConstants.secureStorageKeyUserRefreshToken);
+    await _storage.write(
+      key: AppConstants.secureStorageKeySessionDeviceFingerprint,
+      value: deviceFingerprint,
+    );
+    await _storage.write(
+      key: AppConstants.secureStorageKeyDeviceVerifiedSession,
+      value: 'true',
+    );
+  }
+
+  Future<bool> hasDeviceVerifiedSessionBoundToFingerprint(
+    String currentFingerprint,
+  ) async {
+    await initialize();
+    final marker = await _storage.read(
+      key: AppConstants.secureStorageKeyDeviceVerifiedSession,
+    );
+    final storedFingerprint = await readSessionDeviceFingerprint();
+    return marker == 'true' &&
+        storedFingerprint != null &&
+        storedFingerprint.isNotEmpty &&
+        storedFingerprint == currentFingerprint;
+  }
+
+  Future<bool> hasAuthenticatedSessionBoundToFingerprint(
+    String currentFingerprint,
+  ) async {
+    final token = await readAuthToken();
+    if (token != null && token.isNotEmpty) {
+      return hasSessionBoundToFingerprint(currentFingerprint);
+    }
+    return hasDeviceVerifiedSessionBoundToFingerprint(currentFingerprint);
   }
 
   Future<String?> readAuthToken() async {
@@ -82,36 +126,52 @@ class SecureAuthStorage {
     );
   }
 
-  Future<void> storePin(String pin) async {
+  Future<String?> readDeviceInstallationId() async {
     await initialize();
+    return _storage.read(key: AppConstants.secureStorageKeyDeviceInstallId);
+  }
+
+  Future<void> writeDeviceInstallationId(String installationId) async {
+    await initialize();
+    await _storage.write(
+      key: AppConstants.secureStorageKeyDeviceInstallId,
+      value: installationId,
+    );
+  }
+
+  Future<void> storePin(String pin) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(AppConstants.sharedPrefKeyUserPin);
     try {
+      await initialize();
       await _storage.write(
         key: AppConstants.secureStorageKeyUserPin,
         value: pin,
       );
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(AppConstants.sharedPrefKeyUserPin);
-    } catch (_) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(AppConstants.sharedPrefKeyUserPin, pin);
+    } catch (error) {
+      throw CacheException(
+        message: 'Your PIN could not be stored securely. Please try again.',
+        originalException: error,
+      );
     }
   }
 
   Future<String?> readPin() async {
-    await initialize();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(AppConstants.sharedPrefKeyUserPin);
     try {
+      await initialize();
       final securePin = await _storage.read(
         key: AppConstants.secureStorageKeyUserPin,
       );
       if (securePin != null && securePin.isNotEmpty) {
         return securePin;
       }
-    } catch (_) {}
-
-    final prefs = await SharedPreferences.getInstance();
-    final fallbackPin = prefs.getString(AppConstants.sharedPrefKeyUserPin);
-    if (fallbackPin != null && fallbackPin.isNotEmpty) {
-      return fallbackPin;
+    } catch (error) {
+      throw CacheException(
+        message: 'Your PIN could not be read securely. Please try again.',
+        originalException: error,
+      );
     }
 
     return null;
@@ -136,8 +196,7 @@ class SecureAuthStorage {
 
     final storedFingerprint = await readSessionDeviceFingerprint();
     if (storedFingerprint == null || storedFingerprint.isEmpty) {
-      await writeSessionDeviceFingerprint(currentFingerprint);
-      return true;
+      return false;
     }
 
     return storedFingerprint == currentFingerprint;
@@ -149,6 +208,9 @@ class SecureAuthStorage {
     await _storage.delete(key: AppConstants.secureStorageKeyUserRefreshToken);
     await _storage.delete(
       key: AppConstants.secureStorageKeySessionDeviceFingerprint,
+    );
+    await _storage.delete(
+      key: AppConstants.secureStorageKeyDeviceVerifiedSession,
     );
     try {
       await _storage.delete(key: AppConstants.secureStorageKeyUserPin);
@@ -191,5 +253,6 @@ class SecureAuthStorage {
 
     await prefs.remove(AppConstants.sharedPrefKeyUserToken);
     await prefs.remove(AppConstants.sharedPrefKeyUserRefreshToken);
+    await prefs.remove(AppConstants.sharedPrefKeyUserPin);
   }
 }

@@ -406,7 +406,8 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
         map['product_name'] as String? ??
         map['account_name'] as String? ??
         'Savings';
-    final rawBalance = map['balance'] ?? map['current_balance'] ?? map['amount'];
+    final rawBalance =
+        map['balance'] ?? map['current_balance'] ?? map['amount'];
     final balance = _toDouble(rawBalance ?? 0);
     final target = _toDouble(
       map['target'] ?? map['target_amount'] ?? map['goal_amount'] ?? 0,
@@ -611,6 +612,8 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
         .map(_mapToSavings)
         .where((s) => s.id.isNotEmpty || s.title.isNotEmpty)
         .toList();
+    final localGoalsAsync = ref.watch(localSavingsGoalsProvider);
+    final localGoals = localGoalsAsync.valueOrNull ?? const <Savings>[];
 
     final allSavings = apiSavings;
     final balance = allSavings.fold<double>(0, (sum, s) => sum + s.balance);
@@ -965,6 +968,55 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                   ),
                 );
               }),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'My Savings Goals',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: const Color(0xFF1D2B26),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => context.go('/savings/create'),
+                    icon: const Icon(Icons.add_circle_outline, size: 18),
+                    label: const Text('New Goal'),
+                  ),
+                ],
+              ),
+              if (localGoalsAsync.isLoading)
+                const AppCard(child: Center(child: CircularProgressIndicator()))
+              else if (localGoalsAsync.hasError)
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Saved goals could not be loaded.'),
+                      TextButton.icon(
+                        onPressed: () =>
+                            ref.invalidate(localSavingsGoalsProvider),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              else if (localGoals.isEmpty)
+                const AppCard(
+                  child: Text(
+                    'No savings goals yet. Create a goal to track it here.',
+                  ),
+                )
+              else
+                ...localGoals.map(
+                  (goal) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _buildGoalCard(context, theme, goal, 220),
+                  ),
+                ),
               const SizedBox(height: 18),
               Container(
                 width: double.infinity,
@@ -1791,25 +1843,13 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
         : 'Account number unavailable';
 
     return AppCard(
-      onTap: () => context.go('/savings/${s.id}'),
+      onTap: () => context.go('/savings/${s.id}', extra: s),
       child: Container(
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border(
-            left: BorderSide(
-              color: accentColor.withOpacitySafe(0.14),
-              width: 6,
-            ),
-            top: BorderSide(
-              color: theme.colorScheme.outline.withValues(alpha: 0.06),
-            ),
-            right: BorderSide(
-              color: theme.colorScheme.outline.withValues(alpha: 0.06),
-            ),
-            bottom: BorderSide(
-              color: theme.colorScheme.outline.withValues(alpha: 0.06),
-            ),
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.06),
           ),
         ),
         child: Padding(
@@ -2124,9 +2164,9 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                             fit: BoxFit.scaleDown,
                             alignment: Alignment.centerLeft,
                             child: Text(
-                    balancesAvailable
-                        ? 'GH₵${totalBalance.toStringAsFixed(2)}'
-                        : 'Unavailable',
+                              balancesAvailable
+                                  ? 'GH₵${totalBalance.toStringAsFixed(2)}'
+                                  : 'Unavailable',
                               style: theme.textTheme.headlineMedium?.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w800,

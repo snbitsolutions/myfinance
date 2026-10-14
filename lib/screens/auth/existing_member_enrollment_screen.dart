@@ -88,10 +88,8 @@ class _ExistingMemberEnrollmentScreenState
   final TextEditingController _finalOtpController = TextEditingController();
 
   bool _biometricsEnabled = true;
-  bool _savingsProductSelected = true;
-  bool _sharesProductSelected = false;
-  bool _fixedDepositSelected = false;
-  bool _loanProductSelected = false;
+  int? _selectedSavingsProductId;
+  int? _selectedSharesProductId;
   String? _fundingMethod;
   bool _isSubmittingRegistration = false;
   int _currentStep = 0;
@@ -416,10 +414,8 @@ class _ExistingMemberEnrollmentScreenState
           _confirmPinController.text.trim() == _pinController.text.trim();
     }
     if (title == 'Choose Products') {
-      return _savingsProductSelected ||
-          _sharesProductSelected ||
-          _fixedDepositSelected ||
-          _loanProductSelected;
+      return _selectedSavingsProductId != null ||
+          _selectedSharesProductId != null;
     }
     if (title == 'Fund Your Account') {
       return _fundingMethod != null;
@@ -475,13 +471,10 @@ class _ExistingMemberEnrollmentScreenState
                 gender: _genderController.text.trim(),
                 address: _addressController.text.trim(),
                 email: _emailController.text.trim(),
-                savingsProduct: _savingsProductSelected || _fixedDepositSelected
-                    ? 1
-                    : 0,
-                sharesProduct: _sharesProductSelected ? 5 : 0,
+                savingsProduct: _selectedSavingsProductId ?? 0,
+                sharesProduct: _selectedSharesProductId ?? 0,
                 password: _passwordController.text.trim(),
                 transactionPin: _pinController.text.trim(),
-                imeiNumber: '0',
                 phoneMake: 'Flutter mobile app',
               )
             : await ref
@@ -493,7 +486,6 @@ class _ExistingMemberEnrollmentScreenState
                       '',
                     ),
                     birthDate: _birthDateController.text.trim(),
-                    imeiNumber: '0',
                     phoneMake: 'Flutter mobile app',
                   );
         if (!mounted) return;
@@ -536,6 +528,7 @@ class _ExistingMemberEnrollmentScreenState
             'phoneNumber': normalizedPhone,
             'accountNumber': accountNumber,
             'isRegistration': _isNewMember,
+            'transactionPin': _isNewMember ? _pinController.text.trim() : null,
           },
         );
         return;
@@ -1050,6 +1043,9 @@ class _ExistingMemberEnrollmentScreenState
   }
 
   Widget _buildNewChooseProductsBody(BuildContext context, ThemeData theme) {
+    final savingsProducts = ref.watch(savingsProductsCatalogProvider);
+    final sharesProducts = ref.watch(sharesProductsCatalogProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1062,38 +1058,109 @@ class _ExistingMemberEnrollmentScreenState
         ),
         const SizedBox(height: 8),
         Text(
-          'Select the products you need',
+          'Select up to one product from each category.',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: const Color(0xFF4B5E59),
           ),
         ),
-        const SizedBox(height: 22),
-        _productCheckRow(
-          label: 'Savings Account',
-          isSelected: _savingsProductSelected,
-          onChanged: (selected) {
-            setState(() => _savingsProductSelected = selected);
-          },
+        const SizedBox(height: 18),
+        _buildCatalogProductOptions(
+          title: 'Savings Products',
+          products: savingsProducts,
+          selectedProductId: _selectedSavingsProductId,
+          onSelected: (id) => setState(() => _selectedSavingsProductId = id),
+          onRetry: () => ref.invalidate(savingsProductsCatalogProvider),
         ),
-        _productCheckRow(
-          label: 'Member Savings',
-          isSelected: _sharesProductSelected,
-          onChanged: (selected) {
-            setState(() => _sharesProductSelected = selected);
-          },
+        const SizedBox(height: 14),
+        _buildCatalogProductOptions(
+          title: 'Shares Products',
+          products: sharesProducts,
+          selectedProductId: _selectedSharesProductId,
+          onSelected: (id) => setState(() => _selectedSharesProductId = id),
+          onRetry: () => ref.invalidate(sharesProductsCatalogProvider),
         ),
-        _productCheckRow(
-          label: 'Fixed Deposit',
-          isSelected: _fixedDepositSelected,
-          onChanged: (selected) {
-            setState(() => _fixedDepositSelected = selected);
-          },
+        const SizedBox(height: 8),
+        Text(
+          'You can apply for a loan after your membership is active.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: const Color(0xFF4B5E59),
+          ),
         ),
-        _productCheckRow(
-          label: 'Loan Product',
-          isSelected: _loanProductSelected,
-          onChanged: (selected) {
-            setState(() => _loanProductSelected = selected);
+      ],
+    );
+  }
+
+  Widget _buildCatalogProductOptions({
+    required String title,
+    required AsyncValue<List<Map<String, dynamic>>> products,
+    required int? selectedProductId,
+    required ValueChanged<int?> onSelected,
+    required VoidCallback onRetry,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Color(0xFF0E2B28),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        products.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (error, stackTrace) => Card(
+            child: ListTile(
+              title: const Text('Could not load products.'),
+              trailing: TextButton(
+                onPressed: onRetry,
+                child: const Text('Retry'),
+              ),
+            ),
+          ),
+          data: (items) {
+            final availableProducts = items
+                .map((item) {
+                  final id = int.tryParse(item['id']?.toString() ?? '');
+                  final name = (item['name'] ?? item['product_name'])
+                      ?.toString()
+                      .trim();
+                  if (id == null || name == null || name.isEmpty) return null;
+                  return (id: id, name: name);
+                })
+                .whereType<({int id, String name})>()
+                .toList();
+
+            if (availableProducts.isEmpty) {
+              return const Card(
+                child: ListTile(
+                  title: Text('No products are currently available.'),
+                ),
+              );
+            }
+
+            return Column(
+              children: availableProducts
+                  .map(
+                    (product) => Card(
+                      child: CheckboxListTile(
+                        value: selectedProductId == product.id,
+                        title: Text(product.name),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        onChanged: (selected) => onSelected(
+                          selected == true && selectedProductId != product.id
+                              ? product.id
+                              : null,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            );
           },
         ),
       ],
@@ -1286,9 +1353,9 @@ class _ExistingMemberEnrollmentScreenState
         ),
         const SizedBox(height: 18),
         _buildTextField(
-          label: 'Member ID or Account Number',
+          label: 'Account Number',
           controller: _memberIdController,
-          hint: 'Enter your member ID or account number',
+          hint: 'Enter your full credit union account number',
           icon: Icons.badge_outlined,
           keyboardType: TextInputType.text,
         ),

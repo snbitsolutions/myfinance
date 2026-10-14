@@ -16,7 +16,6 @@ class ReviewTransferScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final data = initialData ?? TransferData();
-
     final total = data.amount;
 
     return AppScaffold(
@@ -32,7 +31,7 @@ class ReviewTransferScreen extends StatelessWidget {
               child: Column(
                 children: [
                   Text(
-              'Transfer Amount',
+                    'Transfer Amount',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onPrimaryContainer,
                     ),
@@ -87,25 +86,27 @@ class ReviewTransferScreen extends StatelessWidget {
             const SizedBox(height: 12),
             _buildDetailRow(
               context,
-              'Amount before backend fees',
-              'GH₵${total.toStringAsFixed(2)}',
+              'Transfer fee',
+              'Not available',
               highlight: true,
             ),
             const SizedBox(height: 12),
             Text(
-              'The transfer cannot be submitted until recipient verification, fees, and processing are supported by the backend.',
+              'This is a review of the details only. Recipient verification, applicable fees, and transfer processing are not connected, so no transfer can be sent.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.error,
               ),
             ),
             const SizedBox(height: 32),
 
-            // Confirm button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: null,
-                child: const Text('Transfer unavailable'),
+                onPressed: () => context.push(
+                  '/transfer/processing',
+                  extra: data,
+                ),
+                child: const Text('Finish Preparing'),
               ),
             ),
 

@@ -8,6 +8,7 @@ import 'package:adepa_teachers/core/providers/app_providers.dart';
 import 'package:adepa_teachers/core/services/api_service.dart';
 import 'package:adepa_teachers/core/services/device_identity_service.dart';
 import 'package:adepa_teachers/screens/transactions/transactions_screen.dart';
+import 'package:adepa_teachers/core/exceptions/app_exceptions.dart';
 
 class ThrowingUserService extends UserService {
   @override
@@ -60,9 +61,7 @@ void main() {
         return null;
       });
 
-  test(
-    'transactions provider uses fallback sample data when unauthenticated',
-    () async {
+  test('transactions provider rejects an incomplete session', () async {
       final container = ProviderContainer(
         overrides: [
           authProvider.overrideWith(
@@ -76,16 +75,13 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final transactions = await container.read(transactionsProvider.future);
+      await expectLater(
+        container.read(transactionsProvider.future),
+        throwsA(isA<ValidationException>()),
+      );
+    });
 
-      expect(transactions, isNotEmpty);
-      expect(transactions.first['description'], 'Salary deposit');
-    },
-  );
-
-  test(
-    'user profile provider uses fallback data when unauthenticated',
-    () async {
+  test('user profile provider rejects an incomplete session', () async {
       final container = ProviderContainer(
         overrides: [
           authProvider.overrideWith(
@@ -99,16 +95,13 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final profile = await container.read(userProfileProvider.future);
+      await expectLater(
+        container.read(userProfileProvider.future),
+        throwsA(isA<ValidationException>()),
+      );
+    });
 
-      expect(profile['name'], 'Demo User');
-      expect(profile['balance'], greaterThan(0));
-    },
-  );
-
-  test(
-    'user profile provider uses fallback data for debug-auth sessions',
-    () async {
+  test('user profile provider does not fabricate debug session data', () async {
       final container = ProviderContainer(
         overrides: [
           authProvider.overrideWith(
@@ -123,12 +116,11 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final profile = await container.read(userProfileProvider.future);
-
-      expect(profile['name'], 'Demo User');
-      expect(profile['balance'], 5240.75);
-    },
-  );
+      await expectLater(
+        container.read(userProfileProvider.future),
+        throwsA(isA<ValidationException>()),
+      );
+    });
 
   testWidgets('transactions screen is overflow-safe on small screens', (
     tester,
@@ -162,7 +154,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Transactions'), findsOneWidget);
+    expect(find.text('Activity'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     // Drag if any scrollable is present (empty state may not have ListView)

@@ -35,7 +35,16 @@ A Flutter personal-finance app for Adepa members. The app uses documented ATCCU 
 ### 🔐 Authentication
 
 - Onboarding and protected routes
+- Phone and 4-digit PIN login; the documented login response verifies the PIN
+  but does not issue a session token, so the app stores a device-bound
+  verification marker and requires a previously linked full account number
 - New-member and existing-member registration
+- Phone and 4-digit PIN sign-in; three invalid-credential responses block
+  sign-in for that phone on the device until support resets the PIN and the
+  user confirms that reset in the app (which only clears the local block)
+- Sign-up collects an account password separately; login uses the 4-digit PIN
+- PIN recovery is not available in the app because the backend does not
+  document a PIN-reset endpoint
 - OTP verification and resend
 - Device-bound sessions
 - Secure PIN creation and storage
@@ -159,7 +168,7 @@ lib/
 ### 🔎 Current Backend Limitations
 
 The available documentation does not define endpoints for profile updates,
-KYC persistence, loan application/details, savings-goal creation, recipient
+KYC persistence, loan details, savings-goal creation, recipient
 lookup, investments, share buy/sell, dividends, portfolio statements, or
 receipt downloads. These flows remain visible only where useful, but they
 cannot complete until the corresponding backend contracts are provided.
@@ -167,8 +176,10 @@ cannot complete until the corresponding backend contracts are provided.
 The app keeps these screens available for future integration. It disables
 unsupported submissions and shows unavailable terms instead of inventing loan
 rates, savings returns, transfer fees, recipient matches, or application
-statuses. Loan repayment also waits for a backend loan record rather than using
-a locally saved draft.
+statuses. Loan applications now submit to `POST /loanApplication`; the
+preferred duration remains a planning-only value because it is not part of
+that endpoint's request contract. Loan repayment also waits for a backend loan
+record rather than using a locally saved draft.
 
 ### 📋 Future Enhancements
 

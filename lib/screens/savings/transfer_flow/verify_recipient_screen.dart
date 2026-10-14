@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/app_scaffold.dart';
 import '../../../core/color_ext.dart';
 import 'transfer_model.dart';
 
@@ -13,9 +14,9 @@ class VerifyRecipientScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final data = initialData ?? TransferData();
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Verify Recipient'), elevation: 0),
-      body: SingleChildScrollView(
+    return AppScaffold(
+      title: 'Confirm Recipient',
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -39,7 +40,7 @@ class VerifyRecipientScreen extends StatelessWidget {
 
             // Recipient details
             Text(
-              'Confirm recipient details',
+              'Review recipient details',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -106,19 +107,21 @@ class VerifyRecipientScreen extends StatelessWidget {
             ),
             const SizedBox(height: 32),
             Text(
-              'Recipient verification is not available because the backend does not provide a recipient lookup endpoint. No transfer can be authorized from these unverified details.',
+              'These details have not been verified with the recipient’s account. Continuing only prepares the transfer; it will not authorize or send money.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurface.withOpacitySafe(0.7),
               ),
             ),
             const SizedBox(height: 16),
 
-            // Do not allow unverified recipient details into amount/auth steps.
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: null,
-                child: const Text('Recipient verification unavailable'),
+                onPressed: () => context.push(
+                  '/transfer/enter-amount',
+                  extra: data,
+                ),
+                child: const Text('Continue to Amount'),
               ),
             ),
 

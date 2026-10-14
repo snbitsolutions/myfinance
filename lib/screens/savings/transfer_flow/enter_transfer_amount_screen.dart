@@ -36,9 +36,15 @@ class _EnterTransferAmountScreenState extends State<EnterTransferAmountScreen> {
   }
 
   bool get _canContinue {
-    final amount = double.tryParse(_amountController.text) ?? 0.0;
-    return amount > 0;
+    final amount = _parseAmount(_amountController.text);
+    return amount.isFinite &&
+        amount > 0 &&
+        (_data.recipientName?.trim().isNotEmpty ?? false) &&
+        (_data.recipientPhone?.trim().isNotEmpty ?? false);
   }
+
+  double _parseAmount(String value) =>
+      double.tryParse(value.replaceAll(',', '').trim()) ?? 0.0;
 
   void _setAmount(double amount) {
     _amountController.text = amount.toStringAsFixed(2);
@@ -64,6 +70,34 @@ class _EnterTransferAmountScreenState extends State<EnterTransferAmountScreen> {
               ),
             ),
             const SizedBox(height: 8),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Recipient',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${_data.recipientName ?? 'Not provided'} · ${_data.recipientPhone ?? 'No phone number'}',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Recipient details are not verified.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             ModernInput(
               controller: _amountController,
               keyboardType:
@@ -108,11 +142,9 @@ class _EnterTransferAmountScreenState extends State<EnterTransferAmountScreen> {
               child: ElevatedButton(
                 onPressed: _canContinue
                     ? () {
-                        final amount =
-                            double.tryParse(_amountController.text) ?? 0.0;
+                        final amount = _parseAmount(_amountController.text);
                         final updated = _data.copyWith(
                           amount: amount,
-                          transactionFee: 0,
                         );
                         context.push(
                           '/transfer/review',

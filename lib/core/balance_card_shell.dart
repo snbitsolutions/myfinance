@@ -121,3 +121,39 @@ class AdepaLogoBadge extends StatelessWidget {
     );
   }
 }
+
+class TreeLogoBadge extends StatelessWidget {
+  final double size;
+  final Color color;
+  final double opacity;
+
+  const TreeLogoBadge({
+    super.key,
+    this.size = 132,
+    this.color = Colors.white,
+    this.opacity = 0.3,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Opacity(
+        opacity: opacity,
+        child: ColorFiltered(
+          colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+          child: Transform.scale(
+            scale: 1.45,
+            alignment: Alignment.topCenter,
+            child: Image.asset(
+              'images/adepa_teachers_logo.png',
+              fit: BoxFit.contain,
+              alignment: Alignment.topCenter,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

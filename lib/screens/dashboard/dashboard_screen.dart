@@ -732,13 +732,6 @@ class _AccountInfoCard extends StatelessWidget {
         : '${viewData.accountStatus.trim()[0].toUpperCase()}${viewData.accountStatus.trim().substring(1).toLowerCase()}';
     final statusStyle = _AccountStatusStyle.fromStatusKey(statusKey);
 
-    final initials = viewData.accountName
-        .split(RegExp(r'\s+'))
-        .where((e) => e.isNotEmpty)
-        .take(2)
-        .map((e) => e.characters.first.toUpperCase())
-        .join();
-
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -803,83 +796,17 @@ class _AccountInfoCard extends StatelessWidget {
                 ),
               ),
             ),
-            const Positioned(
-              top: 8,
-              right: 8,
-              child: AdepaLogoBadge(size: 104),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: TreeLogoBadge(size: 132, opacity: 0.34),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.22),
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          initials.isEmpty ? 'U' : initials,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: _DashboardUi.cardTextColor,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              viewData.accountName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.08,
-                                height: 1.08,
-                                color: _DashboardUi.cardTextColor,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Account Holder',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.18,
-                                color: _DashboardUi.cardTextColor.withValues(
-                                  alpha: 0.78,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              'Primary account · Budget synced',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: _DashboardUi.cardTextColor.withValues(
-                                  alpha: 0.65,
-                                ),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 18),
                   Row(
                     children: [
                       Expanded(

@@ -67,7 +67,14 @@ class AppConstants {
       'Please check your input and try again.';
 
   // Auth Messages
-  static const String invalidCredentialsMessage = 'Invalid phone number or PIN.';
+  static const String invalidCredentialsMessage =
+      'Invalid phone number or PIN.';
+  static const String invalidCredentialsErrorCode = 'invalid_credentials';
+  static const int maxFailedLoginAttempts = 3;
+  static const String loginAttemptsLockedMessage =
+      'Sign-in is blocked on this device for this phone number after too many '
+      'incorrect PIN attempts. Please contact your financial institution to '
+      'reset your PIN. The app cannot reset your PIN.';
   static const String userNotFoundMessage = 'User account not found.';
   static const String accountLockedMessage =
       'Account is locked. Please contact support.';
@@ -119,6 +126,10 @@ class AppConstants {
       'secure.userRefreshToken';
   static const String secureStorageKeySessionDeviceFingerprint =
       'secure.sessionDeviceFingerprint';
+  static const String secureStorageKeyDeviceVerifiedSession =
+      'secure.deviceVerifiedSession';
+  static const String secureStorageKeyDeviceInstallId =
+      'secure.deviceInstallId';
   static const String secureStorageKeyUserPin = 'secure.userPin';
   static const String sharedPrefKeyUserPin = 'userPin';
 
@@ -180,7 +191,9 @@ class ApiEndpoints {
   static const String getSavingsProductsList =
       '$mobileApiBaseUrl/getMemSavings';
   static const String getSavingsBalance = '$mobileApiBaseUrl/getSavingsBalance';
+  static const String getLoanBalance = '$mobileApiBaseUrl/getLoanBalance';
   static const String getLoanProductsList = '$mobileApiBaseUrl/getLoanProducts';
+  static const String applyLoan = '$mobileApiBaseUrl/loanApplication';
   static const String getShares = '$mobileApiBaseUrl/getMemShares';
   static const String getSavingsProducts = '$mobileApiBaseUrl/savings';
   static const String getSharesProducts = '$mobileApiBaseUrl/shares';
@@ -202,7 +215,6 @@ class ApiEndpoints {
   // Loans
   static const String getLoansList = '/loans';
   static const String getLoanDetail = '/loans/:id';
-  static const String applyLoan = '/loans/apply';
   static const String repayLoan = '/loans/:id/repay';
   static const String getLoanHistory = '/loans/history';
 

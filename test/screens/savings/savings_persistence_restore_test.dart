@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:adepa_teachers/core/providers/app_providers.dart';
 import 'package:adepa_teachers/screens/savings/savings_model.dart';
 import 'package:adepa_teachers/screens/savings/savings_screen.dart';
 
@@ -26,40 +27,47 @@ void main() {
       'user_created_savings_goals_v1': [jsonEncode(persistedGoal.toJson())],
     });
 
-    GoRouter buildRouter() {
-      return GoRouter(
-        initialLocation: '/savings',
-        routes: [
-          GoRoute(
-            path: '/savings',
-            builder: (context, state) => const SavingsScreen(),
-          ),
-          GoRoute(
-            path: '/savings/:id',
-            builder: (context, state) => const Scaffold(body: Text('Detail')),
-          ),
-          GoRoute(
-            path: '/savings/types',
-            builder: (context, state) => const Scaffold(body: Text('Types')),
-          ),
-          GoRoute(
-            path: '/savings/create',
-            builder: (context, state) => const Scaffold(body: Text('Create')),
-          ),
-        ],
-      );
-    }
+    GoRouter buildRouter() => GoRouter(
+      initialLocation: '/savings',
+      routes: [
+        GoRoute(
+          path: '/savings',
+          builder: (context, state) => const SavingsScreen(),
+        ),
+        GoRoute(
+          path: '/savings/:id',
+          builder: (context, state) => const Scaffold(body: Text('Detail')),
+        ),
+        GoRoute(
+          path: '/savings/types',
+          builder: (context, state) => const Scaffold(body: Text('Types')),
+        ),
+        GoRoute(
+          path: '/savings/create',
+          builder: (context, state) => const Scaffold(body: Text('Create')),
+        ),
+      ],
+    );
 
-    await tester.pumpWidget(ProviderScope(child: MaterialApp.router(routerConfig: buildRouter())));
+    Widget buildApp() => ProviderScope(
+      overrides: [
+        savingsProvider.overrideWith((ref) async => <Map<String, dynamic>>[]),
+      ],
+      child: MaterialApp.router(routerConfig: buildRouter()),
+    );
+
+    await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
+    expect(find.text('My Savings Goals'), findsOneWidget);
     expect(find.text('Persisted Goal 42'), findsOneWidget);
+    expect(find.text('My Savings Accounts'), findsOneWidget);
+    expect(find.text('Account number unavailable'), findsNothing);
 
-    // Simulate screen/app recreation while using the same persisted storage.
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
 
-    await tester.pumpWidget(ProviderScope(child: MaterialApp.router(routerConfig: buildRouter())));
+    await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
     expect(find.text('Persisted Goal 42'), findsOneWidget);

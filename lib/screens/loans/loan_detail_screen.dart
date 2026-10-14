@@ -6,19 +6,70 @@ import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
 import '../../core/providers/app_providers.dart';
 
-class LoanDetailScreen extends ConsumerWidget {
+class LoanDetailScreen extends ConsumerStatefulWidget {
   final String? loanId;
 
   const LoanDetailScreen({this.loanId, super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LoanDetailScreen> createState() => _LoanDetailScreenState();
+}
+
+class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
+  double? _resolvedOutstandingBalance;
+  bool _isLoadingBalance = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOutstandingBalance();
+  }
+
+  Future<void> _loadOutstandingBalance() async {
+    final loans = ref.read(loansProvider).valueOrNull ?? const <Map<String, dynamic>>[];
+    final loanData = loans.firstWhere(
+      (loan) => loan['loan_id']?.toString() == widget.loanId,
+      orElse: () => const <String, dynamic>{},
+    );
+    if (widget.loanId == null || widget.loanId!.trim().isEmpty) return;
+    if (loanData.containsKey('outstanding_balance') ||
+        loanData.containsKey('balance')) {
+      final rawBalance = loanData['outstanding_balance'] ?? loanData['balance'];
+      if (rawBalance is num) {
+        setState(() => _resolvedOutstandingBalance = rawBalance.toDouble());
+      }
+      return;
+    }
+
+    final credentials = ref.read(memberCredentialsProvider);
+    final accountNumber = credentials['account']?.toString().trim();
+    if (accountNumber == null || accountNumber.isEmpty) return;
+
+    setState(() => _isLoadingBalance = true);
+    try {
+      final response = await ref.read(loanServiceProvider).getLoanBalance(
+        accountNumber: accountNumber,
+        loanId: widget.loanId!,
+      );
+      final balance = response['balance'];
+      if (balance is num) {
+        setState(() => _resolvedOutstandingBalance = balance.toDouble());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingBalance = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loansAsync = ref.watch(loansProvider);
     final loans = loansAsync.valueOrNull ?? const <Map<String, dynamic>>[];
     Map<String, dynamic>? loanData;
     for (final loan in loans) {
-      if (loan['loan_id']?.toString() == loanId) {
+      if (loan['loan_id']?.toString() == widget.loanId) {
         loanData = loan;
         break;
       }
@@ -49,7 +100,14 @@ class LoanDetailScreen extends ConsumerWidget {
         ),
       );
     }
-    final displayedLoanId = loanData['loan_id'];
+
+    final effectiveLoanData = {
+      ...loanData,
+      if ((loanData['outstanding_balance'] ?? loanData['balance']) == null &&
+          _resolvedOutstandingBalance != null)
+        'outstanding_balance': _resolvedOutstandingBalance,
+    };
+    final displayedLoanId = effectiveLoanData['loan_id'];
 
     return AppScaffold(
       title: 'Loan Details',
@@ -88,8 +146,20 @@ class LoanDetailScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_isLoadingBalance)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Center(
+                  child: Text(
+                    'Refreshing outstanding balance…',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
             // Hero Card with Loan Summary
-            _LoanHeroCard(loanData: loanData, theme: theme),
+            _LoanHeroCard(loanData: effectiveLoanData, theme: theme),
             const SizedBox(height: 24),
 
             // Action Buttons
@@ -97,15 +167,15 @@ class LoanDetailScreen extends ConsumerWidget {
             const SizedBox(height: 24),
 
             // Loan Summary
-            _LoanSummary(loanData: loanData, theme: theme),
+            _LoanSummary(loanData: effectiveLoanData, theme: theme),
             const SizedBox(height: 24),
 
             // Repayment Progress
-            _RepaymentProgress(loanData: loanData, theme: theme),
+            _RepaymentProgress(loanData: effectiveLoanData, theme: theme),
             const SizedBox(height: 24),
 
             // Loan Details
-            _LoanDetailsSection(loanData: loanData, theme: theme),
+            _LoanDetailsSection(loanData: effectiveLoanData, theme: theme),
             const SizedBox(height: 24),
 
             // Payment History

@@ -44,6 +44,62 @@ class SavingsDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
+  double? _resolvedBalance;
+  bool _isLoadingBalance = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshMissingBalance();
+  }
+
+  Future<void> _refreshMissingBalance() async {
+    final records = ref.read(savingsProvider).valueOrNull ?? const [];
+    final record = records.firstWhere(
+      (item) =>
+          (item['savings_id'] ?? item['id'] ?? item['product_id'])
+              ?.toString()
+              .trim() ==
+          widget.savingsId,
+      orElse: () => const <String, dynamic>{},
+    );
+    if (widget.savingsId.trim().isEmpty) return;
+
+    final rawBalance =
+        record['balance'] ?? record['current_balance'] ?? record['amount'];
+    if (rawBalance != null) {
+      final amount = _toAmount(rawBalance);
+      if (mounted) {
+        setState(() => _resolvedBalance = amount);
+      }
+      return;
+    }
+
+    final productId =
+        (record['savings_id'] ?? record['id'] ?? record['product_id'])
+            ?.toString()
+            .trim();
+    if (productId == null || productId.isEmpty) return;
+
+    if (mounted) {
+      setState(() => _isLoadingBalance = true);
+    }
+
+    try {
+      final response = await ref.read(savingsServiceProvider).getSavingsBalance(
+        productId: productId,
+      );
+      final balance = response['balance'];
+      if (balance is num && mounted) {
+        setState(() => _resolvedBalance = balance.toDouble());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingBalance = false);
+      }
+    }
+  }
+
   void _showLocalGoalMessage() {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -273,7 +329,7 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final liveSavings = widget.savings ?? _findLiveSavings();
-    final savings = liveSavings != null
+    final baseSavings = liveSavings != null
         ? _fromSavedGoal(liveSavings)
         : _SavingsDetailData(
             id: widget.savingsId,
@@ -287,6 +343,18 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
             transactions: const [],
             isRemote: false,
           );
+    final savings = _SavingsDetailData(
+      id: baseSavings.id,
+      title: baseSavings.title,
+      icon: baseSavings.icon,
+      accent: baseSavings.accent,
+      balance: _resolvedBalance ?? baseSavings.balance,
+      interest: baseSavings.interest,
+      monthlyDeposit: baseSavings.monthlyDeposit,
+      createdLabel: baseSavings.createdLabel,
+      transactions: baseSavings.transactions,
+      isRemote: baseSavings.isRemote,
+    );
     final profile = ref.watch(userProfileProvider).valueOrNull;
     final accountNumber =
         (profile?['account_number'] ??
@@ -308,6 +376,18 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (_isLoadingBalance)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Center(
+                    child: Text(
+                      'Refreshing balance…',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: const Color(0xFF2E8B57),
+                      ),
+                    ),
+                  ),
+                ),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),

@@ -96,6 +96,14 @@ class PaymentsHubScreen extends StatelessWidget {
               physics: const NeverScrollableScrollPhysics(),
               children: [
                 _PaymentGridTile(
+                  icon: Icons.call_received_rounded,
+                  iconColor: const Color(0xFF2E8B57),
+                  tint: const Color(0xFFEAF5EE),
+                  title: 'Receive Money',
+                  subtitle: 'Receive MoMo payments\ninto savings',
+                  route: '/payment/receive',
+                ),
+                _PaymentGridTile(
                   icon: Icons.phone_rounded,
                   iconColor: const Color(0xFF2E8B57),
                   tint: const Color(0xFFEAF5EE),

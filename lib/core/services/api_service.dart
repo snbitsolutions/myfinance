@@ -334,15 +334,15 @@ class AuthService extends BaseService {
     required String accountNumber,
     required String phoneNumber,
     required String birthDate,
-    required String imeiNumber,
+    required int imeiNumber,
     required String phoneMake,
   }) async {
     return handleApiCall(() async {
       final request = <String, dynamic>{
         'acc_number': int.tryParse(accountNumber) ?? accountNumber,
-        'phone_number': int.tryParse(phoneNumber) ?? phoneNumber,
+        'phone_number': int.parse(_toInternationalPhoneNumber(phoneNumber)),
         'birth_date': birthDate,
-        'imei_number': int.tryParse(imeiNumber) ?? imeiNumber,
+        'imei_number': imeiNumber,
         'phone_make': phoneMake,
         's_key': AppConstants.defaultMobileApiSKey,
       };
@@ -373,7 +373,7 @@ class AuthService extends BaseService {
     required int sharesProduct,
     required String password,
     required String transactionPin,
-    required String imeiNumber,
+    required int imeiNumber,
     required String phoneMake,
   }) async {
     return handleApiCall(() async {
@@ -390,7 +390,7 @@ class AuthService extends BaseService {
         // Passwords must remain strings even when the user enters only digits.
         'password': password,
         'trans_pin': int.tryParse(transactionPin) ?? transactionPin,
-        'imei_number': int.tryParse(imeiNumber) ?? imeiNumber,
+        'imei_number': imeiNumber,
         'phone_make': phoneMake,
         's_key': AppConstants.defaultMobileApiSKey,
       };
@@ -417,24 +417,27 @@ class AuthService extends BaseService {
     });
   }
 
-  /// Login with a phone number and password.
+  /// Login with a phone number and PIN. The API names the PIN `password`.
   Future<Map<String, dynamic>> login({
     required String phoneNumber,
-    required String password,
+    required String pin,
+    required int imeiNumber,
   }) async {
     return handleApiCall(() async {
       final normalizedPhone = _toInternationalPhoneNumber(phoneNumber);
-      if (normalizedPhone.length < 9 || password.trim().isEmpty) {
+      final normalizedPin = pin.trim();
+      if (normalizedPhone.length < 9 ||
+          !RegExp(r'^\d{4}$').hasMatch(normalizedPin)) {
         throw ValidationException(
-          message: 'Enter a valid phone number and password.',
+          message: 'Enter a valid phone number and 4-digit PIN.',
         );
       }
 
       final request = <String, dynamic>{
         'phone_number': int.parse(normalizedPhone),
-        'password': password,
+        'password': int.parse(normalizedPin),
         's_key': AppConstants.defaultMobileApiSKey,
-        'imei_number': 100200300,
+        'imei_number': imeiNumber,
       };
 
       AppLogger.logApiRequest('POST', ApiEndpoints.login, request);
@@ -450,6 +453,24 @@ class AuthService extends BaseService {
         statusCode: response.statusCode,
       );
 
+      if (hasExplicitFailure(data)) {
+        final message =
+            data['message']?.toString() ??
+            AppConstants.invalidCredentialsMessage;
+        final normalizedMessage = message.toLowerCase();
+        final isInvalidPin =
+            normalizedMessage.contains('invalid pin') ||
+            normalizedMessage.contains('incorrect pin') ||
+            normalizedMessage.contains('wrong pin') ||
+            normalizedMessage.contains('invalid credential') ||
+            normalizedMessage.contains('invalid password') ||
+            normalizedMessage.contains('incorrect password');
+        throw AuthException(
+          message: message,
+          code: isInvalidPin ? AppConstants.invalidCredentialsErrorCode : null,
+        );
+      }
+
       return data;
     });
   }
@@ -458,6 +479,7 @@ class AuthService extends BaseService {
   Future<Map<String, dynamic>> loginWithPhonePin({
     required String phoneNumber,
     required String pin,
+    required int imeiNumber,
   }) async {
     return handleApiCall(() async {
       final normalizedPhone = phoneNumber.replaceAll(RegExp(r'\D'), '');
@@ -473,7 +495,7 @@ class AuthService extends BaseService {
         'password': int.tryParse(normalizedPin) ?? normalizedPin,
         'phone_number': int.tryParse(normalizedPhone) ?? normalizedPhone,
         's_key': AppConstants.defaultMobileApiSKey,
-        'imei_number': 100200300,
+        'imei_number': imeiNumber,
       };
 
       AppLogger.logApiRequest('POST', ApiEndpoints.login, request);
@@ -532,6 +554,7 @@ class AuthService extends BaseService {
   Future<Map<String, dynamic>> setPin({
     required String userId,
     required String pin,
+    required int imeiNumber,
     Map<String, dynamic>? deviceContext,
   }) async {
     return handleApiCall(() async {
@@ -543,7 +566,7 @@ class AuthService extends BaseService {
 
       final request = {
         'pin': int.tryParse(pin) ?? pin,
-        'imei_number': 100200300,
+        'imei_number': imeiNumber,
         'account_number': int.tryParse(userId) ?? userId,
         's_key': AppConstants.defaultMobileApiSKey,
       };
@@ -568,6 +591,7 @@ class AuthService extends BaseService {
     required String accountNumber,
     required String currentPin,
     required String newPin,
+    required int imeiNumber,
   }) async {
     return handleApiCall(() async {
       if (currentPin.length != AppConstants.pinLength ||
@@ -581,7 +605,7 @@ class AuthService extends BaseService {
         'current_pin': int.tryParse(currentPin) ?? currentPin,
         'new_pin': int.tryParse(newPin) ?? newPin,
         'account_number': int.tryParse(accountNumber) ?? accountNumber,
-        'imei_number': 100200300,
+        'imei_number': imeiNumber,
         's_key': AppConstants.defaultMobileApiSKey,
       };
       AppLogger.logApiRequest('POST', ApiEndpoints.changePin, request);
@@ -684,11 +708,12 @@ class LoanService extends BaseService {
     required String phoneNumber,
     required String accountNumber,
     required String pin,
+    required int imeiNumber,
   }) async {
     return handleApiCall(() async {
       final request = {
         'account_number': int.tryParse(accountNumber) ?? accountNumber,
-        'imei_number': 100200300,
+        'imei_number': imeiNumber,
         's_key': AppConstants.defaultMobileApiSKey,
       };
       AppLogger.logApiRequest('POST', ApiEndpoints.getLoans, request);
@@ -759,6 +784,55 @@ class LoanService extends BaseService {
     });
   }
 
+  /// Get current outstanding loan balance for a member.
+  Future<Map<String, dynamic>> getLoanBalance({
+    required String accountNumber,
+    String? loanId,
+  }) async {
+    return handleApiCall(() async {
+      final request = {
+        'account_number': accountNumber.trim(),
+        if (loanId != null && loanId.trim().isNotEmpty) 'loan_id': loanId,
+        's_key': AppConstants.defaultMobileApiSKey,
+      };
+      AppLogger.logApiRequest('POST', ApiEndpoints.getLoanBalance, request);
+
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.getLoanBalance,
+        data: request,
+      );
+
+      final data = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse('POST', ApiEndpoints.getLoanBalance, data);
+
+      if (hasExplicitFailure(data)) {
+        throw GenericException(
+          message:
+              data['message']?.toString() ??
+              'Unable to retrieve the loan balance.',
+        );
+      }
+
+      final outstanding =
+          data['balance'] ??
+          data['outstanding_balance'] ??
+          data['loan_balance'] ??
+          data['current_balance'] ??
+          data['total_balance'] ??
+          (data['data'] is Map
+              ? (data['data'] as Map)['balance'] ??
+                    (data['data'] as Map)['outstanding_balance'] ??
+                    (data['data'] as Map)['loan_balance']
+              : null);
+
+      return {
+        'status': 'success',
+        'balance': _toDoubleOrNull(outstanding),
+        'raw': data,
+      };
+    });
+  }
+
   /// Get loan detail
   Future<Map<String, dynamic>> getLoanDetail({required String loanId}) async {
     return handleApiCall(() async {
@@ -773,18 +847,19 @@ class LoanService extends BaseService {
 
   /// Apply for a loan
   Future<Map<String, dynamic>> applyLoan({
-    required String userId,
+    required String accountNumber,
     required double amount,
     required String purpose,
-    required String repaymentPlan,
+    required int imeiNumber,
+    int productId = 1,
   }) async {
     return handleApiCall(() async {
-      AppLogger.logApiRequest('POST', ApiEndpoints.applyLoan, {
-        'user_id': userId,
-        'amount': amount,
-        'purpose': purpose,
-        'repayment_plan': repaymentPlan,
-      });
+      final normalizedAccountNumber = accountNumber.trim();
+      final normalizedPurpose = purpose.trim();
+
+      if (normalizedAccountNumber.isEmpty) {
+        throw ValidationException(message: 'Account number is required.');
+      }
       if (amount < AppConstants.loanMinAmount ||
           amount > AppConstants.loanMaxAmount) {
         throw ValidationException(
@@ -792,10 +867,49 @@ class LoanService extends BaseService {
               'Loan amount must be between ${AppConstants.loanMinAmount} and ${AppConstants.loanMaxAmount}',
         );
       }
-      throw BackendNotConfiguredException(
-        message:
-            'Loan applications are not available until the backend endpoint contract is configured.',
+      if (normalizedPurpose.isEmpty) {
+        throw ValidationException(message: 'Loan purpose is required.');
+      }
+      if (productId <= 0) {
+        throw ValidationException(message: 'A valid loan product is required.');
+      }
+
+      final request = {
+        'account_number': normalizedAccountNumber,
+        'product_id': productId,
+        'amount': amount,
+        'purpose': normalizedPurpose,
+        'imei_number': imeiNumber,
+        's_key': AppConstants.defaultMobileApiSKey,
+      };
+      AppLogger.logApiRequest('POST', ApiEndpoints.applyLoan, request);
+
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.applyLoan,
+        data: request,
       );
+      if (isBackendEmptyPayload(response.data)) {
+        throw GenericException(
+          message: 'The loan application service returned an empty response.',
+        );
+      }
+
+      final data = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse('POST', ApiEndpoints.applyLoan, data);
+      if (hasExplicitFailure(data)) {
+        throw GenericException(
+          message:
+              data['message']?.toString() ??
+              'Unable to submit your loan application.',
+        );
+      }
+
+      final message = data['message']?.toString().trim() ?? '';
+      return {
+        'status': 'success',
+        if (message.isNotEmpty) 'message': message,
+        'data': data,
+      };
     });
   }
 
@@ -909,11 +1023,12 @@ class SavingsService extends BaseService {
     required String phoneNumber,
     required String accountNumber,
     required String pin,
+    required int imeiNumber,
   }) async {
     return handleApiCall(() async {
       final request = {
         'account_number': int.tryParse(accountNumber) ?? accountNumber,
-        'imei_number': 100200300,
+        'imei_number': imeiNumber,
         's_key': AppConstants.defaultMobileApiSKey,
       };
       AppLogger.logApiRequest(
@@ -1062,10 +1177,8 @@ class SavingsService extends BaseService {
   /// Deposit to savings
   Future<Map<String, dynamic>> depositSavings({
     required String phoneNumber,
-    required String accountNumber,
-    required String pin,
     required double amount,
-    String? savingsId,
+    required String savingsId,
     String channel = 'mtn-gh',
     String username = 'Member',
     String email = '',
@@ -1096,7 +1209,6 @@ class SavingsService extends BaseService {
       final response = await _paymentClient.post<dynamic>(
         ApiEndpoints.depositFunds,
         data: request,
-        options: BaseService.stccuFormOptions,
       );
 
       final raw = response.data;
@@ -1146,6 +1258,7 @@ class SavingsService extends BaseService {
     required String accountNumber,
     required String pin,
     required double amount,
+    required int imeiNumber,
     String? savingsId,
     String channel = 'mtn-gh',
     String username = 'Member',
@@ -1167,7 +1280,7 @@ class SavingsService extends BaseService {
         'username': username,
         'product_id': savingsId,
         's_key': AppConstants.defaultMobileApiSKey,
-        'imei_number': 100200300,
+        'imei_number': imeiNumber,
         'pin': int.tryParse(pin) ?? pin,
         'ClientReference': reference,
       };
@@ -1250,11 +1363,12 @@ class PaymentService extends BaseService {
 
   Future<Map<String, dynamic>> transferToSelf({
     required String accountNumber,
+    required int imeiNumber,
   }) async {
     return handleApiCall(() async {
       final request = {
         'account_number': int.tryParse(accountNumber) ?? accountNumber,
-        'imei_number': 100200300,
+        'imei_number': imeiNumber,
         's_key': AppConstants.defaultMobileApiSKey,
       };
       AppLogger.logApiRequest('POST', ApiEndpoints.transferToSelf, request);
@@ -1282,7 +1396,7 @@ class PaymentService extends BaseService {
     String email = '',
   }) async {
     return _submitMobilePurchase(
-      description: 'Airtime',
+      description: 'Edeposit',
       phoneNumber: phoneNumber,
       channel: channel,
       amount: amount,
@@ -1351,7 +1465,11 @@ class PaymentService extends BaseService {
           response.statusCode! >= 200 &&
           response.statusCode! < 300 &&
           isBackendEmptyPayload(response.data)) {
-        throw GenericException(message: emptyResponseMessage);
+        return {
+          'status': 'success',
+          'is_pending': true,
+          'message': emptyResponseMessage,
+        };
       }
       final data = normalizeResponsePayload(response.data);
       AppLogger.logApiResponse('POST', endpoint, data);
@@ -1395,11 +1513,12 @@ abstract class _PortfolioService extends BaseService {
     required String phoneNumber,
     required String accountNumber,
     required String pin,
+    required int imeiNumber,
   }) async {
     return handleApiCall(() async {
       final request = {
         'account_number': accountNumber,
-        'imei_number': 100200300,
+        'imei_number': imeiNumber,
         's_key': AppConstants.defaultMobileApiSKey,
       };
       AppLogger.logApiRequest('POST', endpoint, request);
@@ -1443,6 +1562,7 @@ class SharesService extends _PortfolioService {
     required String phoneNumber,
     required String accountNumber,
     required String pin,
+    required int imeiNumber,
   }) {
     return fetchPortfolio(
       endpoint: ApiEndpoints.getShares,
@@ -1450,6 +1570,7 @@ class SharesService extends _PortfolioService {
       phoneNumber: phoneNumber,
       accountNumber: accountNumber,
       pin: pin,
+      imeiNumber: imeiNumber,
     );
   }
 }

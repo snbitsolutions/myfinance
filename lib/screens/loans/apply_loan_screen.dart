@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/color_ext.dart';
+import '../../core/exceptions/app_exceptions.dart';
 import '../../core/layout/responsive.dart';
 import '../../core/modern_input.dart';
+import '../../core/providers/app_providers.dart';
+import 'loan_application_provider.dart';
 
 class ApplyLoanScreen extends ConsumerStatefulWidget {
   const ApplyLoanScreen({super.key});
@@ -21,6 +26,18 @@ class _ApplyLoanScreenState extends ConsumerState<ApplyLoanScreen> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _purposeController = TextEditingController();
   String _repaymentPlan = '3 months';
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final draft = ref.read(loanApplicationProvider);
+    if (draft != null) {
+      _amountController.text = draft.amount.toStringAsFixed(2);
+      _purposeController.text = draft.purpose;
+      _repaymentPlan = draft.repaymentPlan;
+    }
+  }
 
   void _applyQuickAmount(int amount) {
     final text = amount.toString();
@@ -41,12 +58,62 @@ class _ApplyLoanScreenState extends ConsumerState<ApplyLoanScreen> {
   String? get _amountError {
     if (_amountController.text.trim().isEmpty) return null;
     if (_loanAmount <= 0) return 'Enter a valid loan amount.';
-    if (_loanAmount < 100) return 'Minimum loan amount is GH₵100.';
+    if (_loanAmount < AppConstants.loanMinAmount) {
+      return 'Minimum loan amount is GH₵${AppConstants.loanMinAmount.toStringAsFixed(0)}.';
+    }
+    if (_loanAmount > AppConstants.loanMaxAmount) {
+      return 'Maximum loan amount is GH₵${AppConstants.loanMaxAmount.toStringAsFixed(0)}.';
+    }
     return null;
   }
 
-  bool get _canSubmit {
-    return false;
+  bool get _canSubmit =>
+      _loanAmount >= AppConstants.loanMinAmount &&
+      _loanAmount <= AppConstants.loanMaxAmount &&
+      _purposeController.text.trim().isNotEmpty;
+
+  Future<void> _submitApplication() async {
+    if (!_canSubmit || _isSubmitting) return;
+    final auth = ref.read(authProvider);
+    final accountNumber = auth.userId?.trim() ?? '';
+    if (!auth.isAuthenticated || accountNumber.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sign in again before submitting a loan application.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final notifier = ref.read(loanApplicationProvider.notifier);
+      await notifier.prepareDraft(
+        amount: _loanAmount,
+        purpose: _purposeController.text,
+        repaymentPlan: _repaymentPlan,
+      );
+      final result = await ref
+          .read(loanServiceProvider)
+          .applyLoan(
+            accountNumber: accountNumber,
+            amount: _loanAmount,
+            purpose: _purposeController.text,
+            imeiNumber: await ref
+                .read(deviceIdentityServiceProvider)
+                .getBackendDeviceNumber(),
+          );
+      await notifier.markSubmitted(message: result['message']?.toString());
+      if (mounted) context.go('/loan-status');
+    } on AppException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -137,7 +204,7 @@ class _ApplyLoanScreenState extends ConsumerState<ApplyLoanScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Apply in minutes and receive a response quickly.',
+                            'Prepare your loan details before submission.',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: Colors.white.withValues(alpha: 0.90),
                             ),
@@ -173,8 +240,8 @@ class _ApplyLoanScreenState extends ConsumerState<ApplyLoanScreen> {
                     children: [
                       const Expanded(
                         child: _LoanHeroMetric(
-                          value: 'Unavailable',
-                          label: 'Applications',
+                          value: 'Draft',
+                          label: 'Preparation',
                         ),
                       ),
                       Container(
@@ -184,8 +251,8 @@ class _ApplyLoanScreenState extends ConsumerState<ApplyLoanScreen> {
                       ),
                       const Expanded(
                         child: _LoanHeroMetric(
-                          value: 'Pending',
-                          label: 'Backend setup',
+                          value: 'Not sent',
+                          label: 'Submission',
                         ),
                       ),
                     ],
@@ -199,12 +266,12 @@ class _ApplyLoanScreenState extends ConsumerState<ApplyLoanScreen> {
                     _LoanInfoChip(
                       theme: theme,
                       icon: Icons.verified_user_outlined,
-                      label: 'Application submission unavailable',
+                      label: 'No application is sent from this screen',
                     ),
                     _LoanInfoChip(
                       theme: theme,
                       icon: Icons.visibility_outlined,
-                      label: 'Terms not configured',
+                      label: 'Final terms are confirmed by the lender',
                     ),
                   ],
                 ),
@@ -242,7 +309,9 @@ class _ApplyLoanScreenState extends ConsumerState<ApplyLoanScreen> {
                   : const [],
             ),
             child: ElevatedButton(
-              onPressed: null,
+              onPressed: _canSubmit && !_isSubmitting
+                  ? _submitApplication
+                  : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.transparent,
                 shadowColor: Colors.transparent,
@@ -250,12 +319,25 @@ class _ApplyLoanScreenState extends ConsumerState<ApplyLoanScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('Applications Unavailable'),
-                  SizedBox(width: 8),
-                  Icon(Icons.info_outline_rounded, size: 18),
+                  if (_isSubmitting) ...[
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Submitting...'),
+                  ] else ...[
+                    const Text('Submit Application'),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.send_rounded, size: 18),
+                  ],
                 ],
               ),
             ),
@@ -273,7 +355,7 @@ class _ApplyLoanScreenState extends ConsumerState<ApplyLoanScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Loan applications are paused until the backend submission contract and official loan terms are available.',
+                  'Enter your requested amount and purpose. Your application will be sent securely for review.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurface.withOpacitySafe(0.68),
                   ),
@@ -340,7 +422,7 @@ class _ApplyLoanScreenState extends ConsumerState<ApplyLoanScreen> {
                 _ApplicationStepRow(
                   theme: theme,
                   step: '3',
-                  title: 'Choose your repayment plan',
+                  title: 'Choose a preferred duration',
                   isComplete: true,
                 ),
                 const SizedBox(height: 6),
@@ -350,7 +432,8 @@ class _ApplyLoanScreenState extends ConsumerState<ApplyLoanScreen> {
                     child: _RepaymentPlanOption(
                       theme: theme,
                       plan: plan,
-                      rate: 'Terms unavailable',
+                      rate:
+                          'Planning preference only — not included in the submitted request',
                       monthlyAmount: null,
                       selected: _repaymentPlan == plan,
                       onTap: () => setState(() => _repaymentPlan = plan),
@@ -362,13 +445,13 @@ class _ApplyLoanScreenState extends ConsumerState<ApplyLoanScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.errorContainer.withValues(alpha: 0.5),
+                    color: theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     'Repayment rates and estimates are not shown because approved terms have not been configured.',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onErrorContainer,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
