@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:adepa_teachers/screens/savings/create_savings_screen.dart';
 import 'package:adepa_teachers/screens/savings/savings_detail_screen.dart';
 import 'package:adepa_teachers/screens/savings/savings_model.dart';
+import 'package:adepa_teachers/screens/savings/savings_storage.dart';
 import 'package:adepa_teachers/core/providers/app_providers.dart';
 
 Widget _detailApp(Savings savings) {
@@ -70,6 +71,57 @@ void main() {
     expect(tester.widget<ElevatedButton>(createButton).onPressed, isNotNull);
 
     expect(tester.widget<ElevatedButton>(createButton).onPressed, isNotNull);
+  });
+
+  testWidgets('creates a local savings goal without a backend call', (
+    tester,
+  ) async {
+    final router = GoRouter(
+      initialLocation: '/create',
+      routes: [
+        GoRoute(
+          path: '/create',
+          builder: (context, state) =>
+              const CreateSavingsScreen(initialType: SavingsType.memberSaving),
+        ),
+        GoRoute(
+          name: 'savings-success',
+          path: '/success',
+          builder: (context, state) => const Scaffold(
+            body: Center(child: Text('Savings Success Placeholder')),
+          ),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(child: MaterialApp.router(routerConfig: router)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'e.g., Emergency Fund'),
+      'Laptop Upgrade Fund',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'e.g., 2000'),
+      '3000',
+    );
+    await tester.pumpAndSettle();
+    final createButton = find.widgetWithText(
+      ElevatedButton,
+      'Create Member Saving Goal',
+    );
+    await tester.ensureVisible(createButton);
+    await tester.pumpAndSettle();
+    await tester.tap(createButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Savings Success Placeholder'), findsOneWidget);
+    final goals = await SavingsStorage.loadGoals();
+    expect(goals, hasLength(1));
+    expect(goals.single.title, 'Laptop Upgrade Fund');
+    expect(goals.single.target, 3000);
   });
 
   testWidgets('invalid targets are blocked before submission', (tester) async {

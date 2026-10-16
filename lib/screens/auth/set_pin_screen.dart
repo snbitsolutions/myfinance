@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/color_ext.dart';
@@ -34,9 +35,11 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
   bool get _isSignInMode => widget.mode == 'signin';
   bool get _isChangeMode => widget.mode == 'change';
 
+  bool _isFourDigitPin(String value) => RegExp(r'^\d{4}$').hasMatch(value);
+
   bool get _canSubmit =>
-      _pinController.text.trim().length == 4 &&
-      (!_isChangeMode || _currentPinController.text.length == 4) &&
+      _isFourDigitPin(_pinController.text.trim()) &&
+      (!_isChangeMode || _isFourDigitPin(_currentPinController.text)) &&
       (_isSignInMode || _pinController.text == _confirmController.text);
 
   bool get _pinMatch =>
@@ -280,6 +283,9 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                                     controller: _currentPinController,
                                     keyboardType: TextInputType.number,
                                     maxLength: 4,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                    ],
                                     obscureText: true,
                                     textAlign: TextAlign.center,
                                     style: theme.textTheme.headlineMedium
@@ -342,6 +348,9 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                                   controller: _pinController,
                                   keyboardType: TextInputType.number,
                                   maxLength: 4,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
                                   obscureText: !_showPin,
                                   textAlign: TextAlign.center,
                                   style: theme.textTheme.headlineMedium
@@ -414,6 +423,9 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                                     controller: _confirmController,
                                     keyboardType: TextInputType.number,
                                     maxLength: 4,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                    ],
                                     obscureText: !_showPin,
                                     textAlign: TextAlign.center,
                                     style: theme.textTheme.headlineMedium

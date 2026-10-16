@@ -62,65 +62,65 @@ void main() {
       });
 
   test('transactions provider rejects an incomplete session', () async {
-      final container = ProviderContainer(
-        overrides: [
-          authProvider.overrideWith(
-            (ref) => AuthNotifier(
-              authService: AuthService(),
-              userService: UserService(),
-              deviceIdentityService: DeviceIdentityService(),
-            ),
+    final container = ProviderContainer(
+      overrides: [
+        authProvider.overrideWith(
+          (ref) => AuthNotifier(
+            authService: AuthService(),
+            userService: UserService(),
+            deviceIdentityService: DeviceIdentityService(),
           ),
-        ],
-      );
-      addTearDown(container.dispose);
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
 
-      await expectLater(
-        container.read(transactionsProvider.future),
-        throwsA(isA<ValidationException>()),
-      );
-    });
+    await expectLater(
+      container.read(transactionsProvider.future),
+      throwsA(isA<ValidationException>()),
+    );
+  });
 
   test('user profile provider rejects an incomplete session', () async {
-      final container = ProviderContainer(
-        overrides: [
-          authProvider.overrideWith(
-            (ref) => AuthNotifier(
-              authService: AuthService(),
-              userService: UserService(),
-              deviceIdentityService: DeviceIdentityService(),
-            ),
+    final container = ProviderContainer(
+      overrides: [
+        authProvider.overrideWith(
+          (ref) => AuthNotifier(
+            authService: AuthService(),
+            userService: UserService(),
+            deviceIdentityService: DeviceIdentityService(),
           ),
-        ],
-      );
-      addTearDown(container.dispose);
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
 
-      await expectLater(
-        container.read(userProfileProvider.future),
-        throwsA(isA<ValidationException>()),
-      );
-    });
+    await expectLater(
+      container.read(userProfileProvider.future),
+      throwsA(isA<ValidationException>()),
+    );
+  });
 
   test('user profile provider does not fabricate debug session data', () async {
-      final container = ProviderContainer(
-        overrides: [
-          authProvider.overrideWith(
-            (ref) => AuthNotifier(
-              authService: AuthService(),
-              userService: ThrowingUserService(),
-              deviceIdentityService: DeviceIdentityService(),
-            ),
+    final container = ProviderContainer(
+      overrides: [
+        authProvider.overrideWith(
+          (ref) => AuthNotifier(
+            authService: AuthService(),
+            userService: ThrowingUserService(),
+            deviceIdentityService: DeviceIdentityService(),
           ),
-          userServiceProvider.overrideWithValue(ThrowingUserService()),
-        ],
-      );
-      addTearDown(container.dispose);
+        ),
+        userServiceProvider.overrideWithValue(ThrowingUserService()),
+      ],
+    );
+    addTearDown(container.dispose);
 
-      await expectLater(
-        container.read(userProfileProvider.future),
-        throwsA(isA<ValidationException>()),
-      );
-    });
+    await expectLater(
+      container.read(userProfileProvider.future),
+      throwsA(isA<ValidationException>()),
+    );
+  });
 
   testWidgets('transactions screen is overflow-safe on small screens', (
     tester,
@@ -163,6 +163,61 @@ void main() {
       await tester.drag(scrollables.first, const Offset(0, -300));
       await tester.pumpAndSettle();
     }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('transactions screen applies the selected statement period', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final currentMonthDate = DateTime(now.year, now.month, 2, 12);
+    final previousMonthDate = DateTime(now.year, now.month - 1, 2, 12);
+    final router = GoRouter(
+      initialLocation: '/transactions',
+      routes: [
+        GoRoute(
+          path: '/transactions',
+          builder: (context, state) => const TransactionsScreen(),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          transactionsProvider.overrideWith(
+            (ref) async => [
+              {
+                'transaction_id': 'current-month',
+                'type': 'credit',
+                'amount': 25,
+                'description': 'Current month transaction',
+                'date': currentMonthDate.toIso8601String(),
+              },
+              {
+                'transaction_id': 'previous-month',
+                'type': 'debit',
+                'amount': 10,
+                'description': 'Previous month transaction',
+                'date': previousMonthDate.toIso8601String(),
+              },
+            ],
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Current month transaction'), findsNWidgets(2));
+    expect(find.text('Previous month transaction'), findsNothing);
+
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('All Time').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Previous month transaction'), findsNWidgets(2));
     expect(tester.takeException(), isNull);
   });
 }

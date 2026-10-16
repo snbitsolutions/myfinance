@@ -553,7 +553,10 @@ class AppRouter {
         ),
         GoRoute(
           path: '/repayment',
-          builder: (context, state) => const RepaymentScreen(),
+          builder: (context, state) {
+            final loanId = state.uri.queryParameters['loanId'];
+            return RepaymentScreen(loanId: loanId);
+          },
         ),
         GoRoute(
           path: '/investments',

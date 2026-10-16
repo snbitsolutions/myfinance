@@ -105,20 +105,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _buildSettingTile(
                       context,
                       icon: Icons.lock,
-                      title: 'PIN',
-                      subtitle: 'Change your PIN',
+                      title: 'PIN / Password',
+                      subtitle: 'Change your 4-digit security PIN',
                       onTap: () => context.go('/set-pin?mode=change'),
-                    ),
-                    Divider(
-                      height: 1,
-                      color: theme.colorScheme.outline.withOpacitySafe(0.2),
-                    ),
-                    _buildSettingTile(
-                      context,
-                      icon: Icons.password,
-                      title: 'Password',
-                      subtitle: 'Unavailable until the API adds support',
-                      onTap: () => _showUnavailablePasswordDialog(context),
                     ),
                     Divider(
                       height: 1,
@@ -691,24 +680,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _showUnavailablePasswordDialog(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Password change unavailable'),
-        content: const Text(
-          'The current customer API does not document a password-change endpoint. Your password was not changed.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showLanguageDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -854,7 +825,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
-
 
   void _showComingSoon(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(

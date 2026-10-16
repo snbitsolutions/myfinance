@@ -862,34 +862,9 @@ class _CreateSavingsScreenState extends ConsumerState<CreateSavingsScreen> {
                             final messenger = ScaffoldMessenger.maybeOf(
                               context,
                             );
-                            final userId =
-                                ref.read(authProvider).userId?.trim() ?? '';
-                            if (userId.isEmpty) {
-                              messenger?.showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Your session is incomplete. Please sign in again.',
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
                             setState(() => _isSubmitting = true);
 
                             try {
-                              await ref
-                                  .read(savingsServiceProvider)
-                                  .createSavings(
-                                    userId: userId,
-                                    name: _nameController.text.trim(),
-                                    targetAmount:
-                                        double.tryParse(
-                                          _targetController.text,
-                                        ) ??
-                                        0,
-                                    autoSave: _autoSave,
-                                  );
-
                               final newSavings = Savings(
                                 id: DateTime.now().millisecondsSinceEpoch
                                     .toString(),

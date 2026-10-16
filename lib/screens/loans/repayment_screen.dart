@@ -6,12 +6,49 @@ import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
 import '../../core/balance_card_shell.dart';
 import '../../core/color_ext.dart';
+import '../../core/exceptions/app_exceptions.dart';
 import '../../core/layout/responsive.dart';
 import '../../core/modern_input.dart';
-import 'loan_application_provider.dart';
+import '../../core/providers/app_providers.dart';
 
 class RepaymentScreen extends ConsumerStatefulWidget {
-  const RepaymentScreen({super.key});
+  const RepaymentScreen({super.key, this.loanId});
+
+  final String? loanId;
+
+  static String? normalizeLoanId(dynamic value) {
+    final text = value?.toString().trim();
+    if (text == null || text.isEmpty) return null;
+
+    final normalized = text.replaceAll(RegExp(r'\s+'), '');
+    return normalized.isEmpty ? null : normalized;
+  }
+
+  static Map<String, dynamic>? findLoanForRepayment(
+    List<Map<String, dynamic>> loans,
+    String? rawLoanId,
+  ) {
+    final normalizedTarget = normalizeLoanId(rawLoanId);
+    if (normalizedTarget == null) return null;
+
+    for (final loan in loans) {
+      final candidates = [
+        loan['loan_id'],
+        loan['loanId'],
+        loan['id'],
+        loan['product_id'],
+        loan['productId'],
+      ];
+
+      for (final candidate in candidates) {
+        if (normalizeLoanId(candidate) == normalizedTarget) {
+          return loan;
+        }
+      }
+    }
+
+    return null;
+  }
 
   @override
   ConsumerState<RepaymentScreen> createState() => _RepaymentScreenState();
@@ -19,8 +56,31 @@ class RepaymentScreen extends ConsumerStatefulWidget {
 
 class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
   static const _momoProvider = 'Mobile Money';
+  static const _repaymentChannel = 'mtn-gh';
+  static const _repaymentProductId = '59656';
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  String? _selectedLoanId;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final routeLoanId = widget.loanId ?? _routeLoanId();
+    if (routeLoanId != null) {
+      _selectedLoanId = routeLoanId;
+    }
+    final phone = ref.read(authProvider).userEmail?.trim() ?? '';
+    _phoneController.text = _toLocalPhone(phone);
+  }
+
+  String? _routeLoanId() {
+    final currentRoute = GoRouterState.of(
+      context,
+    ).uri.queryParameters['loanId'];
+    final trimmed = currentRoute?.trim();
+    return trimmed != null && trimmed.isNotEmpty ? trimmed : null;
+  }
 
   void _setAmount(double value) {
     final text = value.toStringAsFixed(value % 1 == 0 ? 0 : 2);
@@ -56,6 +116,96 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
     return null;
   }
 
+  double _outstandingBalance(Map<String, dynamic> loan) {
+    final value = loan['outstanding_balance'] ?? loan['balance'];
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString().replaceAll(',', '') ?? '') ?? 0;
+  }
+
+  String _toLocalPhone(String value) {
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('233') && digits.length == 12) {
+      return '0${digits.substring(3)}';
+    }
+    return digits;
+  }
+
+  String _toInternationalPhone(String value) {
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('0') && digits.length == 10) {
+      return '233${digits.substring(1)}';
+    }
+    return digits;
+  }
+
+  Future<void> _submitRepayment({
+    required Map<String, dynamic> loan,
+    required double outstanding,
+  }) async {
+    if (_isSubmitting ||
+        _amount <= 0 ||
+        _amount > outstanding ||
+        !_isValidPhone(_phoneController.text)) {
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final profile = ref.read(userProfileProvider).valueOrNull;
+      final result = await ref
+          .read(paymentServiceProvider)
+          .repayLoan(
+            phoneNumber: _toInternationalPhone(_phoneController.text),
+            channel: _repaymentChannel,
+            amount: _amount,
+            currentOutstanding: outstanding,
+            username: profile?['name']?.toString().trim().isNotEmpty == true
+                ? profile!['name'].toString().trim()
+                : 'Member',
+            productId: _repaymentProductId,
+          );
+      if (!mounted) return;
+
+      ref.invalidate(loansProvider);
+      ref.invalidate(transactionsProvider);
+      final isPending = result['is_pending'] == true;
+      final loanName = loan['name']?.toString() ?? 'Loan';
+      context.go(
+        '/payment-success',
+        extra: {
+          'amount': _amount,
+          'processedAt': DateTime.now().toIso8601String(),
+          'reference': result['reference']?.toString(),
+          'title': isPending ? 'Loan Repayment Pending' : 'Loan Repayment',
+          'message': isPending
+              ? 'Your repayment request was submitted and is awaiting provider confirmation.'
+              : result['message']?.toString() ?? 'Repayment submitted.',
+          'primaryActionLabel': 'Back to Loans',
+          'primaryActionRoute': '/loans',
+          'account': loanName,
+          'paymentMethod': _momoProvider,
+          'isPending': isPending,
+        },
+      );
+    } on AppException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to submit the repayment. Check your transaction history before trying again.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
   @override
   void dispose() {
     _amountController.dispose();
@@ -66,14 +216,56 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loansAsync = ref.watch(loansProvider);
+    final loans = loansAsync.valueOrNull ?? const <Map<String, dynamic>>[];
+    final normalizedRequestedLoanId = RepaymentScreen.normalizeLoanId(
+      widget.loanId,
+    );
+    final selectedLoan = normalizedRequestedLoanId == null
+        ? null
+        : RepaymentScreen.findLoanForRepayment(
+            loans,
+            normalizedRequestedLoanId,
+          );
+    final payableLoans = loans
+        .where(
+          (loan) =>
+              (loan['loan_id']?.toString().trim().isNotEmpty ?? false) &&
+              _outstandingBalance(loan) > 0,
+        )
+        .toList();
+    final preferredLoanId =
+        normalizedRequestedLoanId ??
+        RepaymentScreen.normalizeLoanId(_selectedLoanId);
+    Map<String, dynamic>? loan;
+    if (payableLoans.isNotEmpty) {
+      if (preferredLoanId == null) {
+        loan = payableLoans.first;
+      } else {
+        for (final item in payableLoans) {
+          if (RepaymentScreen.normalizeLoanId(item['loan_id']) ==
+              preferredLoanId) {
+            loan = item;
+            break;
+          }
+        }
+
+        if (loan == null && selectedLoan != null) {
+          loan = selectedLoan;
+        }
+      }
+    }
     final amt = _amount;
-    // Local application drafts are not backend loan records and cannot be
-    // used as repayment identifiers.
-    final LoanApplicationState? loan = null;
-    const outstanding = 0.0;
+    final outstanding = loan == null ? 0.0 : _outstandingBalance(loan);
     final amountError = _amountError(outstanding);
     final phoneText = _phoneController.text.trim();
     final showPhoneError = phoneText.isNotEmpty && !_isValidPhone(phoneText);
+    final canSubmit =
+        loan != null &&
+        amt > 0 &&
+        amt <= outstanding &&
+        _isValidPhone(phoneText) &&
+        !_isSubmitting;
 
     return AppScaffold(
       title: 'Repay Loan',
@@ -81,6 +273,23 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isTablet = constraints.maxWidth >= Responsive.medium;
+
+          if (loansAsync.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (loansAsync.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'Unable to load your loans. Please try again before making a repayment.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ),
+            );
+          }
 
           final noLoanContent = SingleChildScrollView(
             padding: const EdgeInsets.all(16),
@@ -145,6 +354,27 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
+                if (payableLoans.length > 1) ...[
+                  DropdownButtonFormField<String>(
+                    initialValue: loan['loan_id'].toString(),
+                    decoration: const InputDecoration(
+                      labelText: 'Loan account',
+                    ),
+                    items: payableLoans
+                        .map(
+                          (item) => DropdownMenuItem<String>(
+                            value: item['loan_id'].toString(),
+                            child: Text(item['name']?.toString() ?? 'Loan'),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) => setState(() {
+                      _selectedLoanId = value;
+                      _amountController.clear();
+                    }),
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 BalanceCardShell(
                   gradientColors: const [Color(0xFFB86A14), Color(0xFFD98D1F)],
                   shadowColor: const Color(0x33B86A14),
@@ -205,7 +435,7 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Text(
-                          'Plan: ${loan.repaymentPlan}',
+                          'Loan account: ${loan['name']?.toString() ?? 'Loan'}',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
@@ -363,10 +593,10 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
                                 style: theme.textTheme.bodySmall,
                               ),
                               Text(
-                                'Unavailable',
+                                'No separate fee',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.error,
+                                  color: theme.colorScheme.primary,
                                 ),
                               ),
                             ],
@@ -391,7 +621,7 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
                                     style: theme.textTheme.bodyMedium,
                                   ),
                                   Text(
-                                    'Unavailable',
+                                    'GH₵${amt.toStringAsFixed(2)}',
                                     style: theme.textTheme.titleMedium
                                         ?.copyWith(
                                           color: theme.colorScheme.primary,
@@ -465,9 +695,22 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
                   width: double.infinity,
                   height: 52,
                   child: FilledButton.icon(
-                    onPressed: null,
-                    icon: const Icon(Icons.info_outline_rounded),
-                    label: const Text('Repayment unavailable'),
+                    onPressed: canSubmit
+                        ? () => _submitRepayment(
+                            loan: loan!,
+                            outstanding: outstanding,
+                          )
+                        : null,
+                    icon: _isSubmitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.payments_outlined),
+                    label: Text(
+                      _isSubmitting ? 'Submitting...' : 'Submit Repayment',
+                    ),
                   ),
                 ),
               ],

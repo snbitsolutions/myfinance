@@ -26,7 +26,8 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
   }
 
   Future<void> _loadOutstandingBalance() async {
-    final loans = ref.read(loansProvider).valueOrNull ?? const <Map<String, dynamic>>[];
+    final loans =
+        ref.read(loansProvider).valueOrNull ?? const <Map<String, dynamic>>[];
     final loanData = loans.firstWhere(
       (loan) => loan['loan_id']?.toString() == widget.loanId,
       orElse: () => const <String, dynamic>{},
@@ -47,10 +48,9 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
 
     setState(() => _isLoadingBalance = true);
     try {
-      final response = await ref.read(loanServiceProvider).getLoanBalance(
-        accountNumber: accountNumber,
-        loanId: widget.loanId!,
-      );
+      final response = await ref
+          .read(loanServiceProvider)
+          .getLoanBalance(accountNumber: accountNumber, loanId: widget.loanId!);
       final balance = response['balance'];
       if (balance is num) {
         setState(() => _resolvedOutstandingBalance = balance.toDouble());
@@ -163,7 +163,10 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
             const SizedBox(height: 24),
 
             // Action Buttons
-            _ActionButtons(theme: theme),
+            _ActionButtons(
+              theme: theme,
+              loanId: displayedLoanId?.toString() ?? '',
+            ),
             const SizedBox(height: 24),
 
             // Loan Summary
@@ -364,8 +367,9 @@ class _LoanHeroCard extends StatelessWidget {
 
 class _ActionButtons extends StatelessWidget {
   final ThemeData theme;
+  final String loanId;
 
-  const _ActionButtons({required this.theme});
+  const _ActionButtons({required this.theme, required this.loanId});
 
   @override
   Widget build(BuildContext context) {
@@ -385,7 +389,9 @@ class _ActionButtons extends StatelessWidget {
                 icon: actions[0].$2,
                 label: actions[0].$1,
                 theme: theme,
-                onTap: () => context.go('/repayment'),
+                onTap: () => context.go(
+                  '/repayment?loanId=${Uri.encodeComponent(loanId)}',
+                ),
               ),
             ),
             const SizedBox(width: 12),

@@ -594,8 +594,8 @@ class AuthService extends BaseService {
     required int imeiNumber,
   }) async {
     return handleApiCall(() async {
-      if (currentPin.length != AppConstants.pinLength ||
-          newPin.length != AppConstants.pinLength) {
+      if (!RegExp(r'^\d{4}$').hasMatch(currentPin) ||
+          !RegExp(r'^\d{4}$').hasMatch(newPin)) {
         throw ValidationException(
           message: 'PIN must be ${AppConstants.pinLength} digits',
         );
@@ -1360,6 +1360,88 @@ class ProductCatalogService extends BaseService {
 
 class PaymentService extends BaseService {
   final HttpClient _httpClient = HttpClient.paymentInstance;
+
+  Future<Map<String, dynamic>> repayLoan({
+    required String phoneNumber,
+    required String channel,
+    required double amount,
+    required double currentOutstanding,
+    required String username,
+    required String productId,
+    String email = '',
+  }) async {
+    return handleApiCall(() async {
+      if (amount <= 0) {
+        throw ValidationException(message: 'Amount must be greater than zero');
+      }
+      if (amount > currentOutstanding) {
+        throw ValidationException(
+          message: 'Amount cannot exceed the outstanding balance.',
+        );
+      }
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final reference = 'ATCCU-LR-${timestamp.toRadixString(36).toUpperCase()}';
+      final request = {
+        'phone_number': phoneNumber,
+        'channel': channel,
+        'amount': amount,
+        'description': 'Edeposit',
+        'email': email,
+        'username': username,
+        'product_id': productId,
+        's_key': AppConstants.defaultMobileApiSKey,
+        'ExternalTransactionId': timestamp.toString(),
+        'ClientReference': reference,
+      };
+      AppLogger.logApiRequest('POST', ApiEndpoints.depositFunds, request);
+
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.depositFunds,
+        data: request,
+      );
+
+      if (response.statusCode != null &&
+          response.statusCode! >= 200 &&
+          response.statusCode! < 300 &&
+          isBackendEmptyPayload(response.data)) {
+        return {
+          'status': 'success',
+          'is_pending': true,
+          'message': 'Loan repayment request submitted for confirmation.',
+          'transaction_id': reference,
+          'reference': reference,
+        };
+      }
+
+      final data = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse(
+        'POST',
+        ApiEndpoints.depositFunds,
+        data,
+        statusCode: response.statusCode,
+      );
+      if (hasExplicitFailure(data) ||
+          !AuthSession.isSuccessStatus(data['status'])) {
+        throw GenericException(
+          message: data['message']?.toString() ?? 'Loan repayment failed.',
+        );
+      }
+
+      final transactionId =
+          data['transaction_id'] ??
+          data['transactionId'] ??
+          data['reference'] ??
+          reference;
+      return {
+        ...data,
+        'status': 'success',
+        'is_pending': false,
+        'transaction_id': transactionId.toString(),
+        'reference': transactionId.toString(),
+      };
+    });
+  }
 
   Future<Map<String, dynamic>> transferToSelf({
     required String accountNumber,

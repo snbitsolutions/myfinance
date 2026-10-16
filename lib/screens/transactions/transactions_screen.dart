@@ -57,9 +57,12 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         : _normalizeApiTransactions(
             liveTransactionsAsync.valueOrNull ?? const [],
           );
+    final periodTransactions = allTransactions
+        .where((tx) => _isWithinSelectedPeriod(tx.date, DateTime.now()))
+        .toList();
 
     // Filter transactions
-    final transactions = allTransactions.where((tx) {
+    final transactions = periodTransactions.where((tx) {
       // Filter by type
       if (_selectedFilter == 'All') {
         // include all
@@ -75,14 +78,18 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     }).toList();
 
     // Calculate totals
-    final totalIncome = allTransactions
+    final totalIncome = periodTransactions
         .where((tx) => tx.amount != null && tx.type == TransactionType.deposit)
         .fold<double>(0, (sum, tx) => sum + (tx.amount ?? 0));
-    final totalExpense = allTransactions
-        .where((tx) => tx.amount != null && tx.type == TransactionType.withdrawal)
+    final totalExpense = periodTransactions
+        .where(
+          (tx) => tx.amount != null && tx.type == TransactionType.withdrawal,
+        )
         .fold<double>(0, (sum, tx) => sum + (tx.amount ?? 0));
-    final totalRepayment = allTransactions
-        .where((tx) => tx.amount != null && tx.type == TransactionType.repayment)
+    final totalRepayment = periodTransactions
+        .where(
+          (tx) => tx.amount != null && tx.type == TransactionType.repayment,
+        )
         .fold<double>(0, (sum, tx) => sum + (tx.amount ?? 0));
     final netBalance = totalIncome - totalExpense - totalRepayment;
 
@@ -526,8 +533,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
           final type = switch (typeStr) {
             'credit' => TransactionType.deposit,
             'repayment' => TransactionType.repayment,
-            'debit' || 'withdraw' || 'withdrawal' =>
-              TransactionType.withdrawal,
+            'debit' || 'withdraw' || 'withdrawal' => TransactionType.withdrawal,
             _ => TransactionType.unknown,
           };
           final amount =
@@ -553,6 +559,35 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         })
         .whereType<AppTransaction>()
         .toList();
+  }
+
+  bool _isWithinSelectedPeriod(DateTime date, DateTime now) {
+    final localDate = date.toLocal();
+    final transactionDay = DateTime(
+      localDate.year,
+      localDate.month,
+      localDate.day,
+    );
+    final today = DateTime(now.year, now.month, now.day);
+
+    return switch (_selectedPeriod) {
+      'Today' => transactionDay == today,
+      'This Week' =>
+        !transactionDay.isBefore(
+              today.subtract(Duration(days: today.weekday - 1)),
+            ) &&
+            transactionDay.isBefore(
+              today
+                  .subtract(Duration(days: today.weekday - 1))
+                  .add(const Duration(days: 7)),
+            ),
+      'This Month' =>
+        localDate.year == now.year && localDate.month == now.month,
+      'Last Month' =>
+        localDate.year == DateTime(now.year, now.month - 1).year &&
+            localDate.month == DateTime(now.year, now.month - 1).month,
+      _ => true,
+    };
   }
 
   List<AppTransaction> _buildSavingsTransactions(
@@ -765,7 +800,11 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     final isDebit = transaction.type == TransactionType.withdrawal;
     final amountLabel = transaction.amount == null
         ? 'GH₵ —'
-        : '${isCredit ? '+' : isDebit || isRepayment ? '-' : ''}GH₵${transaction.amount!.toStringAsFixed(2)}';
+        : '${isCredit
+              ? '+'
+              : isDebit || isRepayment
+              ? '-'
+              : ''}GH₵${transaction.amount!.toStringAsFixed(2)}';
 
     Color getColor() {
       if (isCredit) return Colors.green;
@@ -908,7 +947,11 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     final isDebit = transaction.type == TransactionType.withdrawal;
     final amountLabel = transaction.amount == null
         ? 'GH₵ —'
-        : '${isCredit ? '+' : isDebit || isRepayment ? '-' : ''}GH₵${transaction.amount!.toStringAsFixed(2)}';
+        : '${isCredit
+              ? '+'
+              : isDebit || isRepayment
+              ? '-'
+              : ''}GH₵${transaction.amount!.toStringAsFixed(2)}';
 
     showModalBottomSheet(
       context: context,
