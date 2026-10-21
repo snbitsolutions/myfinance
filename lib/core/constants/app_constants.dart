@@ -68,13 +68,13 @@ class AppConstants {
 
   // Auth Messages
   static const String invalidCredentialsMessage =
-      'Invalid phone number or PIN.';
+      'Invalid phone number or password.';
   static const String invalidCredentialsErrorCode = 'invalid_credentials';
   static const int maxFailedLoginAttempts = 3;
   static const String loginAttemptsLockedMessage =
       'Sign-in is blocked on this device for this phone number after too many '
-      'incorrect PIN attempts. Please contact your financial institution to '
-      'reset your PIN. The app cannot reset your PIN.';
+      'incorrect password attempts. Please contact your financial institution '
+      'to reset your password.';
   static const String userNotFoundMessage = 'User account not found.';
   static const String accountLockedMessage =
       'Account is locked. Please contact support.';
@@ -190,6 +190,8 @@ class ApiEndpoints {
   static const String getBranches = '/getBranch';
   static const String getSavingsProductsList =
       '$mobileApiBaseUrl/getMemSavings';
+  static const String getFixedDeposits =
+      '$mobileApiBaseUrl/getMemFixedDeposits';
   static const String getSavingsBalance = '$mobileApiBaseUrl/getSavingsBalance';
   static const String getLoanBalance = '$mobileApiBaseUrl/getLoanBalance';
   static const String getLoanProductsList = '$mobileApiBaseUrl/getLoanProducts';

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,12 +24,12 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _pinController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   bool _showSnbReveal = false;
   int _snbTapCount = 0;
   bool _isSubmitting = false;
   bool _biometricEnabled = false;
-  bool _obscurePin = true;
+  bool _obscurePassword = true;
   int _failedLoginAttempts = 0;
   final _biometricAuthService = BiometricAuthService();
   final _loginAttemptTracker = LoginAttemptTracker();
@@ -43,8 +42,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   bool get _isValid {
     final phoneDigits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
-    return phoneDigits.length >= 9 &&
-        RegExp(r'^\d{4}$').hasMatch(_pinController.text);
+    return phoneDigits.length >= 9 && _passwordController.text.isNotEmpty;
   }
 
   bool get _isLoginLocked =>
@@ -94,8 +92,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         title: const Text('Sign-in blocked'),
         content: const Text(
           '${AppConstants.loginAttemptsLockedMessage}\n\n'
-          "If support has reset your PIN, confirm below to clear this device's "
-          'local sign-in block. This will not reset or verify your PIN.',
+          "If support has reset your password, confirm below to clear this device's "
+          'local sign-in block. This will not reset or verify your password.',
         ),
         actions: [
           TextButton(
@@ -104,7 +102,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('PIN reset by support'),
+            child: const Text('Password reset by support'),
           ),
         ],
       ),
@@ -120,7 +118,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'The local sign-in block was cleared. Your PIN will be verified '
+            'The local sign-in block was cleared. Your password will be verified '
             'by the server when you sign in.',
           ),
         ),
@@ -197,11 +195,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(AppConstants.sharedPrefKeyDebugBypassAuth, false);
-      await ref
+      final accountNumber = await ref
           .read(authProvider.notifier)
           .login(
             phoneNumber: _normalizedPhoneNumber,
-            pin: _pinController.text,
+            password: _passwordController.text,
           );
       if (!mounted) return;
 
@@ -212,7 +210,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
       if (!mounted) return;
       AppRouter.invalidateSessionCache();
-      context.go('/home');
+      context.go(
+        '/otp',
+        extra: {
+          'phoneNumber': _normalizedPhoneNumber,
+          'accountNumber': accountNumber,
+          'isRegistration': false,
+        },
+      );
     } on AppException catch (e) {
       if (!mounted) return;
       if (shouldRedirectToSignup(e.message)) {
@@ -235,7 +240,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Invalid PIN. $remaining '
+                  'Invalid password. $remaining '
                   '${remaining == 1 ? 'attempt' : 'attempts'} remaining.',
                 ),
               ),
@@ -359,7 +364,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   void dispose() {
     _phoneController.dispose();
-    _pinController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -561,7 +566,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
-                                    '4-digit PIN',
+                                    'Password',
                                     style: theme.textTheme.bodyLarge?.copyWith(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w500,
@@ -569,45 +574,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   TextField(
-                                    controller: _pinController,
-                                    obscureText: _obscurePin,
+                                    controller: _passwordController,
+                                    obscureText: _obscurePassword,
                                     onChanged: (_) => setState(() {}),
-                                    keyboardType: TextInputType.number,
+                                    keyboardType: TextInputType.visiblePassword,
+                                    textInputAction: TextInputAction.done,
                                     autofillHints: const [
                                       AutofillHints.password,
-                                    ],
-                                    maxLength: AppConstants.pinLength,
-                                    buildCounter:
-                                        (
-                                          context, {
-                                          required currentLength,
-                                          required isFocused,
-                                          maxLength,
-                                        }) => null,
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.digitsOnly,
                                     ],
                                     decoration: InputDecoration(
                                       prefixIcon: const Icon(
                                         Icons.lock_outline,
                                         color: Colors.white70,
                                       ),
-                                      hintText: 'Enter your 4-digit PIN',
+                                      hintText: 'Enter your password',
                                       hintStyle: theme.textTheme.bodyMedium
                                           ?.copyWith(color: Colors.white54),
                                       suffixIcon: IconButton(
                                         onPressed: () => setState(
-                                          () => _obscurePin = !_obscurePin,
+                                          () => _obscurePassword =
+                                              !_obscurePassword,
                                         ),
                                         icon: Icon(
-                                          _obscurePin
+                                          _obscurePassword
                                               ? Icons.visibility_outlined
                                               : Icons.visibility_off_outlined,
                                           color: Colors.white70,
                                         ),
-                                        tooltip: _obscurePin
-                                            ? 'Show PIN'
-                                            : 'Hide PIN',
+                                        tooltip: _obscurePassword
+                                            ? 'Show password'
+                                            : 'Hide password',
                                       ),
                                       filled: true,
                                       fillColor: Colors.white.withOpacitySafe(
@@ -662,7 +658,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                           _normalizedPhoneNumber,
                                         ),
                                   child: const Text(
-                                    'I have reset my PIN with support',
+                                    'I have reset my password with support',
                                     style: TextStyle(color: Colors.white),
                                   ),
                                 ),

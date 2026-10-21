@@ -334,14 +334,35 @@ class AuthService extends BaseService {
     required String accountNumber,
     required String phoneNumber,
     required String birthDate,
+    String? password,
+    String? transactionPin,
     required int imeiNumber,
     required String phoneMake,
   }) async {
     return handleApiCall(() async {
+      final normalizedPassword = password?.trim();
+      if (normalizedPassword != null && normalizedPassword.length < 8) {
+        throw ValidationException(
+          message: 'Password must be at least 8 characters.',
+        );
+      }
+
+      final normalizedTransactionPin = transactionPin?.trim();
+      if (normalizedTransactionPin != null &&
+          !RegExp(r'^\d{4}$').hasMatch(normalizedTransactionPin)) {
+        throw ValidationException(
+          message: 'Transaction PIN must be exactly 4 digits.',
+        );
+      }
+
       final request = <String, dynamic>{
         'acc_number': int.tryParse(accountNumber) ?? accountNumber,
         'phone_number': int.parse(_toInternationalPhoneNumber(phoneNumber)),
         'birth_date': birthDate,
+        'password': ?normalizedPassword,
+        if (normalizedTransactionPin != null)
+          'trans_pin': int.tryParse(normalizedTransactionPin) ??
+              normalizedTransactionPin,
         'imei_number': imeiNumber,
         'phone_make': phoneMake,
         's_key': AppConstants.defaultMobileApiSKey,
@@ -377,10 +398,11 @@ class AuthService extends BaseService {
     required String phoneMake,
   }) async {
     return handleApiCall(() async {
+      final normalizedPhoneNumber = _toInternationalPhoneNumber(phoneNumber);
       final request = <String, dynamic>{
         'full_name': fullName,
         'ghana_card': ghanaCard,
-        'phone_number': int.tryParse(phoneNumber) ?? phoneNumber,
+        'phone_number': int.parse(normalizedPhoneNumber),
         'birth_date': birthDate,
         'gender': gender,
         'address': address,
@@ -417,25 +439,24 @@ class AuthService extends BaseService {
     });
   }
 
-  /// Login with a phone number and PIN. The API names the PIN `password`.
+  /// Login with a phone number and the member's login password.
   Future<Map<String, dynamic>> login({
     required String phoneNumber,
-    required String pin,
+    required String password,
     required int imeiNumber,
   }) async {
     return handleApiCall(() async {
       final normalizedPhone = _toInternationalPhoneNumber(phoneNumber);
-      final normalizedPin = pin.trim();
-      if (normalizedPhone.length < 9 ||
-          !RegExp(r'^\d{4}$').hasMatch(normalizedPin)) {
+      final normalizedPassword = password.trim();
+      if (normalizedPhone.length < 9 || normalizedPassword.isEmpty) {
         throw ValidationException(
-          message: 'Enter a valid phone number and 4-digit PIN.',
+          message: 'Enter a valid phone number and password.',
         );
       }
 
       final request = <String, dynamic>{
         'phone_number': int.parse(normalizedPhone),
-        'password': int.parse(normalizedPin),
+        'password': normalizedPassword,
         's_key': AppConstants.defaultMobileApiSKey,
         'imei_number': imeiNumber,
       };
@@ -1115,6 +1136,85 @@ class SavingsService extends BaseService {
     });
   }
 
+  Future<Map<String, dynamic>> getFixedDeposits({
+    required String accountNumber,
+    required int imeiNumber,
+  }) async {
+    return handleApiCall(() async {
+      final request = {
+        'account_number': accountNumber,
+        'imei_number': imeiNumber,
+        's_key': AppConstants.defaultMobileApiSKey,
+      };
+      AppLogger.logApiRequest('POST', ApiEndpoints.getFixedDeposits, request);
+
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.getFixedDeposits,
+        data: request,
+      );
+      final raw = response.data;
+      final data = normalizeResponsePayload(raw);
+
+      AppLogger.logApiResponse('POST', ApiEndpoints.getFixedDeposits, data);
+
+      final message = data['message']?.toString().trim().toLowerCase() ?? '';
+      if (message == 'no record found' ||
+          (raw is String && raw.trim().toLowerCase() == 'no record found')) {
+        return {'status': 'success', 'data': <Map<String, dynamic>>[]};
+      }
+      if (isBackendEmptyPayload(raw)) {
+        return {'status': 'success', 'data': <Map<String, dynamic>>[]};
+      }
+      if (hasExplicitFailure(data)) {
+        throw GenericException(
+          message:
+              data['message']?.toString() ??
+              'Unable to load fixed deposits.',
+        );
+      }
+
+      String textValue(Iterable<dynamic> values, String fallback) {
+        for (final value in values) {
+          final text = value?.toString().trim() ?? '';
+          if (text.isNotEmpty) return text;
+        }
+        return fallback;
+      }
+
+      final fixedDeposits = _findFirstList(data)
+          .whereType<Map>()
+          .map((record) {
+            final entry = Map<String, dynamic>.from(record);
+            return {
+              ...entry,
+              'savings_id': textValue([
+                entry['id'],
+                entry['fixed_deposit_id'],
+                entry['deposit_id'],
+                entry['fd_id'],
+                entry['account_number'],
+              ], ''),
+              'name': textValue([
+                entry['name'],
+                entry['product_name'],
+                entry['account_name'],
+              ], 'Fixed Deposit'),
+              'balance':
+                  entry['balance'] ??
+                  entry['principal_amount'] ??
+                  entry['deposit_amount'] ??
+                  entry['amount'] ??
+                  entry['initial_amount'] ??
+                  entry['current_balance'],
+              'type': 'fixed_deposit',
+            };
+          })
+          .toList();
+
+      return {'status': 'success', 'data': fixedDeposits};
+    });
+  }
+
   Future<Map<String, dynamic>> getSavingsBalance({
     required String productId,
   }) async {
@@ -1556,13 +1656,17 @@ class PaymentService extends BaseService {
       final data = normalizeResponsePayload(response.data);
       AppLogger.logApiResponse('POST', endpoint, data);
 
-      if (!AuthSession.isSuccessStatus(data['status'])) {
+      final status = data['status'];
+      final isPending =
+          data['is_pending'] == true ||
+          (status is String && status.trim().toLowerCase() == 'pending');
+      if (!AuthSession.isSuccessStatus(status) && !isPending) {
         throw GenericException(
           message: data['message'] as String? ?? failureMessage,
         );
       }
 
-      return data;
+      return {...data, 'is_pending': isPending};
     });
   }
 

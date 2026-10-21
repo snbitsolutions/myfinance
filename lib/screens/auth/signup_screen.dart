@@ -29,16 +29,10 @@ class _SignupScreenState extends State<SignupScreen> {
     bool isPrimary = false,
     bool emphasizeTitle = false,
   }) {
-    final cardColor = isPrimary
-        ? const Color(0xFFF8FFFA)
-        : Colors.white.withOpacitySafe(0.92);
-    final borderColor = isPrimary
-        ? const Color(0xFFBEE9CE)
-        : const Color(0xFFD7E9DF);
-    final iconBg = isPrimary
-        ? const Color(0xFFDFF6E9)
-        : const Color(0xFFEAF6EF);
-    final contentColor = const Color(0xFF0E3A30);
+    final cardColor = Colors.white.withOpacitySafe(isPrimary ? 0.2 : 0.12);
+    final borderColor = Colors.white.withOpacitySafe(isPrimary ? 0.72 : 0.42);
+    final iconBg = Colors.white.withOpacitySafe(isPrimary ? 0.24 : 0.16);
+    final contentColor = Colors.white;
 
     return Material(
       color: Colors.transparent,
@@ -80,7 +74,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                   ],
                 ),
-                child: Icon(icon, color: theme.colorScheme.primary, size: 28),
+                child: Icon(icon, color: Colors.white, size: 28),
               ),
               const SizedBox(width: 18),
               Expanded(
@@ -107,14 +101,12 @@ class _SignupScreenState extends State<SignupScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isPrimary
-                      ? theme.colorScheme.primary.withValues(alpha: 0.12)
-                      : Colors.white10,
+                  color: Colors.white.withOpacitySafe(0.16),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.arrow_forward_ios_rounded,
-                  color: theme.colorScheme.primary,
+                  color: Colors.white,
                   size: 18,
                 ),
               ),
@@ -150,7 +142,7 @@ class _SignupScreenState extends State<SignupScreen> {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacitySafe(0.96),
+            color: theme.colorScheme.primary,
             borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
@@ -166,8 +158,8 @@ class _SignupScreenState extends State<SignupScreen> {
                 width: 76,
                 height: 76,
                 padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE7F6ED),
+                decoration: BoxDecoration(
+                  color: Colors.white,
                   shape: BoxShape.circle,
                 ),
                 child: Image.asset(
@@ -180,7 +172,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 'Choose an account option',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0E3A30),
+                  color: Colors.white,
                   letterSpacing: -0.5,
                 ),
               ),
@@ -189,7 +181,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 'Choose one option below. You will only need to complete the steps for your situation.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF5B7A6A),
+                  color: Colors.white.withOpacitySafe(0.78),
                 ),
               ),
               if (widget.reason == 'not_registered') ...[
@@ -201,15 +193,17 @@ class _SignupScreenState extends State<SignupScreen> {
                     vertical: 12,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE1F4E8),
+                    color: theme.colorScheme.secondaryContainer,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFB9E3C8)),
+                    border: Border.all(
+                      color: theme.colorScheme.secondary.withOpacitySafe(0.35),
+                    ),
                   ),
                   child: Text(
                     "We couldn't find an account for those details. Choose the option that matches your situation below.",
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: const Color(0xFF174B36),
+                      color: theme.colorScheme.onSecondaryContainer,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -237,7 +231,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Text(
                   'Already enrolled for mobile banking? Sign in',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF1D7A52),
+                    color: Colors.white,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -260,9 +254,9 @@ class _SignupScreenState extends State<SignupScreen> {
       backgroundColor: secondary,
       body: SizedBox.expand(
         child: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF2E8B57), Color(0xFF0E8F87), Color(0xFF1F5F3F)],
+              colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),

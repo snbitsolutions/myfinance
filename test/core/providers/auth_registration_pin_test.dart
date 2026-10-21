@@ -2,11 +2,37 @@ import 'package:adepa_teachers/core/constants/app_constants.dart';
 import 'package:adepa_teachers/core/providers/app_providers.dart';
 import 'package:adepa_teachers/core/services/api_service.dart';
 import 'package:adepa_teachers/core/services/device_identity_service.dart';
+import 'package:adepa_teachers/core/services/secure_auth_storage.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _RegistrationOtpAuthService extends AuthService {
+  String? setPinAccountNumber;
+  String? setPinValue;
+  String? loginPassword;
+  String? otpPhoneNumber;
+  String? otpAccountNumber;
+
+  @override
+  Future<Map<String, dynamic>> login({
+    required String phoneNumber,
+    required String password,
+    required int imeiNumber,
+  }) async {
+    loginPassword = password;
+    return {'status': 1, 'account_number': '0010100000144795'};
+  }
+
+  @override
+  Future<void> sendLoginOtp({
+    required String phoneNumber,
+    required String accountNumber,
+  }) async {
+    otpPhoneNumber = phoneNumber;
+    otpAccountNumber = accountNumber;
+  }
+
   @override
   Future<Map<String, dynamic>> verifyLoginOtp({
     required String accountNumber,
@@ -14,11 +40,26 @@ class _RegistrationOtpAuthService extends AuthService {
   }) async {
     return {'status': 0, 'account_number': accountNumber};
   }
+
+  @override
+  Future<Map<String, dynamic>> setPin({
+    required String userId,
+    required String pin,
+    required int imeiNumber,
+    Map<String, dynamic>? deviceContext,
+  }) async {
+    setPinAccountNumber = userId;
+    setPinValue = pin;
+    return {'status': 1, 'message': 'PIN set'};
+  }
 }
 
 class _RegistrationDeviceIdentityService extends DeviceIdentityService {
   @override
   Future<String> getInstallationFingerprint() async => 'test-fingerprint';
+
+  @override
+  Future<int> getBackendDeviceNumber() async => 100200300;
 }
 
 void main() {
@@ -66,11 +107,36 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
+  test('provisions an existing-member PIN after successful OTP', () async {
+    final authService = _RegistrationOtpAuthService();
+    final notifier = AuthNotifier(
+      authService: authService,
+      userService: UserService(),
+      deviceIdentityService: _RegistrationDeviceIdentityService(),
+    );
+    addTearDown(notifier.dispose);
+
+    await notifier.loginWithOtp(
+      phoneNumber: '233241952608',
+      accountNumber: '0010100000144795',
+      otp: '1234',
+      transactionPin: '2468',
+    );
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(notifier.state.isAuthenticated, isTrue);
+    expect(authService.setPinAccountNumber, '0010100000144795');
+    expect(authService.setPinValue, '2468');
+    expect(secureStore[AppConstants.secureStorageKeyUserPin], '2468');
+    expect(prefs.containsKey(AppConstants.sharedPrefKeyUserPin), isFalse);
+  });
+
   test(
-    'stores the registration transaction PIN after successful OTP',
+    'does not provision the new-member PIN twice after successful OTP',
     () async {
+      final authService = _RegistrationOtpAuthService();
       final notifier = AuthNotifier(
-        authService: _RegistrationOtpAuthService(),
+        authService: authService,
         userService: UserService(),
         deviceIdentityService: _RegistrationDeviceIdentityService(),
       );
@@ -81,12 +147,39 @@ void main() {
         accountNumber: '0010100000144795',
         otp: '1234',
         transactionPin: '2468',
+        transactionPinAlreadyProvisioned: true,
       );
 
-      final prefs = await SharedPreferences.getInstance();
       expect(notifier.state.isAuthenticated, isTrue);
+      expect(authService.setPinAccountNumber, isNull);
+      expect(authService.setPinValue, isNull);
       expect(secureStore[AppConstants.secureStorageKeyUserPin], '2468');
-      expect(prefs.containsKey(AppConstants.sharedPrefKeyUserPin), isFalse);
+    },
+  );
+
+  test(
+    'password login requests OTP without authenticating before verification',
+    () async {
+      final authService = _RegistrationOtpAuthService();
+      final notifier = AuthNotifier(
+        authService: authService,
+        userService: UserService(),
+        deviceIdentityService: _RegistrationDeviceIdentityService(),
+      );
+      addTearDown(notifier.dispose);
+      await SecureAuthStorage.instance.storePin('1357');
+
+      final accountNumber = await notifier.login(
+        phoneNumber: '233241952608',
+        password: 'member-password',
+      );
+
+      expect(accountNumber, '0010100000144795');
+      expect(notifier.state.isAuthenticated, isFalse);
+      expect(authService.loginPassword, 'member-password');
+      expect(authService.otpPhoneNumber, '233241952608');
+      expect(authService.otpAccountNumber, accountNumber);
+      expect(secureStore[AppConstants.secureStorageKeyUserPin], '1357');
     },
   );
 }

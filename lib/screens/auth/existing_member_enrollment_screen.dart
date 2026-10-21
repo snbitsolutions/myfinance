@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -72,119 +70,32 @@ class _ExistingMemberEnrollmentScreenState
   final TextEditingController _memberIdController = TextEditingController();
   final TextEditingController _existingPhoneController =
       TextEditingController();
-  final TextEditingController _otpController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _ghanaCardController = TextEditingController();
   final TextEditingController _birthDateController = TextEditingController();
   final TextEditingController _genderController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
   final TextEditingController _pinController = TextEditingController();
   final TextEditingController _confirmPinController = TextEditingController();
-  final TextEditingController _finalOtpController = TextEditingController();
 
-  bool _biometricsEnabled = true;
   int? _selectedSavingsProductId;
   int? _selectedSharesProductId;
   String? _fundingMethod;
   bool _isSubmittingRegistration = false;
   int _currentStep = 0;
-  int _otpResendSecondsRemaining = 45;
-  Timer? _otpResendTimer;
-
   bool get _isNewMember => widget.memberType == 'new';
 
   late final List<_EnrollmentStep> _steps;
-
-  String _formatCountdown(int seconds) {
-    final minutes = seconds ~/ 60;
-    final remainingSeconds = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
-  }
-
-  String _resolvedPhoneNumber() {
-    if (!_isNewMember) {
-      return _existingPhoneController.text.replaceAll(RegExp(r'\D'), '');
-    }
-    final digits = _otpController.text.replaceAll(RegExp(r'\D'), '');
-    return digits.isNotEmpty
-        ? digits
-        : _memberIdController.text.replaceAll(RegExp(r'\D'), '');
-  }
-
-  Future<void> _resendOtpCode() async {
-    if (_otpResendSecondsRemaining > 0) {
-      return;
-    }
-
-    final phoneNumber = _resolvedPhoneNumber();
-    final accountNumber = _memberIdController.text.trim().isNotEmpty
-        ? _memberIdController.text.trim()
-        : (await SharedPreferences.getInstance())
-                  .getString(AppConstants.sharedPrefKeyUserId)
-                  ?.trim() ??
-              '';
-
-    if (phoneNumber.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Enter a valid phone number before resending the code.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    try {
-      await ref
-          .read(authProvider.notifier)
-          .sendLoginOtp(phoneNumber: phoneNumber, accountNumber: accountNumber);
-      if (!mounted) return;
-      _startOtpResendCountdown();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('A new verification code has been sent.')),
-      );
-    } on AppException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.message)));
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to resend the OTP right now.')),
-      );
-    }
-  }
-
-  void _startOtpResendCountdown() {
-    _otpResendTimer?.cancel();
-    setState(() => _otpResendSecondsRemaining = 45);
-    _otpResendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      if (_otpResendSecondsRemaining <= 1) {
-        timer.cancel();
-        setState(() => _otpResendSecondsRemaining = 0);
-        return;
-      }
-      setState(() => _otpResendSecondsRemaining--);
-    });
-  }
 
   @override
   void initState() {
     super.initState();
     _steps = _buildSteps();
-    _startOtpResendCountdown();
   }
 
   List<_EnrollmentStep> _buildSteps() {
@@ -235,8 +146,8 @@ class _ExistingMemberEnrollmentScreenState
         _EnrollmentStep(
           number: 6,
           title: 'Create Login Credentials',
-          subtitle: 'Create a username and password',
-          description: 'Use a secure username and password.',
+          subtitle: 'Create a password',
+          description: 'Use a secure password to sign in with your phone number.',
           label: 'Create Login Credentials',
           body: _buildCredentialsBody,
         ),
@@ -255,39 +166,6 @@ class _ExistingMemberEnrollmentScreenState
           description: 'Please confirm your details before continuing.',
           label: 'Review & Confirm',
           body: _buildReviewBody,
-        ),
-        _EnrollmentStep(
-          number: 9,
-          title: 'Verify Phone Number',
-          subtitle: 'Confirm your phone number',
-          description:
-              'We sent a ${AppConstants.otpLength}-digit code to your registered phone number.',
-          label: 'Verify Phone Number',
-          body: _buildOtpBody,
-        ),
-        _EnrollmentStep(
-          number: 10,
-          title: 'Account Created',
-          subtitle: 'Your account is ready',
-          description: 'Welcome to Adepa Credit Union.',
-          label: 'Account Created',
-          body: _buildSuccessBody,
-        ),
-        _EnrollmentStep(
-          number: 11,
-          title: 'Enable Biometrics',
-          subtitle: 'Use biometric log-in',
-          description: 'Enable fingerprint or face ID for faster access.',
-          label: 'Enable Biometrics',
-          body: _buildBiometricsBody,
-        ),
-        _EnrollmentStep(
-          number: 12,
-          title: 'Registration Complete',
-          subtitle: 'You are all set!',
-          description: 'Start banking and enjoy the features of Adepa.',
-          label: 'Registration Complete',
-          body: _buildReadyBody,
         ),
       ];
     }
@@ -311,23 +189,15 @@ class _ExistingMemberEnrollmentScreenState
       ),
       _EnrollmentStep(
         number: 3,
-        title: 'Verify Identity (OTP)',
-        subtitle: 'Confirm your phone number',
-        description:
-            'We sent a ${AppConstants.otpLength}-digit code to the registered phone number.',
-        label: 'Verify Identity',
-        body: _buildOtpBody,
-      ),
-      _EnrollmentStep(
-        number: 4,
         title: 'Create Login Credentials',
-        subtitle: 'Create a username and password',
-        description: 'Use a secure username and password.',
+        subtitle: 'Create a password',
+        description:
+            'Use a secure password to sign in with your phone number.',
         label: 'Create Login Credentials',
         body: _buildCredentialsBody,
       ),
       _EnrollmentStep(
-        number: 5,
+        number: 4,
         title: 'Set Transaction PIN',
         subtitle: 'Secure your transactions',
         description: 'Create a 4-digit PIN for transaction authorization.',
@@ -335,44 +205,12 @@ class _ExistingMemberEnrollmentScreenState
         body: _buildPinBody,
       ),
       _EnrollmentStep(
-        number: 6,
-        title: 'Enable Biometrics',
-        subtitle: 'Use biometric log-in',
-        description: 'Enable fingerprint or face ID for faster access.',
-        label: 'Enable Biometrics',
-        body: _buildBiometricsBody,
-      ),
-      _EnrollmentStep(
-        number: 7,
+        number: 5,
         title: 'Review & Confirm',
         subtitle: 'Review your information',
         description: 'Please confirm your details before continuing.',
         label: 'Review & Confirm',
         body: _buildReviewBody,
-      ),
-      _EnrollmentStep(
-        number: 8,
-        title: 'Verify Final Authentication',
-        subtitle: 'Complete enrollment',
-        description: 'Enter the final OTP to complete your enrollment.',
-        label: 'Verify Final Authentication',
-        body: _buildFinalOtpBody,
-      ),
-      _EnrollmentStep(
-        number: 9,
-        title: 'Enrollment Successful',
-        subtitle: 'You are ready to use mobile banking',
-        description: 'Your enrollment has been completed successfully.',
-        label: 'Enrollment Successful',
-        body: _buildSuccessBody,
-      ),
-      _EnrollmentStep(
-        number: 10,
-        title: 'Ready to Use',
-        subtitle: 'Step into your account',
-        description: 'Your account is ready for everyday banking.',
-        label: 'Ready to Use',
-        body: _buildReadyBody,
       ),
     ];
   }
@@ -383,7 +221,7 @@ class _ExistingMemberEnrollmentScreenState
 
     if (title == 'Personal Information') {
       final fullName = _fullNameController.text.trim();
-      final phone = _otpController.text.replaceAll(RegExp(r'\D'), '');
+      final phone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
       return fullName.isNotEmpty && phone.length >= 9;
     }
     if (title == 'Verify Identity (KYC)') {
@@ -400,12 +238,8 @@ class _ExistingMemberEnrollmentScreenState
           phone.length >= 9 &&
           _birthDateController.text.trim().isNotEmpty;
     }
-    if (title == 'Verify Identity (OTP)' || title == 'Verify Phone Number') {
-      return _otpController.text.trim().length == AppConstants.otpLength;
-    }
     if (title == 'Create Login Credentials') {
-      return _usernameController.text.trim().isNotEmpty &&
-          _passwordController.text.trim().length >= 8 &&
+      return _passwordController.text.trim().length >= 8 &&
           _confirmPasswordController.text.trim() ==
               _passwordController.text.trim();
     }
@@ -419,9 +253,6 @@ class _ExistingMemberEnrollmentScreenState
     }
     if (title == 'Fund Your Account') {
       return _fundingMethod != null;
-    }
-    if (title == 'Verify Final Authentication') {
-      return _finalOtpController.text.trim().length == AppConstants.otpLength;
     }
     return true;
   }
@@ -437,7 +268,8 @@ class _ExistingMemberEnrollmentScreenState
   }
 
   Future<void> _nextStep() async {
-    if (_currentStep >= _steps.length - 1) {
+    if (_currentStep >= _steps.length - 1 &&
+        _steps[_currentStep].title != 'Review & Confirm') {
       context.go('/home');
       return;
     }
@@ -445,7 +277,7 @@ class _ExistingMemberEnrollmentScreenState
     if (!_canContinue) {
       final message = switch (_steps[_currentStep].title) {
         'Create Login Credentials' =>
-          'Enter a username, a password with at least 8 characters, and matching passwords.',
+          'Enter a password with at least 8 characters and confirm it.',
         'Set Transaction PIN' =>
           'Enter a 4-digit PIN and confirm that both PINs match.',
         'Choose Products' => 'Select at least one product to continue.',
@@ -466,7 +298,7 @@ class _ExistingMemberEnrollmentScreenState
             ? await authNotifier.submitNewMemberRegistration(
                 fullName: _fullNameController.text.trim(),
                 ghanaCard: _ghanaCardController.text.trim(),
-                phoneNumber: _otpController.text.replaceAll(RegExp(r'\D'), ''),
+                phoneNumber: _phoneController.text.replaceAll(RegExp(r'\D'), ''),
                 birthDate: _birthDateController.text.trim(),
                 gender: _genderController.text.trim(),
                 address: _addressController.text.trim(),
@@ -486,6 +318,8 @@ class _ExistingMemberEnrollmentScreenState
                       '',
                     ),
                     birthDate: _birthDateController.text.trim(),
+                    password: _passwordController.text.trim(),
+                    transactionPin: _pinController.text.trim(),
                     phoneMake: 'Flutter mobile app',
                   );
         if (!mounted) return;
@@ -495,7 +329,7 @@ class _ExistingMemberEnrollmentScreenState
         // Persist phone/account for OTP flow and navigate to OTP screen
         final prefs = await SharedPreferences.getInstance();
         final normalizedPhone =
-            (_isNewMember ? _otpController.text : _existingPhoneController.text)
+            (_isNewMember ? _phoneController.text : _existingPhoneController.text)
                 .replaceAll(RegExp(r'\D'), '');
         final accountNumber = _isNewMember
             ? (authNotifier.lastRegisteredAccountNumber?.trim().isNotEmpty ==
@@ -527,8 +361,9 @@ class _ExistingMemberEnrollmentScreenState
           extra: {
             'phoneNumber': normalizedPhone,
             'accountNumber': accountNumber,
-            'isRegistration': _isNewMember,
-            'transactionPin': _isNewMember ? _pinController.text.trim() : null,
+            'isRegistration': true,
+            'transactionPin': _pinController.text.trim(),
+            'transactionPinAlreadyProvisioned': true,
           },
         );
         return;
@@ -550,18 +385,46 @@ class _ExistingMemberEnrollmentScreenState
 
   Widget _buildContentCard(BuildContext context, ThemeData theme) {
     final step = _steps[_currentStep];
-    final bodyWidget = step.body(context, theme);
+    final primary = theme.colorScheme.primary;
+    final formTheme = theme.copyWith(
+      textTheme: theme.textTheme.copyWith(
+        titleLarge: theme.textTheme.titleLarge?.copyWith(
+          fontSize: 23,
+          letterSpacing: -0.35,
+          height: 1.2,
+        ),
+        titleSmall: theme.textTheme.titleSmall?.copyWith(
+          fontSize: 19,
+          letterSpacing: -0.2,
+          height: 1.2,
+        ),
+        bodyMedium: theme.textTheme.bodyMedium?.copyWith(
+          fontSize: 15,
+          height: 1.45,
+        ),
+        bodySmall: theme.textTheme.bodySmall?.copyWith(
+          fontSize: 13,
+          height: 1.4,
+        ),
+      ),
+    );
+    final bodyWidget = step.body(context, formTheme);
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9FCFA),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFB8E4C8), Color(0xFFD8F0EA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: primary.withValues(alpha: 0.22)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 24,
+            color: primary.withValues(alpha: 0.2),
+            blurRadius: 26,
             offset: const Offset(0, 12),
           ),
         ],
@@ -583,23 +446,20 @@ class _ExistingMemberEnrollmentScreenState
 
   @override
   void dispose() {
-    _otpResendTimer?.cancel();
     _pageController.dispose();
     _memberIdController.dispose();
     _existingPhoneController.dispose();
-    _otpController.dispose();
+    _phoneController.dispose();
     _fullNameController.dispose();
     _ghanaCardController.dispose();
     _birthDateController.dispose();
     _genderController.dispose();
     _addressController.dispose();
     _emailController.dispose();
-    _usernameController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _pinController.dispose();
     _confirmPinController.dispose();
-    _finalOtpController.dispose();
     super.dispose();
   }
 
@@ -613,7 +473,8 @@ class _ExistingMemberEnrollmentScreenState
       backgroundColor: theme.colorScheme.secondary,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
         elevation: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 0,
@@ -624,9 +485,9 @@ class _ExistingMemberEnrollmentScreenState
               height: 36,
               margin: const EdgeInsets.only(left: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF173D32),
+                color: Colors.white.withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFDDE7E2)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
               ),
               child: IconButton(
                 padding: EdgeInsets.zero,
@@ -639,7 +500,7 @@ class _ExistingMemberEnrollmentScreenState
                 },
                 icon: const Icon(
                   Icons.arrow_back_ios_new_rounded,
-                  color: Color(0xFF2E8B57),
+                  color: Colors.white,
                   size: 18,
                 ),
               ),
@@ -734,7 +595,7 @@ class _ExistingMemberEnrollmentScreenState
                                 vertical: 8,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: Colors.white.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(999),
                                 border: Border.all(
                                   color: Colors.white.withValues(alpha: 0.2),
@@ -743,7 +604,7 @@ class _ExistingMemberEnrollmentScreenState
                               child: Text(
                                 _steps[_currentStep].label,
                                 style: theme.textTheme.labelLarge?.copyWith(
-                                  color: const Color(0xFF1D6B49),
+                                  color: primary,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.2,
                                 ),
@@ -809,8 +670,9 @@ class _ExistingMemberEnrollmentScreenState
                                     ),
                                   ),
                                   child: Text(
-                                    _isNewMember
-                                        ? 'Go to Dashboard'
+                                    _steps[_currentStep].title ==
+                                            'Review & Confirm'
+                                        ? 'Confirm & Continue'
                                         : 'Go to Dashboard',
                                     style: theme.textTheme.labelLarge?.copyWith(
                                       color: Colors.white,
@@ -861,7 +723,7 @@ class _ExistingMemberEnrollmentScreenState
         const SizedBox(height: 14),
         _buildTextField(
           label: 'Phone Number',
-          controller: _otpController,
+          controller: _phoneController,
           hint: 'Enter your active phone number',
           icon: Icons.phone_rounded,
           keyboardType: TextInputType.phone,
@@ -1387,71 +1249,6 @@ class _ExistingMemberEnrollmentScreenState
     );
   }
 
-  Widget _buildOtpBody(BuildContext context, ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Verify Identity (OTP)',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFF0E2B28),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'We sent a ${AppConstants.otpLength}-digit code to your registered mobile number.',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: const Color(0xFF4B5E59),
-          ),
-        ),
-        const SizedBox(height: 18),
-        _buildTextField(
-          label: 'Enter verification code',
-          controller: _otpController,
-          hint: 'Enter ${AppConstants.otpLength}-digit code',
-          icon: Icons.lock_outline_rounded,
-          keyboardType: TextInputType.number,
-          maxLength: AppConstants.otpLength,
-          obscureText: true,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(AppConstants.otpLength),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Text(
-              'Didn’t receive the code?',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: const Color(0xFF4B5E59),
-              ),
-            ),
-            const SizedBox(width: 6),
-            TextButton(
-              onPressed: _otpResendSecondsRemaining > 0 ? null : _resendOtpCode,
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: Text(
-                _otpResendSecondsRemaining > 0
-                    ? 'Resend in ${_formatCountdown(_otpResendSecondsRemaining)}'
-                    : 'Resend code',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
   Widget _buildCredentialsBody(BuildContext context, ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1465,17 +1262,10 @@ class _ExistingMemberEnrollmentScreenState
         ),
         const SizedBox(height: 6),
         Text(
-          'Create a username and password',
+          'Create a password to sign in with your phone number',
           style: theme.textTheme.bodySmall?.copyWith(
             color: const Color(0xFF4B5E59),
           ),
-        ),
-        const SizedBox(height: 14),
-        _buildTextField(
-          label: 'Username',
-          controller: _usernameController,
-          hint: 'Choose a username',
-          icon: Icons.person_outline_rounded,
         ),
         const SizedBox(height: 14),
         _buildTextField(
@@ -1547,92 +1337,15 @@ class _ExistingMemberEnrollmentScreenState
     );
   }
 
-  Widget _buildBiometricsBody(BuildContext context, ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Enable Biometrics',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFF0E2B28),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Use biometrics to log in quickly and securely',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: const Color(0xFF4B5E59),
-          ),
-        ),
-        const SizedBox(height: 28),
-        Align(
-          alignment: Alignment.center,
-          child: Container(
-            width: 134,
-            height: 134,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Color(0xFFEAF7F0),
-            ),
-            child: const Icon(
-              Icons.fingerprint_rounded,
-              size: 64,
-              color: Color(0xFF1D7A52),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF3F6F4),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Enable biometrics login',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Use your fingerprint or face ID for faster login.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFF4B5E59),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: _biometricsEnabled,
-                onChanged: (value) =>
-                    setState(() => _biometricsEnabled = value),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildReviewBody(BuildContext context, ThemeData theme) {
     final memberId = _memberIdController.text.trim();
-    final phone = _otpController.text.trim();
+    final phone = _phoneController.text.trim();
     final fullName = _fullNameController.text.trim();
     final ghanaCard = _ghanaCardController.text.trim();
     final birthDate = _birthDateController.text.trim();
     final gender = _genderController.text.trim();
     final address = _addressController.text.trim();
     final email = _emailController.text.trim();
-    final username = _usernameController.text.trim();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1697,150 +1410,12 @@ class _ExistingMemberEnrollmentScreenState
             value: birthDate.isEmpty ? 'Not provided' : birthDate,
           ),
         ],
-        _infoRow(
-          label: 'Username',
-          value: username.isEmpty ? 'Not provided' : username,
-        ),
         const SizedBox(height: 18),
         Text(
           'By continuing, you agree to our Terms & Conditions and Privacy Policy.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: const Color(0xFF4B5E59),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFinalOtpBody(BuildContext context, ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Final Verification',
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFF0E2B28),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Enter the final OTP to complete signup.',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: const Color(0xFF4B5E59),
-          ),
-        ),
-        const SizedBox(height: 14),
-        _buildTextField(
-          label: 'One-time password',
-          controller: _finalOtpController,
-          hint: 'Enter ${AppConstants.otpLength}-digit code',
-          icon: Icons.verified_user_outlined,
-          keyboardType: TextInputType.number,
-          maxLength: AppConstants.otpLength,
-          obscureText: true,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(AppConstants.otpLength),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSuccessBody(BuildContext context, ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        const SizedBox(height: 14),
-        Container(
-          width: 120,
-          height: 120,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Color(0xFFEAF7F0),
-          ),
-          child: const Icon(
-            Icons.check_circle_rounded,
-            size: 72,
-            color: Color(0xFF1D7A52),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Text(
-          'Enrollment Successful!',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFF0E2B28),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'You have successfully enrolled for Adepa Mobile Banking.',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: const Color(0xFF4B5E59),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildReadyBody(BuildContext context, ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Ready to use',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFF0E2B28),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1D7A52),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'John Mensah',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Total Account Balance',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.8),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'GH¢ 45,000.00',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            _miniMetric(icon: Icons.home_rounded, label: 'Home'),
-            const SizedBox(width: 12),
-            _miniMetric(icon: Icons.savings_rounded, label: 'Savings'),
-            const SizedBox(width: 12),
-            _miniMetric(icon: Icons.send_rounded, label: 'Transfer'),
-          ],
         ),
       ],
     );
@@ -2020,30 +1595,6 @@ class _ExistingMemberEnrollmentScreenState
     );
   }
 
-  Widget _miniMetric({required IconData icon, required String label}) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF5F7F5),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: const Color(0xFF1D7A52)),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF0E2B28),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _EnrollmentStep {

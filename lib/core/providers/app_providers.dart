@@ -307,17 +307,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     AppLogger.info('Loaded stored authentication');
   }
 
-  /// Login user
-  Future<void> login({required String phoneNumber, required String pin}) async {
+  /// Verifies the password and requests the OTP required to finish login.
+  Future<String> login({
+    required String phoneNumber,
+    required String password,
+  }) async {
     state = AuthState.loading();
 
     try {
       final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
-      final deviceFingerprint = await deviceIdentityService
-          .getInstallationFingerprint();
       final response = await authService.login(
         phoneNumber: phoneNumber,
-        pin: pin,
+        password: password,
         imeiNumber: imeiNumber,
       );
 
@@ -351,36 +352,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (userId.length < 6) {
         throw AuthException(
           message:
-              'Your PIN was verified, but this device has no linked account number. '
+              'Your password was accepted, but this device has no linked account number. '
               'Choose Sign up > I have an account to link your account first.',
         );
       }
 
-      await SecureAuthStorage.instance.storePin(pin);
-      if (session != null) {
-        await SecureAuthStorage.instance.storeSession(
-          authToken: session.accessToken,
-          refreshToken: session.refreshToken,
-          deviceFingerprint: deviceFingerprint,
-        );
-      } else {
-        await SecureAuthStorage.instance.storeDeviceVerifiedSession(
-          deviceFingerprint: deviceFingerprint,
-        );
-      }
       await prefs.setString(AppConstants.sharedPrefKeyUserId, userId);
       await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
-
-      state = AuthState.authenticated(
-        userId: userId,
-        userEmail: phoneNumber,
-        authToken: session?.accessToken,
+      await sendLoginOtp(
+        phoneNumber: phoneNumber,
+        accountNumber: userId,
       );
-
-      AppLogger.info(
-        'User PIN verified successfully; server session token returned: '
-        '${session != null}',
-      );
+      state = AuthState.unauthenticated();
+      AppLogger.info('Password accepted; login OTP requested.');
+      return userId;
     } on AppException catch (e) {
       state = AuthState.error(e.message);
       AppLogger.error('Login failed', e);
@@ -780,6 +765,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String accountNumber,
     required String otp,
     String? transactionPin,
+    bool transactionPinAlreadyProvisioned = false,
   }) async {
     state = AuthState.loading();
 
@@ -859,7 +845,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
             message: 'Transaction PIN must be exactly 4 digits.',
           );
         }
-        await SecureAuthStorage.instance.storePin(transactionPin);
+        if (transactionPinAlreadyProvisioned) {
+          await SecureAuthStorage.instance.storePin(transactionPin);
+        } else {
+          await setPin(userId: accountForSession, pin: transactionPin);
+        }
       }
 
       final currentFingerprint = await deviceIdentityService
@@ -917,6 +907,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String accountNumber,
     required String phoneNumber,
     required String birthDate,
+    required String password,
+    required String transactionPin,
     required String phoneMake,
   }) async {
     try {
@@ -925,6 +917,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         accountNumber: accountNumber,
         phoneNumber: phoneNumber,
         birthDate: birthDate,
+        password: password,
+        transactionPin: transactionPin,
         imeiNumber: imeiNumber,
         phoneMake: phoneMake,
       );
@@ -974,10 +968,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String phoneMake,
   }) async {
     final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
+    final normalizedPhoneNumber = _normalizePhoneNumber(phoneNumber);
     final response = await authService.createMember(
       fullName: fullName,
       ghanaCard: ghanaCard,
-      phoneNumber: phoneNumber,
+      phoneNumber: normalizedPhoneNumber,
       birthDate: birthDate,
       gender: gender,
       address: address,
@@ -1026,13 +1021,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // OTP verification. Keep the phone-based flow moving until then.
       await prefs.remove(AppConstants.sharedPrefKeyUserId);
     }
-    await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
+    await prefs.setString(
+      AppConstants.sharedPrefKeyUserEmail,
+      normalizedPhoneNumber,
+    );
     await prefs.setString(AppConstants.sharedPrefKeyUserName, fullName);
 
     // Creating a new member does not reliably trigger the mobile OTP
     // endpoint. Request it explicitly before showing the OTP screen.
     await authService.sendLoginOtp(
-      phoneNumber: phoneNumber,
+      phoneNumber: normalizedPhoneNumber,
       accountNumber: generatedAccountNumber,
     );
 
@@ -1283,9 +1281,10 @@ final savingsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       imeiNumber: imeiNumber,
     );
     final data = response['data'];
+    var savingsAccounts = <Map<String, dynamic>>[];
     if (data is List) {
       final accounts = data.whereType<Map<String, dynamic>>().toList();
-      return await Future.wait(
+      savingsAccounts = await Future.wait(
         accounts.map((accountData) async {
           final productId =
               (accountData['savings_id'] ??
@@ -1322,7 +1321,7 @@ final savingsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       );
     }
 
-    return [];
+    return savingsAccounts;
   } on AppException {
     rethrow;
   }
@@ -1353,20 +1352,97 @@ final investmentsApiProvider = FutureProvider<List<Map<String, dynamic>>>((
 ) async {
   final credentials = ref.watch(memberCredentialsProvider);
   final pin = await SecureAuthStorage.instance.readPin() ?? '';
-  if (pin.isEmpty) {
+  final phone = credentials['phone']?.trim() ?? '';
+  final account = credentials['account']?.trim() ?? '';
+  if (phone.isEmpty || account.isEmpty) {
     throw ValidationException(
-      message: 'Your account PIN is missing. Please sign in again.',
+      message: 'Your account details are missing. Please sign in again.',
     );
   }
-  final response = await ref
-      .watch(investmentServiceProvider)
-      .getInvestments(
-        phoneNumber: credentials['phone']!,
-        accountNumber: credentials['account']!,
-        pin: pin,
+  final investmentRecords = <Map<String, dynamic>>[];
+
+  if (pin.isNotEmpty) {
+    try {
+      final response = await ref
+          .watch(investmentServiceProvider)
+          .getInvestments(
+            phoneNumber: phone,
+            accountNumber: account,
+            pin: pin,
+          );
+      final data = response['data'];
+      if (data is List) {
+        investmentRecords.addAll(data.whereType<Map<String, dynamic>>());
+      }
+    } on AppException catch (error) {
+      AppLogger.warning(
+        'General investment data is unavailable; keeping fixed deposits.',
+        error,
       );
-  final data = response['data'];
-  return data is List ? data.whereType<Map<String, dynamic>>().toList() : [];
+    }
+  }
+
+  try {
+    final imeiNumber = await ref
+        .watch(deviceIdentityServiceProvider)
+        .getBackendDeviceNumber();
+    final response = await ref
+        .watch(savingsServiceProvider)
+        .getFixedDeposits(accountNumber: account, imeiNumber: imeiNumber);
+    final data = response['data'];
+    if (data is List) {
+      investmentRecords.addAll(
+        data.whereType<Map<String, dynamic>>().map((deposit) {
+          final principal =
+              deposit['principal'] ??
+              deposit['principal_amount'] ??
+              deposit['deposit_amount'] ??
+              deposit['initial_amount'] ??
+              deposit['amount'] ??
+              deposit['balance'];
+          final currentValue =
+              deposit['current_value'] ??
+              deposit['maturity_value'] ??
+              deposit['balance'] ??
+              principal;
+          return {
+            ...deposit,
+            'id':
+                deposit['investment_id'] ??
+                deposit['fixed_deposit_id'] ??
+                deposit['savings_id'] ??
+                deposit['id'] ??
+                '',
+            'type': 'Fixed Deposit',
+            'plan':
+                deposit['plan'] ??
+                deposit['product_name'] ??
+                deposit['name'] ??
+                'Fixed Deposit',
+            'principal': principal,
+            'current_value': currentValue,
+            'total_interest':
+                deposit['total_interest'] ?? deposit['interest_earned'],
+            'maturity_date':
+                deposit['maturity_date'] ??
+                deposit['maturity'] ??
+                deposit['end_date'] ??
+                '—',
+          };
+        }),
+      );
+    }
+  } on AppException catch (error) {
+    if (investmentRecords.isEmpty) {
+      rethrow;
+    }
+    AppLogger.warning(
+      'Fixed deposit data is unavailable; keeping available investments.',
+      error,
+    );
+  }
+
+  return investmentRecords;
 });
 
 /// Loads the selected savings account for mutation flows without using demo data.

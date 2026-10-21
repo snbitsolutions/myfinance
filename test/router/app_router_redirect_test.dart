@@ -72,21 +72,29 @@ void main() {
         .setMockMethodCallHandler(secureStorageChannel, null);
   });
 
-  Future<void> pumpAt(WidgetTester tester, String path) async {
+  Future<void> pumpAt(
+    WidgetTester tester,
+    String path, {
+    bool settle = true,
+  }) async {
     AppRouter.router.go(path);
     await tester.pumpWidget(
       ProviderScope(child: MaterialApp.router(routerConfig: AppRouter.router)),
     );
     await tester.pump();
-    await tester.pumpAndSettle(const Duration(milliseconds: 50));
+    if (settle) {
+      await tester.pumpAndSettle(const Duration(milliseconds: 50));
+    } else {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
   }
 
   testWidgets('starts unauthenticated users on onboarding from root', (
     tester,
   ) async {
-    await pumpAt(tester, '/');
+    await pumpAt(tester, '/', settle: false);
     await tester.pump(const Duration(seconds: 5));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byType(OnboardingScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);

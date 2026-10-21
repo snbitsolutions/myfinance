@@ -55,11 +55,15 @@ class RepaymentScreen extends ConsumerStatefulWidget {
 }
 
 class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
-  static const _momoProvider = 'Mobile Money';
-  static const _repaymentChannel = 'mtn-gh';
+  static const _repaymentNetworks = {
+    'MTN Ghana': 'mtn-gh',
+    'Tigo Ghana': 'tigo-gh',
+    'Vodafone Ghana': 'vodafone-gh',
+  };
   static const _repaymentProductId = '59656';
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  String _selectedRepaymentChannel = 'mtn-gh';
   String? _selectedLoanId;
   bool _isSubmitting = false;
 
@@ -97,6 +101,13 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
   }
 
   double get _amount => _parseAmount(_amountController.text);
+
+  String get _momoProvider => switch (_selectedRepaymentChannel) {
+    'mtn-gh' => 'MTN MoMo',
+    'tigo-gh' => 'Tigo MoMo',
+    'vodafone-gh' => 'Vodafone Cash',
+    _ => 'Mobile Money',
+  };
 
   bool _isValidPhone(String value) {
     final phone = value.trim();
@@ -156,7 +167,7 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
           .read(paymentServiceProvider)
           .repayLoan(
             phoneNumber: _toInternationalPhone(_phoneController.text),
-            channel: _repaymentChannel,
+            channel: _selectedRepaymentChannel,
             amount: _amount,
             currentOutstanding: outstanding,
             username: profile?['name']?.toString().trim().isNotEmpty == true
@@ -531,34 +542,28 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 14,
-                          horizontal: 12,
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedRepaymentChannel,
+                        decoration: const InputDecoration(
+                          labelText: 'Mobile money network',
+                          prefixIcon: Icon(Icons.phone_android_rounded),
                         ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest
-                              .withOpacitySafe(0.35),
-                          border: Border.all(
-                            color: theme.colorScheme.outline.withOpacitySafe(
-                              0.2,
-                            ),
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.phone_android_rounded, size: 18),
-                            const SizedBox(width: 8),
-                            Text(
-                              _momoProvider,
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w600,
+                        items: _repaymentNetworks.entries
+                            .map(
+                              (network) => DropdownMenuItem<String>(
+                                value: network.value,
+                                child: Text(network.key),
                               ),
-                            ),
-                          ],
-                        ),
+                            )
+                            .toList(),
+                        onChanged: _isSubmitting
+                            ? null
+                            : (channel) {
+                                if (channel == null) return;
+                                setState(
+                                  () => _selectedRepaymentChannel = channel,
+                                );
+                              },
                       ),
                       const SizedBox(height: 10),
                       ModernInput(

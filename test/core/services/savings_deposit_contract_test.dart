@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:adepa_teachers/core/exceptions/app_exceptions.dart';
 import 'package:adepa_teachers/core/services/api_service.dart';
 import 'package:adepa_teachers/core/services/http_client.dart';
 import 'package:dio/dio.dart';
@@ -33,12 +34,16 @@ class _DepositResponseAdapter implements HttpClientAdapter {
 
 void main() {
   late Dio dio;
+  late Dio savingsDio;
   late HttpClientAdapter originalAdapter;
+  late HttpClientAdapter originalSavingsAdapter;
   late _DepositResponseAdapter adapter;
 
   setUp(() {
     dio = HttpClient.paymentInstance.dio;
+    savingsDio = HttpClient.instance.dio;
     originalAdapter = dio.httpClientAdapter;
+    originalSavingsAdapter = savingsDio.httpClientAdapter;
     adapter = _DepositResponseAdapter(
       '{"status":1,"transaction_id":"deposit-123"}',
     );
@@ -47,6 +52,57 @@ void main() {
 
   tearDown(() {
     dio.httpClientAdapter = originalAdapter;
+    savingsDio.httpClientAdapter = originalSavingsAdapter;
+  });
+
+  test(
+    'loads fixed deposits using the documented account and device payload',
+    () async {
+      adapter = _DepositResponseAdapter(
+        '{"status":1,"data":[{"fixed_deposit_id":"fd-123",'
+        '"product_name":"90 Day Fixed Deposit","principal_amount":"250.00"}]}',
+      );
+      savingsDio.httpClientAdapter = adapter;
+
+      final result = await SavingsService().getFixedDeposits(
+        accountNumber: '0010500000133848',
+        imeiNumber: 100200300,
+      );
+
+      final request = adapter.request!;
+      final body = request.data as Map<String, dynamic>;
+      expect(request.method, 'POST');
+      expect(request.uri.path, endsWith('/getMemFixedDeposits'));
+      expect(request.contentType, Headers.jsonContentType);
+      expect(body['account_number'], '0010500000133848');
+      expect(body['imei_number'], 100200300);
+      expect(body['s_key'], isNotEmpty);
+      expect(result['status'], 'success');
+      expect(result['data'], [
+        {
+          'fixed_deposit_id': 'fd-123',
+          'product_name': '90 Day Fixed Deposit',
+          'principal_amount': '250.00',
+          'savings_id': 'fd-123',
+          'name': '90 Day Fixed Deposit',
+          'balance': '250.00',
+          'type': 'fixed_deposit',
+        },
+      ]);
+    },
+  );
+
+  test('returns an empty list when the fixed deposit API has no records', () async {
+    adapter = _DepositResponseAdapter('{"status":0,"message":"No Record Found"}');
+    savingsDio.httpClientAdapter = adapter;
+
+    final result = await SavingsService().getFixedDeposits(
+      accountNumber: '0010500000133848',
+      imeiNumber: 100200300,
+    );
+
+    expect(result['status'], 'success');
+    expect(result['data'], isEmpty);
   });
 
   test(
@@ -131,6 +187,44 @@ void main() {
       expect(result['is_pending'], isTrue);
     },
   );
+
+  test('treats an airtime authorization response as pending', () async {
+    adapter = _DepositResponseAdapter(
+      '{"status":"pending","message":"Please authorize the payment",'
+      '"transaction_id":"airtime-123"}',
+    );
+    dio.httpClientAdapter = adapter;
+
+    final result = await PaymentService().buyAirtime(
+      phoneNumber: '233241234567',
+      channel: 'mtn-gh',
+      amount: 10,
+      username: 'Test Member',
+      productId: '59656',
+    );
+
+    expect(result['status'], 'pending');
+    expect(result['is_pending'], isTrue);
+    expect(result['transaction_id'], 'airtime-123');
+  });
+
+  test('continues to reject an explicitly failed airtime response', () async {
+    adapter = _DepositResponseAdapter(
+      '{"status":"failed","message":"Payment declined"}',
+    );
+    dio.httpClientAdapter = adapter;
+
+    await expectLater(
+      PaymentService().buyAirtime(
+        phoneNumber: '233241234567',
+        channel: 'mtn-gh',
+        amount: 10,
+        username: 'Test Member',
+        productId: '59656',
+      ),
+      throwsA(isA<GenericException>()),
+    );
+  });
 
   test(
     'sends the documented withdrawal payload and returns its reference',

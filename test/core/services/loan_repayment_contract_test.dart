@@ -78,6 +78,22 @@ void main() {
     expect(result['transaction_id'], result['reference']);
   });
 
+  for (final channel in ['mtn-gh', 'tigo-gh', 'vodafone-gh']) {
+    test('posts the selected repayment channel: $channel', () async {
+      await PaymentService().repayLoan(
+        phoneNumber: '233241952608',
+        channel: channel,
+        amount: 100,
+        currentOutstanding: 500,
+        username: 'Test Member',
+        productId: '59656',
+      );
+
+      final body = adapter.request!.data as Map<String, dynamic>;
+      expect(body['channel'], channel);
+    });
+  }
+
   test(
     'rejects repayment above the outstanding balance before posting',
     () async {

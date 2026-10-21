@@ -351,6 +351,8 @@ class AppRouter {
                   '',
               isRegistration: extra?['isRegistration'] as bool? ?? false,
               transactionPin: extra?['transactionPin'] as String?,
+              transactionPinAlreadyProvisioned:
+                  extra?['transactionPinAlreadyProvisioned'] as bool? ?? false,
             );
           },
         ),

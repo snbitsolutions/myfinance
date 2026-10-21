@@ -50,12 +50,14 @@ void main() {
   });
 
   test(
-    'sends existing-member registration details in documented format',
+    'sends existing-member registration details including login password',
     () async {
       final response = await AuthService().register(
         accountNumber: '0010600000040752',
         phoneNumber: '0241234567',
         birthDate: '1989-10-07',
+        password: 'member-pass-123',
+        transactionPin: '2468',
         imeiNumber: 100200300,
         phoneMake: 'Flutter mobile app',
       );
@@ -70,10 +72,10 @@ void main() {
       expect(body['acc_number'], 10600000040752);
       expect(body['phone_number'], 233241234567);
       expect(body['birth_date'], '1989-10-07');
+      expect(body['password'], 'member-pass-123');
+      expect(body['trans_pin'], 2468);
       expect(body['imei_number'], 100200300);
       expect(body['phone_make'], 'Flutter mobile app');
-      expect(body.containsKey('pin'), isFalse);
-      expect(body.containsKey('trans_pin'), isFalse);
       expect(response['status'], 1);
     },
   );
@@ -125,6 +127,30 @@ void main() {
       expect(body['phone_make'], 'Flutter mobile app');
       expect(body['s_key'], isNotEmpty);
       expect(response['account_number'], '0010100000144795');
+    },
+  );
+
+  test(
+    'normalizes Ghana local phone numbers before account creation',
+    () async {
+      await AuthService().createMember(
+        fullName: 'Maximus Alves',
+        ghanaCard: 'GHA-10000075-2',
+        phoneNumber: '0241952608',
+        birthDate: '1985-12-25',
+        gender: 'Male',
+        address: '266 Butare Street',
+        email: 'member@example.com',
+        savingsProduct: 1,
+        sharesProduct: 5,
+        password: 'strong-password',
+        transactionPin: '1010',
+        imeiNumber: 100000000000001,
+        phoneMake: 'Flutter mobile app',
+      );
+
+      final body = adapter.request!.data as Map<String, dynamic>;
+      expect(body['phone_number'], 233241952608);
     },
   );
 }
