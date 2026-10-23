@@ -36,12 +36,14 @@ String _normalizePhoneNumber(String value) {
 }
 
 String _findAccountNumber(dynamic value) {
-  const keys = {
+  const accountNumberKeys = {
     'account_number',
     'accountnumber',
     'acc_number',
     'account_no',
     'account',
+  };
+  const memberIdentifierKeys = {
     'member_id',
     'memberid',
     'member_no',
@@ -52,25 +54,32 @@ String _findAccountNumber(dynamic value) {
     'userid',
   };
 
-  if (value is Map) {
-    for (final entry in value.entries) {
-      if (keys.contains(entry.key.toString().trim().toLowerCase())) {
-        final candidate = entry.value?.toString().trim() ?? '';
-        if (candidate.isNotEmpty) return candidate;
+  String findByKeys(dynamic candidate, Set<String> keys) {
+    if (candidate is Map) {
+      for (final entry in candidate.entries) {
+        if (keys.contains(entry.key.toString().trim().toLowerCase())) {
+          final text = entry.value?.toString().trim() ?? '';
+          if (text.isNotEmpty) return text;
+        }
+      }
+      for (final nested in candidate.values) {
+        final text = findByKeys(nested, keys);
+        if (text.isNotEmpty) return text;
+      }
+    } else if (candidate is Iterable) {
+      for (final nested in candidate) {
+        final text = findByKeys(nested, keys);
+        if (text.isNotEmpty) return text;
       }
     }
-    for (final nested in value.values) {
-      final candidate = _findAccountNumber(nested);
-      if (candidate.isNotEmpty) return candidate;
-    }
-  } else if (value is Iterable) {
-    for (final nested in value) {
-      final candidate = _findAccountNumber(nested);
-      if (candidate.isNotEmpty) return candidate;
-    }
+
+    return '';
   }
 
-  return '';
+  final accountNumber = findByKeys(value, accountNumberKeys);
+  return accountNumber.isNotEmpty
+      ? accountNumber
+      : findByKeys(value, memberIdentifierKeys);
 }
 
 String _findMemberName(dynamic value) {
@@ -321,6 +330,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         password: password,
         imeiNumber: imeiNumber,
       );
+      AppLogger.info('Login password accepted by backend.');
 
       final session = AuthSession.fromResponse(response);
       final status = response['status'];
@@ -356,18 +366,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
               'Choose Sign up > I have an account to link your account first.',
         );
       }
+      AppLogger.info('Linked account number resolved for OTP login.');
 
       await prefs.setString(AppConstants.sharedPrefKeyUserId, userId);
       await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
-      await sendLoginOtp(
-        phoneNumber: phoneNumber,
-        accountNumber: userId,
-      );
-      state = AuthState.unauthenticated();
-      AppLogger.info('Password accepted; login OTP requested.');
+      final memberName = _findMemberName(response);
+      if (memberName.isNotEmpty) {
+        await prefs.setString(AppConstants.sharedPrefKeyUserName, memberName);
+      } else {
+        await prefs.remove(AppConstants.sharedPrefKeyUserName);
+      }
+      AppLogger.info('Requesting login OTP.');
+      await sendLoginOtp(phoneNumber: phoneNumber, accountNumber: userId);
+      if (mounted) {
+        state = AuthState.unauthenticated();
+      }
+      AppLogger.info('Login OTP request accepted.');
       return userId;
     } on AppException catch (e) {
-      state = AuthState.error(e.message);
+      if (mounted) {
+        state = AuthState.error(e.message);
+      }
       AppLogger.error('Login failed', e);
       rethrow;
     }
@@ -1073,15 +1092,11 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final authService = ref.watch(authServiceProvider);
   final userService = ref.watch(userServiceProvider);
   final deviceIdentityService = ref.watch(deviceIdentityServiceProvider);
-  final prefs = ref
-      .watch(sharedPreferencesProvider)
-      .maybeWhen(data: (prefs) => prefs, orElse: () => null);
 
   return AuthNotifier(
     authService: authService,
     userService: userService,
     deviceIdentityService: deviceIdentityService,
-    prefs: prefs,
   );
 });
 

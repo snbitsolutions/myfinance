@@ -11,6 +11,7 @@ class _RegistrationOtpAuthService extends AuthService {
   String? setPinAccountNumber;
   String? setPinValue;
   String? loginPassword;
+  String? loginMemberName;
   String? otpPhoneNumber;
   String? otpAccountNumber;
 
@@ -21,7 +22,12 @@ class _RegistrationOtpAuthService extends AuthService {
     required int imeiNumber,
   }) async {
     loginPassword = password;
-    return {'status': 1, 'account_number': '0010100000144795'};
+    return {
+      'status': 1,
+      'member_id': '40752',
+      'account_number': '0010100000144795',
+      if (loginMemberName != null) 'member_name': loginMemberName,
+    };
   }
 
   @override
@@ -180,6 +186,62 @@ void main() {
       expect(authService.otpPhoneNumber, '233241952608');
       expect(authService.otpAccountNumber, accountNumber);
       expect(secureStore[AppConstants.secureStorageKeyUserPin], '1357');
+    },
+  );
+
+  test(
+    'password login refreshes the cached name from the active account',
+    () async {
+      final authService = _RegistrationOtpAuthService()
+        ..loginMemberName = 'Current Account Holder';
+      final notifier = AuthNotifier(
+        authService: authService,
+        userService: UserService(),
+        deviceIdentityService: _RegistrationDeviceIdentityService(),
+      );
+      addTearDown(notifier.dispose);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        AppConstants.sharedPrefKeyUserName,
+        'Previous Account Holder',
+      );
+
+      await notifier.login(
+        phoneNumber: '233241952608',
+        password: 'member-password',
+      );
+
+      expect(
+        prefs.getString(AppConstants.sharedPrefKeyUserName),
+        'Current Account Holder',
+      );
+    },
+  );
+
+  test(
+    'password login clears a cached name when response has no account name',
+    () async {
+      final authService = _RegistrationOtpAuthService();
+      final notifier = AuthNotifier(
+        authService: authService,
+        userService: UserService(),
+        deviceIdentityService: _RegistrationDeviceIdentityService(),
+      );
+      addTearDown(notifier.dispose);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        AppConstants.sharedPrefKeyUserName,
+        'Previous Account Holder',
+      );
+
+      await notifier.login(
+        phoneNumber: '233241952608',
+        password: 'member-password',
+      );
+
+      expect(prefs.containsKey(AppConstants.sharedPrefKeyUserName), isFalse);
     },
   );
 }

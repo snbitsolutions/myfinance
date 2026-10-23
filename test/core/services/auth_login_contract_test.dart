@@ -72,6 +72,17 @@ void main() {
     },
   );
 
+  test('sends non-zero numeric login passwords as JSON numbers', () async {
+    await AuthService().login(
+      phoneNumber: '0241234567',
+      password: '1040',
+      imeiNumber: 100200300,
+    );
+
+    final body = adapter.request!.data as Map<String, dynamic>;
+    expect(body['password'], 1040);
+  });
+
   test('preserves leading zeros in numeric-looking login passwords', () async {
     await AuthService().login(
       phoneNumber: '0241234567',

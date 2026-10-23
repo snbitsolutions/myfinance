@@ -84,6 +84,10 @@ class AppConstants {
   static const String pinResetUnavailableMessage =
       'Forgot-PIN reset is not available because the backend does not document a PIN recovery endpoint.';
   static const String defaultMobileApiSKey = 'ArTM3c8yq0Lhlh';
+  static const int defaultMobileApiImeiNumber = int.fromEnvironment(
+    'DEBUG_API_IMEI',
+    defaultValue: 100200300,
+  );
   static const String pinTooSimpleMessage =
       'PIN is too simple. Please choose a different PIN.';
 

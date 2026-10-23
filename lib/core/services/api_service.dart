@@ -439,6 +439,12 @@ class AuthService extends BaseService {
     });
   }
 
+  static dynamic _normalizeNumberLikeJsonValue(String value) {
+    final trimmed = value.trim();
+    if (!RegExp(r'^(0|[1-9]\d*)$').hasMatch(trimmed)) return trimmed;
+    return int.tryParse(trimmed) ?? trimmed;
+  }
+
   /// Login with a phone number and the member's login password.
   Future<Map<String, dynamic>> login({
     required String phoneNumber,
@@ -456,7 +462,7 @@ class AuthService extends BaseService {
 
       final request = <String, dynamic>{
         'phone_number': int.parse(normalizedPhone),
-        'password': normalizedPassword,
+        'password': _normalizeNumberLikeJsonValue(normalizedPassword),
         's_key': AppConstants.defaultMobileApiSKey,
         'imei_number': imeiNumber,
       };
@@ -513,7 +519,7 @@ class AuthService extends BaseService {
       }
 
       final request = <String, dynamic>{
-        'password': int.tryParse(normalizedPin) ?? normalizedPin,
+        'password': _normalizeNumberLikeJsonValue(normalizedPin),
         'phone_number': int.tryParse(normalizedPhone) ?? normalizedPhone,
         's_key': AppConstants.defaultMobileApiSKey,
         'imei_number': imeiNumber,

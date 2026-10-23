@@ -47,8 +47,9 @@ void main() {
       expect(ApiEndpoints.verifyPayment, '/verify');
     });
 
-    test('keeps a default shared secret for the documented API requests', () {
+    test('keeps the documented mobile API defaults for auth requests', () {
       expect(AppConstants.defaultMobileApiSKey, isNotEmpty);
+      expect(AppConstants.defaultMobileApiImeiNumber, 100200300);
     });
 
     test('accepts common success status values for OTP verification', () {

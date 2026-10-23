@@ -210,6 +210,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
       if (!mounted) return;
       AppRouter.invalidateSessionCache();
+      AppLogger.info('Opening OTP screen after successful login.');
       context.go(
         '/otp',
         extra: {
@@ -264,7 +265,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(e.message)));
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'Unexpected error during sign-in (${error.runtimeType})',
+        null,
+        stackTrace,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to sign in. Please try again.')),

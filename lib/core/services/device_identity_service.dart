@@ -23,6 +23,15 @@ class DeviceIdentityService {
   Future<String> getInstallationId() => _getOrCreateInstallationId();
 
   Future<int> getBackendDeviceNumber() async {
+    // The documented mobile app backend currently expects a stable device number
+    // for the active member/session, not a per-installation hash. Keep the
+    // published sample value as the default and allow an override via
+    // --dart-define=DEBUG_API_IMEI=<value> when a different backend profile is
+    // required.
+    if (AppConstants.defaultMobileApiImeiNumber > 0) {
+      return AppConstants.defaultMobileApiImeiNumber;
+    }
+
     final installationId = await _getOrCreateInstallationId();
     return backendDeviceNumber(installationId);
   }
