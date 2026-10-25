@@ -163,31 +163,33 @@ void main() {
     },
   );
 
-  test(
-    'password login requests OTP without authenticating before verification',
-    () async {
-      final authService = _RegistrationOtpAuthService();
-      final notifier = AuthNotifier(
-        authService: authService,
-        userService: UserService(),
-        deviceIdentityService: _RegistrationDeviceIdentityService(),
-      );
-      addTearDown(notifier.dispose);
-      await SecureAuthStorage.instance.storePin('1357');
+  test('password login authenticates without requesting OTP', () async {
+    final authService = _RegistrationOtpAuthService();
+    final notifier = AuthNotifier(
+      authService: authService,
+      userService: UserService(),
+      deviceIdentityService: _RegistrationDeviceIdentityService(),
+    );
+    addTearDown(notifier.dispose);
+    await SecureAuthStorage.instance.storePin('1357');
 
-      final accountNumber = await notifier.login(
-        phoneNumber: '233241952608',
-        password: 'member-password',
-      );
+    final accountNumber = await notifier.login(
+      phoneNumber: '233241952608',
+      password: 'member-password',
+    );
 
-      expect(accountNumber, '0010100000144795');
-      expect(notifier.state.isAuthenticated, isFalse);
-      expect(authService.loginPassword, 'member-password');
-      expect(authService.otpPhoneNumber, '233241952608');
-      expect(authService.otpAccountNumber, accountNumber);
-      expect(secureStore[AppConstants.secureStorageKeyUserPin], '1357');
-    },
-  );
+    expect(accountNumber, '0010100000144795');
+    expect(notifier.state.isAuthenticated, isTrue);
+    expect(notifier.state.userId, accountNumber);
+    expect(authService.loginPassword, 'member-password');
+    expect(authService.otpPhoneNumber, isNull);
+    expect(authService.otpAccountNumber, isNull);
+    expect(secureStore[AppConstants.secureStorageKeyUserPin], '1357');
+    expect(
+      secureStore[AppConstants.secureStorageKeyDeviceVerifiedSession],
+      'true',
+    );
+  });
 
   test(
     'password login refreshes the cached name from the active account',

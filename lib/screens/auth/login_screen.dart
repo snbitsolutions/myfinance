@@ -195,7 +195,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(AppConstants.sharedPrefKeyDebugBypassAuth, false);
-      final accountNumber = await ref
+      await ref
           .read(authProvider.notifier)
           .login(
             phoneNumber: _normalizedPhoneNumber,
@@ -210,15 +210,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
       if (!mounted) return;
       AppRouter.invalidateSessionCache();
-      AppLogger.info('Opening OTP screen after successful login.');
-      context.go(
-        '/otp',
-        extra: {
-          'phoneNumber': _normalizedPhoneNumber,
-          'accountNumber': accountNumber,
-          'isRegistration': false,
-        },
-      );
+      AppLogger.info('Opening home screen after successful password login.');
+      context.go('/home');
     } on AppException catch (e) {
       if (!mounted) return;
       if (shouldRedirectToSignup(e.message)) {

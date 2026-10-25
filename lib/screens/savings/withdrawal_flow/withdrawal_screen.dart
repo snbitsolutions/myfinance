@@ -150,25 +150,315 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
 
     return AppScaffold(
       title: 'Withdraw',
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+      child: ColoredBox(
+        color: const Color(0xFFF4F7F4),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // From Account
-            _WithdrawalCard(
-              child: Row(
+            Expanded(
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Withdraw from savings',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                        color: const Color(0xFF163A2A),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Send funds to your mobile money account.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF6D7B73),
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _WithdrawalBalanceCard(
+                      title: (_account?['name'] ?? 'Savings Account')
+                          .toString(),
+                      accountNumber: _maskedAccountNumber(
+                        ref.read(authProvider).userId ?? '',
+                      ),
+                      balance: balance,
+                    ),
+                    const SizedBox(height: 26),
+                    // Withdrawal Amount
+                    Text(
+                      'Withdrawal Amount',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ModernInput(
+                      controller: _amountController,
+                      label: 'GH₵',
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    if (balance != null && _amount > balance) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Amount exceeds the available balance.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    // Quick Amounts
+                    Wrap(
+                      spacing: 9,
+                      runSpacing: 9,
+                      children: _quickAmounts.map((amount) {
+                        final selected = _amount == amount;
+                        return ChoiceChip(
+                          label: Text('GH₵ $amount'),
+                          selected: selected,
+                          showCheckmark: false,
+                          onSelected: (_) => _selectQuickAmount(amount),
+                          labelStyle: TextStyle(
+                            color: selected
+                                ? Colors.white
+                                : const Color(0xFF3B5144),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          backgroundColor: Colors.white,
+                          selectedColor: theme.colorScheme.primary,
+                          side: BorderSide(
+                            color: selected
+                                ? theme.colorScheme.primary
+                                : const Color(0xFFE1E9E3),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    // Withdrawal Limits
+                    Text(
+                      'Withdrawal Limits',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _WithdrawalCard(
+                      child: dailyLimit == null && monthlyLimit == null
+                          ? Text(
+                              'Withdrawal limits are not available for this account.',
+                              style: theme.textTheme.bodyMedium,
+                            )
+                          : Column(
+                              children: [
+                                if (dailyLimit != null)
+                                  _LimitRow(
+                                    label: 'Daily Limit',
+                                    total: dailyLimit,
+                                    used: _number('used_daily_limit') ?? 0,
+                                    theme: theme,
+                                  ),
+                                if (dailyLimit != null && monthlyLimit != null)
+                                  const Divider(height: 16),
+                                if (monthlyLimit != null)
+                                  _LimitRow(
+                                    label: 'Monthly Limit',
+                                    total: monthlyLimit,
+                                    used: _number('used_monthly_limit') ?? 0,
+                                    theme: theme,
+                                  ),
+                              ],
+                            ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Supported withdrawal network
+                    Text(
+                      'Mobile Money Network',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _WithdrawalCard(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _selectedNetwork,
+                        decoration: const InputDecoration(
+                          labelText: 'Network',
+                          border: InputBorder.none,
+                        ),
+                        items: _networks
+                            .map(
+                              (network) => DropdownMenuItem(
+                                value: network,
+                                child: Text('$network Mobile Money'),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (network) => setState(
+                          () => _selectedNetwork = network ?? _selectedNetwork,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        'Bank account withdrawals are unavailable.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacitySafe(
+                            0.65,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Destination Phone Number',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ModernInput(
+                      controller: _phoneController,
+                      label: 'Phone',
+                      keyboardType: TextInputType.phone,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9FBF9),
+                border: const Border(top: BorderSide(color: Color(0xFFE6ECE7))),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.035),
+                    blurRadius: 16,
+                    offset: const Offset(0, -5),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: FilledButton(
+                    onPressed: _canContinue ? _continueToReview : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      disabledBackgroundColor: const Color(0xFFCAD5CD),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'Continue',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (_amount > 0) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            '· GH₵ ${_amount.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(width: 8),
+                        const Icon(Icons.arrow_forward_rounded, size: 19),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WithdrawalBalanceCard extends StatelessWidget {
+  final String title;
+  final String accountNumber;
+  final double? balance;
+
+  const _WithdrawalBalanceCard({
+    required this.title,
+    required this.accountNumber,
+    required this.balance,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final availableBalance = balance;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF26734A), Color(0xFF164B35)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF164B35).withValues(alpha: 0.18),
+            blurRadius: 20,
+            offset: const Offset(0, 9),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -8,
+            top: -30,
+            child: Icon(
+              Icons.account_balance_wallet_rounded,
+              size: 132,
+              color: Colors.white.withValues(alpha: 0.06),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 42,
+                    height: 42,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withOpacitySafe(0.15),
-                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Icon(
-                      Icons.account_balance_wallet_rounded,
-                      color: theme.colorScheme.primary,
+                    child: const Icon(
+                      Icons.savings_rounded,
+                      color: Colors.white,
+                      size: 22,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -177,224 +467,70 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'From Account',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacitySafe(
-                              0.6,
-                            ),
+                          'WITHDRAWING FROM',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.72),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.1,
                           ),
                         ),
+                        const SizedBox(height: 4),
                         Text(
-                          (_account?['name'] ?? 'Savings Account').toString(),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          _maskedAccountNumber(
-                            ref.read(authProvider).userId ?? '',
-                          ),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacitySafe(
-                              0.6,
-                            ),
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Available Balance
-            _WithdrawalCard(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Available Balance',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacitySafe(
-                            0.6,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        balance == null
-                            ? 'Unavailable'
-                            : 'GH₵ ${balance.toStringAsFixed(2)}',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Icon(
-                    Icons.trending_up_rounded,
-                    color: theme.colorScheme.primary,
-                    size: 28,
+                  const Icon(
+                    Icons.verified_rounded,
+                    color: Color(0xFFB7E2C4),
+                    size: 20,
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
-            // Withdrawal Amount
-            Text(
-              'Withdrawal Amount',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            ModernInput(
-              controller: _amountController,
-              label: 'GH₵',
-              keyboardType: TextInputType.number,
-              onChanged: (_) => setState(() {}),
-            ),
-            if (balance != null && _amount > balance) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 22),
               Text(
-                'Amount exceeds the available balance.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
-                  fontWeight: FontWeight.w600,
+                'AVAILABLE BALANCE',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.72),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.1,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                availableBalance == null
+                    ? 'Unavailable'
+                    : 'GH₵ ${availableBalance.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 25,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                accountNumber,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.78),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.2,
                 ),
               ),
             ],
-            const SizedBox(height: 12),
-            // Quick Amounts
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: _quickAmounts
-                  .map(
-                    (amount) => Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: OutlinedButton(
-                          onPressed: () => _selectQuickAmount(amount),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: Text('GH₵ $amount'),
-                        ),
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-            const SizedBox(height: 16),
-            // Withdrawal Limits
-            Text(
-              'Withdrawal Limits',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _WithdrawalCard(
-              child: dailyLimit == null && monthlyLimit == null
-                  ? Text(
-                      'Withdrawal limits are not available for this account.',
-                      style: theme.textTheme.bodyMedium,
-                    )
-                  : Column(
-                      children: [
-                        if (dailyLimit != null)
-                          _LimitRow(
-                            label: 'Daily Limit',
-                            total: dailyLimit,
-                            used: _number('used_daily_limit') ?? 0,
-                            theme: theme,
-                          ),
-                        if (dailyLimit != null && monthlyLimit != null)
-                          const Divider(height: 16),
-                        if (monthlyLimit != null)
-                          _LimitRow(
-                            label: 'Monthly Limit',
-                            total: monthlyLimit,
-                            used: _number('used_monthly_limit') ?? 0,
-                            theme: theme,
-                          ),
-                      ],
-                    ),
-            ),
-            const SizedBox(height: 16),
-            // Supported withdrawal network
-            Text(
-              'Mobile Money Network',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            _WithdrawalCard(
-              child: DropdownButtonFormField<String>(
-                initialValue: _selectedNetwork,
-                decoration: const InputDecoration(
-                  labelText: 'Network',
-                  border: InputBorder.none,
-                ),
-                items: _networks
-                    .map((network) => DropdownMenuItem(
-                          value: network,
-                          child: Text('$network Mobile Money'),
-                        ))
-                    .toList(),
-                onChanged: (network) => setState(
-                  () => _selectedNetwork = network ?? _selectedNetwork,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                'Bank account withdrawals are unavailable.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacitySafe(0.65),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Destination Phone Number',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            ModernInput(
-              controller: _phoneController,
-              label: 'Phone',
-              keyboardType: TextInputType.phone,
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 24),
-            // Continue Button
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: FilledButton(
-                onPressed: _canContinue ? _continueToReview : null,
-                style: FilledButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Continue'),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -469,28 +605,19 @@ class _WithdrawalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: theme.colorScheme.outline.withOpacitySafe(0.16),
-        ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE3EAE4)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacitySafe(0.12),
-            blurRadius: 18,
-            spreadRadius: 1,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: theme.colorScheme.primary.withOpacitySafe(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.035),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
           ),
         ],
       ),

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/app_scaffold.dart';
 import '../../../core/color_ext.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/utils/logger.dart';
 import 'withdrawal_model.dart';
 
 class ProcessingWithdrawalScreen extends ConsumerStatefulWidget {
@@ -78,10 +79,15 @@ class _ProcessingWithdrawalScreenState
       context.push("/withdrawal/success", extra: updatedData);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Withdrawal failed: $error")));
-      context.pop();
+      AppLogger.error('Withdrawal outcome could not be confirmed.', error);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'We could not confirm the withdrawal. Check your balance or transaction history before trying again.',
+          ),
+        ),
+      );
+      context.go('/withdrawal/review', extra: widget.data);
     }
   }
 

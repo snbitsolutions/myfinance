@@ -1,4 +1,4 @@
-package com.example.adepa_teachers
+package com.adepa.teachers
 
 import io.flutter.embedding.android.FlutterActivity
 

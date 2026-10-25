@@ -176,434 +176,396 @@ class _CreateSavingsScreenState extends ConsumerState<CreateSavingsScreen> {
 
     return AppScaffold(
       title: 'Create Savings',
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isTablet = constraints.maxWidth >= Responsive.medium;
-          final content = SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        theme.colorScheme.primary,
-                        theme.colorScheme.primary.withOpacitySafe(0.8),
+      child: ColoredBox(
+        color: const Color(0xFFF4F7F4),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isTablet = constraints.maxWidth >= Responsive.medium;
+            final content = SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF26734A), Color(0xFF164B35)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                            0xFF164B35,
+                          ).withValues(alpha: 0.18),
+                          blurRadius: 20,
+                          offset: const Offset(0, 9),
+                        ),
                       ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
                     ),
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                        color: theme.colorScheme.primary.withOpacitySafe(0.2),
-                        blurRadius: 14,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          right: -8,
+                          top: -24,
+                          child: Icon(
+                            Icons.savings_rounded,
+                            size: 126,
+                            color: Colors.white.withValues(alpha: 0.06),
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.savings_rounded,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        Row(
                           children: [
-                            Text(
-                              'Build Your Savings Plan',
-                              style: theme.textTheme.titleMedium?.copyWith(
+                            Container(
+                              width: 46,
+                              height: 46,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.14),
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              child: const Icon(
+                                Icons.savings_rounded,
                                 color: Colors.white,
-                                fontWeight: FontWeight.w700,
+                                size: 25,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Set a target today and make progress with confidence.',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.9),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Create a savings goal',
+                                    style: theme.textTheme.titleLarge?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.3,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    'Give your next milestone a name and a target.',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.86,
+                                      ),
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: theme.colorScheme.outline.withOpacitySafe(0.12),
+                      ],
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Live goal snapshot',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacitySafe(
-                            0.7,
-                          ),
-                          fontWeight: FontWeight.w700,
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: theme.colorScheme.outline.withOpacitySafe(0.12),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _buildSummaryPill(
-                            theme,
-                            label: _selectedType.label,
-                            icon: _selectedType.icon,
-                          ),
-                          _buildSummaryPill(
-                            theme,
-                            label: liveTargetLabel,
-                            icon: Icons.currency_exchange_rounded,
-                            accent: liveTarget.isEmpty
-                                ? theme.colorScheme.error
-                                : theme.colorScheme.primary,
-                          ),
-                          _buildSummaryPill(
-                            theme,
-                            label: _autoSave ? 'Auto-save on' : 'Manual plan',
-                            icon: _autoSave ? Icons.auto_awesome : Icons.tune,
-                            accent: _autoSave
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.secondary,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        liveGoalName,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: theme.colorScheme.outline.withOpacitySafe(0.1),
+                      ],
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      _buildStepIndicator(
-                        theme,
-                        number: '1',
-                        label: 'Plan',
-                        active: true,
-                      ),
-                      Expanded(
-                        child: Divider(
-                          color: theme.colorScheme.primary.withOpacitySafe(0.2),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Live goal snapshot',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacitySafe(
+                              0.7,
+                            ),
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      _buildStepIndicator(
-                        theme,
-                        number: '2',
-                        label: 'Target',
-                        active: _nameController.text.trim().isNotEmpty,
-                      ),
-                      Expanded(
-                        child: Divider(
-                          color: theme.colorScheme.primary.withOpacitySafe(0.2),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _buildSummaryPill(
+                              theme,
+                              label: _selectedType.label,
+                              icon: _selectedType.icon,
+                            ),
+                            _buildSummaryPill(
+                              theme,
+                              label: liveTargetLabel,
+                              icon: Icons.currency_exchange_rounded,
+                              accent: liveTarget.isEmpty
+                                  ? theme.colorScheme.error
+                                  : theme.colorScheme.primary,
+                            ),
+                            _buildSummaryPill(
+                              theme,
+                              label: _autoSave ? 'Auto-save on' : 'Manual plan',
+                              icon: _autoSave ? Icons.auto_awesome : Icons.tune,
+                              accent: _autoSave
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.secondary,
+                            ),
+                          ],
                         ),
-                      ),
-                      _buildStepIndicator(
-                        theme,
-                        number: '3',
-                        label: 'Review',
-                        active: _isFormValid,
-                      ),
-                    ],
+                        const SizedBox(height: 10),
+                        Text(
+                          liveGoalName,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                _buildSectionHeading(
-                  theme,
-                  step: '01',
-                  title: 'Choose your savings plan',
-                  subtitle: 'Start with the account type that fits your goal.',
-                ),
-                const SizedBox(height: 10),
-                AppCard(
-                  child: InkWell(
-                    onTap: _selectSavingsType,
-                    borderRadius: BorderRadius.circular(16),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: theme.colorScheme.outline.withOpacitySafe(0.1),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
                     child: Row(
                       children: [
-                        Container(
-                          width: 46,
-                          height: 46,
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primaryContainer
-                                .withOpacitySafe(0.45),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            _selectedType.icon,
-                            color: theme.colorScheme.primary,
+                        _buildStepIndicator(
+                          theme,
+                          number: '1',
+                          label: 'Plan',
+                          active: true,
+                        ),
+                        Expanded(
+                          child: Divider(
+                            color: theme.colorScheme.primary.withOpacitySafe(
+                              0.2,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        _buildStepIndicator(
+                          theme,
+                          number: '2',
+                          label: 'Target',
+                          active: _nameController.text.trim().isNotEmpty,
+                        ),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Divider(
+                            color: theme.colorScheme.primary.withOpacitySafe(
+                              0.2,
+                            ),
+                          ),
+                        ),
+                        _buildStepIndicator(
+                          theme,
+                          number: '3',
+                          label: 'Review',
+                          active: _isFormValid,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSectionHeading(
+                    theme,
+                    step: '01',
+                    title: 'Choose your savings plan',
+                    subtitle:
+                        'Start with the account type that fits your goal.',
+                  ),
+                  const SizedBox(height: 10),
+                  AppCard(
+                    child: InkWell(
+                      onTap: _selectSavingsType,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primaryContainer
+                                  .withOpacitySafe(0.45),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              _selectedType.icon,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Savings Type',
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _selectedType.label,
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  _selectedType.description,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurface
+                                        .withOpacitySafe(0.6),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                color: theme.colorScheme.primary,
+                              ),
+                              const SizedBox(height: 4),
                               Text(
-                                'Savings Type',
-                                style: theme.textTheme.labelLarge?.copyWith(
+                                'Change',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.primary,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _selectedType.label,
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                _selectedType.description,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurface
-                                      .withOpacitySafe(0.6),
-                                ),
-                              ),
                             ],
                           ),
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  _buildSectionHeading(
+                    theme,
+                    step: '02',
+                    title: 'Set your target',
+                    subtitle:
+                        'Give your goal a name and a clear amount to reach.',
+                  ),
+                  const SizedBox(height: 10),
+                  AppCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
                             Icon(
-                              Icons.chevron_right_rounded,
+                              Icons.edit_note_rounded,
                               color: theme.colorScheme.primary,
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(width: 8),
                             Text(
-                              'Change',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.w700,
+                              'Goal details',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                _buildSectionHeading(
-                  theme,
-                  step: '02',
-                  title: 'Set your target',
-                  subtitle:
-                      'Give your goal a name and a clear amount to reach.',
-                ),
-                const SizedBox(height: 10),
-                AppCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.edit_note_rounded,
-                            color: theme.colorScheme.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Goal details',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      ModernInput(
-                        label: 'Savings Goal',
-                        hintText: 'e.g., Emergency Fund',
-                        controller: _nameController,
-                        prefixIcon: Icons.savings,
-                        onChanged: _validateName,
-                        errorText: _nameError,
-                      ),
-                      const SizedBox(height: 16),
-                      ModernInput(
-                        label: 'Target Amount',
-                        hintText: 'e.g., 2000',
-                        controller: _targetController,
-                        keyboardType: TextInputType.number,
-                        prefixText: 'GH₵ ',
-                        onChanged: _validateTarget,
-                        errorText: _targetError,
-                        helperText: 'Set a realistic goal based on your budget',
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _quickTargets
-                            .map(
-                              (amount) => ActionChip(
-                                label: Text('GH₵$amount'),
-                                avatar: const Icon(
-                                  Icons.bolt_rounded,
-                                  size: 16,
-                                ),
-                                onPressed: () => setQuickTarget(amount),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                      if (_selectedType == SavingsType.fixedDeposit) ...[
-                        const SizedBox(height: 16),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primaryContainer
-                                .withOpacitySafe(0.25),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: theme.colorScheme.primary.withOpacitySafe(
-                                0.2,
-                              ),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.percent,
-                                color: theme.colorScheme.primary,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Interest Rate',
-                                      style: theme.textTheme.labelSmall
-                                          ?.copyWith(
-                                            color: theme.colorScheme.onSurface
-                                                .withOpacitySafe(0.6),
-                                          ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'Unavailable until backend terms are provided',
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
+                        const SizedBox(height: 14),
+                        ModernInput(
+                          label: 'Savings Goal',
+                          hintText: 'e.g., Emergency Fund',
+                          controller: _nameController,
+                          prefixIcon: Icons.savings,
+                          onChanged: _validateName,
+                          errorText: _nameError,
                         ),
                         const SizedBox(height: 16),
-                        GestureDetector(
-                          onTap: () async {
-                            final selected = await showDatePicker(
-                              context: context,
-                              initialDate: DateTime.now().add(
-                                const Duration(days: 365),
+                        ModernInput(
+                          label: 'Target Amount',
+                          hintText: 'e.g., 2000',
+                          controller: _targetController,
+                          keyboardType: TextInputType.number,
+                          prefixText: 'GH₵ ',
+                          onChanged: _validateTarget,
+                          errorText: _targetError,
+                          helperText:
+                              'Set a realistic goal based on your budget',
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _quickTargets.map((amount) {
+                            final selected =
+                                _targetController.text == '$amount';
+                            return ChoiceChip(
+                              label: Text('GH₵ $amount'),
+                              selected: selected,
+                              showCheckmark: false,
+                              onSelected: (_) => setQuickTarget(amount),
+                              labelStyle: TextStyle(
+                                color: selected
+                                    ? Colors.white
+                                    : const Color(0xFF3B5144),
+                                fontWeight: FontWeight.w700,
                               ),
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime.now().add(
-                                const Duration(days: 365 * 5),
+                              backgroundColor: Colors.white,
+                              selectedColor: theme.colorScheme.primary,
+                              side: BorderSide(
+                                color: selected
+                                    ? theme.colorScheme.primary
+                                    : const Color(0xFFE1E9E3),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
                               ),
                             );
-                            if (selected != null) {
-                              setState(() {
-                                _maturityDate = selected;
-                                _validateMaturity();
-                              });
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
+                          }).toList(),
+                        ),
+                        if (_selectedType == SavingsType.fixedDeposit) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              border: Border.all(
-                                color: _maturityError != null
-                                    ? theme.colorScheme.error
-                                    : theme.colorScheme.outline.withOpacitySafe(
-                                        0.3,
-                                      ),
-                                width: _maturityError != null ? 1.5 : 1,
-                              ),
+                              color: theme.colorScheme.primaryContainer
+                                  .withOpacitySafe(0.25),
                               borderRadius: BorderRadius.circular(8),
-                              color: _maturityError != null
-                                  ? theme.colorScheme.error.withOpacitySafe(
-                                      0.05,
-                                    )
-                                  : null,
+                              border: Border.all(
+                                color: theme.colorScheme.primary
+                                    .withOpacitySafe(0.2),
+                              ),
                             ),
                             child: Row(
                               children: [
                                 Icon(
-                                  Icons.calendar_today,
-                                  color: _maturityError != null
-                                      ? theme.colorScheme.error
-                                      : theme.colorScheme.primary,
-                                  size: 20,
+                                  Icons.percent,
+                                  color: theme.colorScheme.primary,
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
@@ -612,368 +574,347 @@ class _CreateSavingsScreenState extends ConsumerState<CreateSavingsScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Maturity Date',
+                                        'Interest Rate',
                                         style: theme.textTheme.labelSmall
                                             ?.copyWith(
                                               color: theme.colorScheme.onSurface
                                                   .withOpacitySafe(0.6),
                                             ),
                                       ),
+                                      const SizedBox(height: 2),
                                       Text(
-                                        _maturityDate != null
-                                            ? '${_maturityDate!.day}/${_maturityDate!.month}/${_maturityDate!.year}'
-                                            : 'Select date',
-                                        style: theme.textTheme.bodyMedium,
+                                        'Unavailable until backend terms are provided',
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                       ),
-                                      if (_maturityError != null)
-                                        Text(
-                                          _maturityError!,
-                                          style: theme.textTheme.labelSmall
-                                              ?.copyWith(
-                                                color: theme.colorScheme.error,
-                                              ),
-                                        ),
                                     ],
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Interest terms and maturity projections are unavailable until provided by the backend.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.outline,
-                          ),
-                        ),
-                      ] else ...[
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primaryContainer
-                                .withOpacitySafe(0.3),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: theme.colorScheme.primary.withOpacitySafe(
-                                0.2,
-                              ),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Switch(
-                                value: _autoSave,
-                                onChanged: (v) => setState(() => _autoSave = v),
-                                activeThumbColor: theme.colorScheme.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Enable Auto-Save',
-                                      style: theme.textTheme.bodyLarge
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                    Text(
-                                      'Automatically save amounts monthly',
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: theme.colorScheme.onSurface
-                                                .withOpacitySafe(0.6),
-                                          ),
-                                    ),
-                                  ],
+                          const SizedBox(height: 16),
+                          GestureDetector(
+                            onTap: () async {
+                              final selected = await showDatePicker(
+                                context: context,
+                                initialDate: DateTime.now().add(
+                                  const Duration(days: 365),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                _buildSectionHeading(
-                  theme,
-                  step: '03',
-                  title: 'Review your plan',
-                  subtitle:
-                      'Check the details before creating your savings goal.',
-                ),
-                const SizedBox(height: 10),
-                AppCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Your Savings Plan',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_nameController.text.trim().isEmpty &&
-                          _targetController.text.trim().isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Text(
-                            'Your completed details will appear here.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface
-                                  .withOpacitySafe(0.6),
-                            ),
-                          ),
-                        ),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Goal Name',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface
-                                    .withOpacitySafe(0.7),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Flexible(
-                            child: Text(
-                              _nameController.text.trim(),
-                              textAlign: TextAlign.right,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Target',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface
-                                  .withOpacitySafe(0.7),
-                            ),
-                          ),
-                          Text(
-                            _targetController.text.isNotEmpty
-                                ? 'GH₵${_targetController.text}'
-                                : '—',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (_selectedType == SavingsType.fixedDeposit) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Interest Rate',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface
-                                    .withOpacitySafe(0.7),
-                              ),
-                            ),
-                            Text(
-                              'Unavailable',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Maturity Date',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface
-                                    .withOpacitySafe(0.7),
-                              ),
-                            ),
-                            Text(
-                              _maturityDate != null
-                                  ? '${_maturityDate!.day}/${_maturityDate!.month}/${_maturityDate!.year}'
-                                  : '—',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ] else ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Auto-Save',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface
-                                    .withOpacitySafe(0.7),
-                              ),
-                            ),
-                            Text(
-                              _autoSave ? 'Enabled' : 'Disabled',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: _autoSave
-                                    ? theme.colorScheme.primary
-                                    : theme.colorScheme.onSurface
-                                          .withOpacitySafe(0.6),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isFormValid && !_isSubmitting
-                        ? () async {
-                            if (!mounted) return;
-                            final router = GoRouter.of(context);
-                            final messenger = ScaffoldMessenger.maybeOf(
-                              context,
-                            );
-                            setState(() => _isSubmitting = true);
-
-                            try {
-                              final newSavings = Savings(
-                                id: DateTime.now().millisecondsSinceEpoch
-                                    .toString(),
-                                title: _nameController.text.trim(),
-                                balance: 0,
-                                target:
-                                    double.tryParse(_targetController.text) ??
-                                    0,
-                                type: _selectedType,
-                                interestRate: null,
-                                maturityDate:
-                                    _selectedType == SavingsType.fixedDeposit
-                                    ? _maturityDate
-                                    : null,
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now().add(
+                                  const Duration(days: 365 * 5),
+                                ),
                               );
-
-                              await SavingsStorage.addGoal(newSavings);
-                              ref.invalidate(localSavingsGoalsProvider);
-                              try {
-                                await NotificationService.instance.addNotification(
-                                  AppNotification(
-                                    id: 'savings_created_${DateTime.now().millisecondsSinceEpoch}',
-                                    title: 'Savings goal created',
-                                    message:
-                                        'Your savings goal “${newSavings.title}” is now ready to grow.',
-                                    timestamp: DateTime.now(),
-                                    type: AppNotificationType.savings,
-                                    read: false,
-                                  ),
-                                );
-                              } catch (error) {
-                                debugPrint(
-                                  'Savings goal notification failed: $error',
-                                );
+                              if (selected != null) {
+                                setState(() {
+                                  _maturityDate = selected;
+                                  _validateMaturity();
+                                });
                               }
-
-                              if (!mounted) return;
-
-                              router.pushReplacementNamed(
-                                'savings-success',
-                                extra: newSavings,
-                              );
-                            } on AppException catch (error) {
-                              if (!mounted) return;
-                              setState(() => _isSubmitting = false);
-                              messenger?.showSnackBar(
-                                SnackBar(content: Text(error.message)),
-                              );
-                            } catch (_) {
-                              if (!mounted) return;
-                              setState(() => _isSubmitting = false);
-                              messenger?.showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'We could not create this savings goal. Please try again.',
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: _maturityError != null
+                                      ? theme.colorScheme.error
+                                      : theme.colorScheme.outline
+                                            .withOpacitySafe(0.3),
+                                  width: _maturityError != null ? 1.5 : 1,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                                color: _maturityError != null
+                                    ? theme.colorScheme.error.withOpacitySafe(
+                                        0.05,
+                                      )
+                                    : null,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.calendar_today,
+                                    color: _maturityError != null
+                                        ? theme.colorScheme.error
+                                        : theme.colorScheme.primary,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Maturity Date',
+                                          style: theme.textTheme.labelSmall
+                                              ?.copyWith(
+                                                color: theme
+                                                    .colorScheme
+                                                    .onSurface
+                                                    .withOpacitySafe(0.6),
+                                              ),
+                                        ),
+                                        Text(
+                                          _maturityDate != null
+                                              ? '${_maturityDate!.day}/${_maturityDate!.month}/${_maturityDate!.year}'
+                                              : 'Select date',
+                                          style: theme.textTheme.bodyMedium,
+                                        ),
+                                        if (_maturityError != null)
+                                          Text(
+                                            _maturityError!,
+                                            style: theme.textTheme.labelSmall
+                                                ?.copyWith(
+                                                  color:
+                                                      theme.colorScheme.error,
+                                                ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Interest terms and maturity projections are unavailable until provided by the backend.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.outline,
+                            ),
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primaryContainer
+                                  .withOpacitySafe(0.3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: theme.colorScheme.primary
+                                    .withOpacitySafe(0.2),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Switch(
+                                  value: _autoSave,
+                                  onChanged: (v) =>
+                                      setState(() => _autoSave = v),
+                                  activeThumbColor: theme.colorScheme.primary,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Enable Auto-Save',
+                                        style: theme.textTheme.bodyLarge
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                      Text(
+                                        'Automatically save amounts monthly',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: theme.colorScheme.onSurface
+                                                  .withOpacitySafe(0.6),
+                                            ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              );
-                            }
-                          }
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shadowColor: theme.colorScheme.primary.withOpacitySafe(
-                        0.2,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                    ),
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.white,
+                              ],
                             ),
-                          )
-                        : Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.add_circle_outline_rounded,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text('Create ${_selectedType.label} Goal'),
-                            ],
                           ),
+                        ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          );
+                  const SizedBox(height: 20),
+                  _buildSectionHeading(
+                    theme,
+                    step: '03',
+                    title: 'Review your plan',
+                    subtitle: 'Check the details before creating your goal.',
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFE4EBE6)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _nameController.text.trim().isEmpty
+                              ? 'Your savings goal'
+                              : _nameController.text.trim(),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF1D2B23),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _buildReviewRow(
+                          theme,
+                          label: 'Plan',
+                          value: _selectedType.label,
+                        ),
+                        const SizedBox(height: 10),
+                        _buildReviewRow(
+                          theme,
+                          label: 'Target amount',
+                          value: _targetController.text.trim().isEmpty
+                              ? 'Enter an amount'
+                              : 'GH₵ ${_targetController.text.trim()}',
+                        ),
+                        if (_selectedType == SavingsType.fixedDeposit) ...[
+                          const SizedBox(height: 10),
+                          _buildReviewRow(
+                            theme,
+                            label: 'Maturity date',
+                            value: _maturityDate == null
+                                ? 'Select a date'
+                                : '${_maturityDate!.day}/${_maturityDate!.month}/${_maturityDate!.year}',
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 10),
+                          _buildReviewRow(
+                            theme,
+                            label: 'Auto-save',
+                            value: _autoSave ? 'On' : 'Off',
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _isFormValid && !_isSubmitting
+                          ? () => _createSavingsGoal(context)
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFFD8E2DB),
+                        disabledForegroundColor: const Color(0xFF829087),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.add_circle_outline_rounded,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text('Create ${_selectedType.label} Goal'),
+                              ],
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            );
 
-          if (!isTablet) return content;
-          return Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 860),
-              child: content,
-            ),
-          );
-        },
+            if (!isTablet) return content;
+            return Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 860),
+                child: content,
+              ),
+            );
+          },
+        ),
       ),
     );
+  }
+
+  Future<void> _createSavingsGoal(BuildContext context) async {
+    if (!mounted) return;
+    final router = GoRouter.of(context);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    setState(() => _isSubmitting = true);
+
+    try {
+      final newSavings = Savings(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        title: _nameController.text.trim(),
+        balance: 0,
+        target: double.tryParse(_targetController.text) ?? 0,
+        type: _selectedType,
+        interestRate: null,
+        maturityDate: _selectedType == SavingsType.fixedDeposit
+            ? _maturityDate
+            : null,
+      );
+
+      await SavingsStorage.addGoal(newSavings);
+      ref.invalidate(localSavingsGoalsProvider);
+      try {
+        await NotificationService.instance.addNotification(
+          AppNotification(
+            id: 'savings_created_${DateTime.now().millisecondsSinceEpoch}',
+            title: 'Savings goal created',
+            message:
+                'Your savings goal “${newSavings.title}” is now ready to grow.',
+            timestamp: DateTime.now(),
+            type: AppNotificationType.savings,
+            read: false,
+          ),
+        );
+      } catch (error) {
+        debugPrint('Savings goal notification failed: $error');
+      }
+
+      if (!mounted) return;
+      router.pushReplacementNamed('savings-success', extra: newSavings);
+    } on AppException catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      messenger?.showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      messenger?.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'We could not create this savings goal. Please try again.',
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildSummaryPill(
@@ -1045,6 +986,35 @@ class _CreateSavingsScreenState extends ConsumerState<CreateSavingsScreen> {
           style: theme.textTheme.labelSmall?.copyWith(
             color: color,
             fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReviewRow(
+    ThemeData theme, {
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: const Color(0xFF708077),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: const Color(0xFF26372D),
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],

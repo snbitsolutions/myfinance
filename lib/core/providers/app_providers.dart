@@ -316,7 +316,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     AppLogger.info('Loaded stored authentication');
   }
 
-  /// Verifies the password and requests the OTP required to finish login.
+  /// Authenticates with the member's phone number and password.
   Future<String> login({
     required String phoneNumber,
     required String password,
@@ -366,7 +366,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
               'Choose Sign up > I have an account to link your account first.',
         );
       }
-      AppLogger.info('Linked account number resolved for OTP login.');
+      AppLogger.info('Linked account number resolved for password login.');
 
       await prefs.setString(AppConstants.sharedPrefKeyUserId, userId);
       await prefs.setString(AppConstants.sharedPrefKeyUserEmail, phoneNumber);
@@ -376,12 +376,29 @@ class AuthNotifier extends StateNotifier<AuthState> {
       } else {
         await prefs.remove(AppConstants.sharedPrefKeyUserName);
       }
-      AppLogger.info('Requesting login OTP.');
-      await sendLoginOtp(phoneNumber: phoneNumber, accountNumber: userId);
-      if (mounted) {
-        state = AuthState.unauthenticated();
+
+      final fingerprint = await deviceIdentityService
+          .getInstallationFingerprint();
+      if (session != null) {
+        await SecureAuthStorage.instance.storeSession(
+          authToken: session.accessToken,
+          refreshToken: session.refreshToken,
+          deviceFingerprint: fingerprint,
+        );
+      } else {
+        await SecureAuthStorage.instance.storeDeviceVerifiedSession(
+          deviceFingerprint: fingerprint,
+        );
       }
-      AppLogger.info('Login OTP request accepted.');
+
+      if (mounted) {
+        state = AuthState.authenticated(
+          userId: userId,
+          userEmail: phoneNumber,
+          authToken: session?.accessToken,
+        );
+      }
+      AppLogger.info('Password login completed.');
       return userId;
     } on AppException catch (e) {
       if (mounted) {
@@ -1154,6 +1171,7 @@ final userProfileProvider = FutureProvider<Map<String, dynamic>>((ref) async {
     savings = savingsResponse['data'] is List
         ? (savingsResponse['data'] as List)
               .whereType<Map<String, dynamic>>()
+              .where((item) => !SavingsService.isShareProduct(item))
               .toList()
         : const [];
   } on AppException catch (error) {
@@ -1298,7 +1316,10 @@ final savingsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
     final data = response['data'];
     var savingsAccounts = <Map<String, dynamic>>[];
     if (data is List) {
-      final accounts = data.whereType<Map<String, dynamic>>().toList();
+      final accounts = data
+          .whereType<Map<String, dynamic>>()
+          .where((account) => !SavingsService.isShareProduct(account))
+          .toList();
       savingsAccounts = await Future.wait(
         accounts.map((accountData) async {
           final productId =
@@ -1348,18 +1369,100 @@ final sharesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final imeiNumber = await ref
       .watch(deviceIdentityServiceProvider)
       .getBackendDeviceNumber();
-  final phone = credentials['phone']!;
-  final account = credentials['account']!;
-  final response = await ref
-      .watch(sharesServiceProvider)
-      .getShares(
-        phoneNumber: phone,
-        accountNumber: account,
-        pin: pin,
-        imeiNumber: imeiNumber,
+  final phone = credentials['phone']?.trim() ?? '';
+  final account = credentials['account']?.trim() ?? '';
+  if (phone.isEmpty || account.isEmpty) {
+    throw ValidationException(
+      message: 'Your account details are missing. Please sign in again.',
+    );
+  }
+
+  final sharesService = ref.watch(sharesServiceProvider);
+  final savingsService = ref.watch(savingsServiceProvider);
+  List<Map<String, dynamic>> apiShares = [];
+  AppException? sharesError;
+  try {
+    final response = await sharesService.getShares(
+      phoneNumber: phone,
+      accountNumber: account,
+      pin: pin,
+      imeiNumber: imeiNumber,
+    );
+    final data = response['data'];
+    if (data is List) {
+      apiShares = data.whereType<Map<String, dynamic>>().toList();
+    }
+  } on AppException catch (error) {
+    sharesError = error;
+    AppLogger.warning(
+      'Dedicated shares endpoint unavailable; checking member savings products.',
+      error,
+    );
+  }
+
+  List<Map<String, dynamic>> memberProducts;
+  try {
+    final response = await savingsService.getSavingsList(
+      phoneNumber: phone,
+      accountNumber: account,
+      pin: pin,
+      imeiNumber: imeiNumber,
+    );
+    final data = response['data'];
+    memberProducts = data is List
+        ? data.whereType<Map<String, dynamic>>().toList()
+        : [];
+  } on AppException catch (error) {
+    if (apiShares.isNotEmpty) {
+      AppLogger.warning(
+        'Member savings products unavailable; showing dedicated shares data.',
+        error,
       );
-  final data = response['data'];
-  return data is List ? data.whereType<Map<String, dynamic>>().toList() : [];
+      return apiShares;
+    }
+    rethrow;
+  }
+
+  final sharesFromMemberProducts = memberProducts
+      .where(SavingsService.isShareProduct)
+      .toList();
+  if (sharesError != null && sharesFromMemberProducts.isEmpty) {
+    throw sharesError;
+  }
+
+  final result = <Map<String, dynamic>>[...apiShares];
+  final knownIds = apiShares
+      .map(
+        (share) =>
+            (share['id'] ??
+                    share['share_id'] ??
+                    share['account_id'] ??
+                    share['product_id'] ??
+                    share['savings_id'])
+                ?.toString()
+                .trim()
+                .toLowerCase() ??
+            '',
+      )
+      .where((id) => id.isNotEmpty)
+      .toSet();
+  for (final share in sharesFromMemberProducts) {
+    final id =
+        (share['id'] ??
+                share['share_id'] ??
+                share['account_id'] ??
+                share['product_id'] ??
+                share['savings_id'])
+            ?.toString()
+            .trim()
+            .toLowerCase() ??
+        '';
+    if (id.isEmpty || knownIds.add(id)) {
+      result.add(share);
+    }
+  }
+
+  return result;
 });
 
 final investmentsApiProvider = FutureProvider<List<Map<String, dynamic>>>((

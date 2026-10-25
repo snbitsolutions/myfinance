@@ -58,6 +58,10 @@ void main() {
     final targetField = find.widgetWithText(TextField, 'e.g., 2000');
     expect(goalField, findsOneWidget);
     expect(targetField, findsOneWidget);
+    expect(find.text('Choose your savings plan'), findsOneWidget);
+    expect(find.text('Review your plan'), findsOneWidget);
+    expect(find.text('Live goal snapshot'), findsOneWidget);
+    expect(find.text('Review'), findsOneWidget);
 
     await tester.enterText(goalField, 'Laptop Upgrade Fund');
     await tester.enterText(targetField, '3000');

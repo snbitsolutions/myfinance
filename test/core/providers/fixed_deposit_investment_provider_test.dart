@@ -27,6 +27,18 @@ class _FixedDepositSavingsService extends SavingsService {
           'balance': 100,
           'type': 'member',
         },
+        {
+          'savings_id': 'share-1',
+          'name': 'PROJECT SHARES',
+          'balance': 891.03,
+          'type': 'member',
+        },
+        {
+          'savings_id': 'share-2',
+          'name': 'ORDINARY SHARES',
+          'balance': 2262.73,
+          'type': 'member',
+        },
       ],
     };
   }
@@ -49,6 +61,18 @@ class _FixedDepositSavingsService extends SavingsService {
         },
       ],
     };
+  }
+}
+
+class _EmptySharesService extends SharesService {
+  @override
+  Future<Map<String, dynamic>> getShares({
+    required String phoneNumber,
+    required String accountNumber,
+    required String pin,
+    required int imeiNumber,
+  }) async {
+    return {'status': 'success', 'data': <Map<String, dynamic>>[]};
   }
 }
 
@@ -123,6 +147,7 @@ void main() {
           'account': '0010500000133848',
         }),
         savingsServiceProvider.overrideWith((ref) => savingsService),
+        sharesServiceProvider.overrideWith((ref) => _EmptySharesService()),
         investmentServiceProvider.overrideWith(
           (ref) => _UnavailableInvestmentService(),
         ),
@@ -145,6 +170,22 @@ void main() {
     expect(savings.map((record) => record['name']), ['Member Savings']);
     expect(savingsService.fixedDepositRequests, 0);
   });
+
+  test(
+    'shares from the member savings endpoint appear in the shares list',
+    () async {
+      final shares = await container.read(sharesProvider.future);
+
+      expect(shares.map((record) => record['name']), [
+        'PROJECT SHARES',
+        'ORDINARY SHARES',
+      ]);
+      expect(shares.map((record) => record['savings_id']), [
+        'share-1',
+        'share-2',
+      ]);
+    },
+  );
 
   test('fixed deposits appear in investment records', () async {
     final investments = await container.read(investmentsApiProvider.future);

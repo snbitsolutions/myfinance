@@ -40,7 +40,7 @@ class ReviewWithdrawalScreen extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Withdrawal submission is unavailable until backend processing is ready.',
+                      'Continuing will submit a withdrawal request to your savings provider. The provider has not supplied a fee estimate, so any additional charge is not shown here. A pending result means the provider has not confirmed completion.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -155,15 +155,11 @@ class ReviewWithdrawalScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _SummaryRow(
-                    'Transaction Fee',
-                    'Unavailable',
-                    theme,
-                  ),
+                  _SummaryRow('Provider fee', 'Not provided', theme),
                   const Divider(height: 16),
                   _SummaryRow(
-                    'Total Amount',
-                    'Unavailable',
+                    'Amount requested',
+                    'GH₵ ${data.amount.toStringAsFixed(2)}',
                     theme,
                     isBold: true,
                   ),
@@ -220,14 +216,15 @@ class ReviewWithdrawalScreen extends StatelessWidget {
               width: double.infinity,
               height: 50,
               child: FilledButton(
-                onPressed: null,
+                onPressed: () =>
+                    context.push('/withdrawal/authenticate', extra: data),
                 style: FilledButton.styleFrom(
                   backgroundColor: theme.colorScheme.primary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text('Withdrawal unavailable'),
+                child: const Text('Authorize Withdrawal'),
               ),
             ),
             const SizedBox(height: 12),

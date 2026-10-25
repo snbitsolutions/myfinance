@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/color_ext.dart';
 import '../../core/app_card.dart';
+import '../../core/app_scaffold.dart';
 import 'package:go_router/go_router.dart';
 
 class PaymentSuccessScreen extends StatelessWidget {
@@ -52,7 +53,7 @@ class PaymentSuccessScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final resolvedTitle = (title != null && title!.trim().isNotEmpty)
         ? title!
-        : (isPending ? 'Deposit Pending' : 'Deposit Status');
+        : (isPending ? 'Deposit Pending' : 'Provider reported completion');
     final resolvedMessage = (message != null && message!.trim().isNotEmpty)
         ? message!
         : (isPending
@@ -62,241 +63,184 @@ class PaymentSuccessScreen extends StatelessWidget {
     final resolvedPaymentMethod = paymentMethod ?? 'Mobile Money';
     final resolvedNewBalance = newBalance;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          // Dark green header at the very top
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.fromLTRB(
-              20,
-              MediaQuery.of(context).padding.top + 16,
-              20,
-              24,
-            ),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF075D21), Color(0xFF08752B)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Row(
+    return AppScaffold(
+      title: 'Deposit Status',
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            // Success Icon with decorative dots
+            Stack(
+              alignment: Alignment.center,
               children: [
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: const Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white,
+                // Decorative dots scattered around
+                ..._generateDecorativeDots(),
+                // Center checkmark icon
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withOpacitySafe(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 16),
-                const Text(
-                  'Deposit Status',
-                  style: TextStyle(
+                  child: Icon(
+                    isPending
+                        ? Icons.hourglass_top_rounded
+                        : Icons.check_rounded,
+                    size: 56,
                     color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
             ),
-          ),
-          // Scrollable content
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+            const SizedBox(height: 24),
+            // Title
+            Text(
+              resolvedTitle,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: theme.colorScheme.onSurface,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            // Message
+            Text(
+              resolvedMessage,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            // Amount section (plain background)
+            Text(
+              _formatAmount(),
+              style: theme.textTheme.displaySmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              isPending ? 'Amount Requested' : 'Amount Deposited',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Transaction Details Card
+            AppCard(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Success Icon with decorative dots
-                  Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Decorative dots scattered around
-                      ..._generateDecorativeDots(),
-                      // Center checkmark icon
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: theme.colorScheme.primary.withOpacitySafe(
-                                0.3,
-                              ),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          isPending
-                              ? Icons.hourglass_top_rounded
-                              : Icons.check_rounded,
-                          size: 56,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  // Title
-                  Text(
-                    resolvedTitle,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  // Message
-                  Text(
-                    resolvedMessage,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  // Amount section (plain background)
-                  Text(
-                    _formatAmount(),
-                    style: theme.textTheme.displaySmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Amount entered',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Transaction Details Card
-                  AppCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _TransactionDetailRow(
-                          'Account',
-                          resolvedAccount,
-                          theme,
-                        ),
-                        _TransactionDetailRow(
-                          'Method',
-                          resolvedPaymentMethod,
-                          theme,
-                        ),
-                        _TransactionDetailRow(
-                          'Reference',
-                          _formatReference(),
-                          theme,
-                        ),
-                        _TransactionDetailRow('Date', _formatDateTime(), theme),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  // Balance Card
-                  AppCard(
-                    backgroundColor: const Color(0xFFF0F8EF),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.trending_up_rounded,
-                          color: theme.colorScheme.primary,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                isPending
-                                    ? 'Balance will update after confirmation'
-                                    : 'Balance',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurface
-                                      .withOpacitySafe(0.6),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                isPending || resolvedNewBalance == null
-                                    ? 'Balance unavailable'
-                                    : 'GH₵${resolvedNewBalance.toStringAsFixed(2)}',
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Action Buttons
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: FilledButton(
-                      onPressed: () {
-                        if (primaryActionRoute != null &&
-                            primaryActionRoute!.trim().isNotEmpty) {
-                          context.go(primaryActionRoute!);
-                        } else {
-                          context.go('/savings');
-                        }
-                      },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: theme.colorScheme.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(primaryActionLabel ?? 'Done'),
-                    ),
-                  ),
-                  if (secondaryActionRoute != null &&
-                      secondaryActionRoute!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: OutlinedButton(
-                        onPressed: () => context.push(
-                          secondaryActionRoute!,
-                          extra: {
-                            'amount': amount,
-                            'processedAt': processedAt?.toIso8601String(),
-                            'reference': reference,
-                            'account': account,
-                            'paymentMethod': paymentMethod,
-                            'newBalance': newBalance,
-                            'isPending': isPending,
-                          },
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(secondaryActionLabel ?? 'View Receipt'),
-                      ),
-                    ),
-                  ],
+                  _TransactionDetailRow('Account', resolvedAccount, theme),
+                  _TransactionDetailRow('Method', resolvedPaymentMethod, theme),
+                  _TransactionDetailRow('Reference', _formatReference(), theme),
+                  _TransactionDetailRow('Date', _formatDateTime(), theme),
                 ],
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 14),
+            // Balance Card
+            AppCard(
+              backgroundColor: const Color(0xFFF0F8EF),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.trending_up_rounded,
+                    color: theme.colorScheme.primary,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isPending
+                              ? 'Balance will update after confirmation'
+                              : 'Balance',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacitySafe(
+                              0.6,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isPending || resolvedNewBalance == null
+                              ? 'Balance unavailable'
+                              : 'GH₵${resolvedNewBalance.toStringAsFixed(2)}',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Action Buttons
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: FilledButton(
+                onPressed: () {
+                  if (primaryActionRoute != null &&
+                      primaryActionRoute!.trim().isNotEmpty) {
+                    context.go(primaryActionRoute!);
+                  } else {
+                    context.go('/savings');
+                  }
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(primaryActionLabel ?? 'Done'),
+              ),
+            ),
+            if (secondaryActionRoute != null &&
+                secondaryActionRoute!.trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton(
+                  onPressed: () => context.push(
+                    secondaryActionRoute!,
+                    extra: {
+                      'amount': amount,
+                      'processedAt': processedAt?.toIso8601String(),
+                      'reference': reference,
+                      'account': account,
+                      'paymentMethod': paymentMethod,
+                      'newBalance': newBalance,
+                      'isPending': isPending,
+                    },
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(secondaryActionLabel ?? 'View Receipt'),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

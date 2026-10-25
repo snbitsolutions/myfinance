@@ -42,6 +42,7 @@ import '../screens/payment/payment_receipt_screen.dart';
 import '../screens/payment/payment_screen.dart';
 import '../screens/payment/payment_success_screen.dart';
 import '../screens/payment/payments_hub_screen.dart';
+import '../screens/payment/payroll_deduction_adjustment_screen.dart';
 import '../screens/profile/kyc_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/profile/settings_screen.dart';
@@ -392,6 +393,10 @@ class AppRouter {
         GoRoute(
           path: '/payments-hub',
           builder: (context, state) => const PaymentsHubScreen(),
+        ),
+        GoRoute(
+          path: '/payroll-deduction-adjustment',
+          builder: (context, state) => const PayrollDeductionAdjustmentScreen(),
         ),
         GoRoute(
           path: '/payment/bills',

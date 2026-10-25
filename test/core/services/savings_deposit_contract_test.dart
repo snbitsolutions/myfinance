@@ -92,17 +92,79 @@ void main() {
     },
   );
 
-  test('returns an empty list when the fixed deposit API has no records', () async {
-    adapter = _DepositResponseAdapter('{"status":0,"message":"No Record Found"}');
+  test(
+    'returns an empty list when the fixed deposit API has no records',
+    () async {
+      adapter = _DepositResponseAdapter(
+        '{"status":0,"message":"No Record Found"}',
+      );
+      savingsDio.httpClientAdapter = adapter;
+
+      final result = await SavingsService().getFixedDeposits(
+        accountNumber: '0010500000133848',
+        imeiNumber: 100200300,
+      );
+
+      expect(result['status'], 'success');
+      expect(result['data'], isEmpty);
+    },
+  );
+
+  test(
+    'identifies share products returned by the member savings endpoint',
+    () async {
+      adapter = _DepositResponseAdapter(
+        '{"status":1,"data":['
+        '{"id":"1436","name":"PROJECT SHARES","balance":"891.03"},'
+        '{"id":"1437","product_name":"ORDINARY SHARES","balance":"2262.73"},'
+        '{"id":"1438","name":"Member Investment","type":"member",'
+        '"product_type":"shares","balance":"100"},'
+        '{"id":"9656","name":"SAVINGS","balance":"324.95"}]}',
+      );
+      savingsDio.httpClientAdapter = adapter;
+
+      final result = await SavingsService().getSavingsList(
+        phoneNumber: '0241234567',
+        accountNumber: '0010600000040752',
+        pin: '',
+        imeiNumber: 100200300,
+      );
+
+      final products = result['data'] as List<Map<String, dynamic>>;
+      expect(products.map((product) => product['name']), [
+        'PROJECT SHARES',
+        'ORDINARY SHARES',
+        'Member Investment',
+        'SAVINGS',
+      ]);
+      expect(products.map(SavingsService.isShareProduct), [
+        true,
+        true,
+        true,
+        false,
+      ]);
+    },
+  );
+
+  test('keeps share products available through the shares endpoint', () async {
+    adapter = _DepositResponseAdapter(
+      '{"status":1,"shares":['
+      '{"id":"1436","name":"PROJECT SHARES","balance":"891.03"},'
+      '{"id":"1437","name":"ORDINARY SHARES","balance":"2262.73"}]}',
+    );
     savingsDio.httpClientAdapter = adapter;
 
-    final result = await SavingsService().getFixedDeposits(
-      accountNumber: '0010500000133848',
+    final result = await SharesService().getShares(
+      phoneNumber: '0241234567',
+      accountNumber: '0010600000040752',
+      pin: '',
       imeiNumber: 100200300,
     );
 
-    expect(result['status'], 'success');
-    expect(result['data'], isEmpty);
+    expect((result['data'] as List).map((share) => share['name']), [
+      'PROJECT SHARES',
+      'ORDINARY SHARES',
+    ]);
   });
 
   test(
@@ -133,7 +195,7 @@ void main() {
       expect(body.containsKey('pin'), isFalse);
       expect(body.containsKey('account_number'), isFalse);
       expect(result['transaction_id'], 'deposit-123');
-      expect(result['is_pending'], isNull);
+      expect(result['is_pending'], isFalse);
     },
   );
 
@@ -155,6 +217,68 @@ void main() {
       expect(result['reference'], result['transaction_id']);
     },
   );
+
+  test(
+    'treats an unrecognized successful HTTP response as pending, not failed',
+    () async {
+      adapter = _DepositResponseAdapter(
+        '{"status":0,"message":"Request accepted","transaction_id":"deposit-456"}',
+      );
+      dio.httpClientAdapter = adapter;
+
+      final result = await SavingsService().depositSavings(
+        phoneNumber: '233241234567',
+        amount: 10,
+        savingsId: '59656',
+      );
+
+      expect(result['status'], 'pending');
+      expect(result['is_pending'], isTrue);
+      expect(result['transaction_id'], 'deposit-456');
+      expect(result['reference'], 'deposit-456');
+      expect(
+        result['message'],
+        contains('Request accepted Do not submit another deposit'),
+      );
+    },
+  );
+
+  test(
+    'keeps an accepted response pending when the provider omits its reference',
+    () async {
+      adapter = _DepositResponseAdapter(
+        '{"status":"processing","message":"Deposit request received"}',
+      );
+      dio.httpClientAdapter = adapter;
+
+      final result = await SavingsService().depositSavings(
+        phoneNumber: '233241234567',
+        amount: 10,
+        savingsId: '59656',
+      );
+
+      expect(result['status'], 'pending');
+      expect(result['is_pending'], isTrue);
+      expect(result['transaction_id'], startsWith('ATCCU-'));
+      expect(result['reference'], result['transaction_id']);
+    },
+  );
+
+  test('continues to reject an explicitly failed savings deposit', () async {
+    adapter = _DepositResponseAdapter(
+      '{"status":"failed","message":"Payment declined"}',
+    );
+    dio.httpClientAdapter = adapter;
+
+    await expectLater(
+      SavingsService().depositSavings(
+        phoneNumber: '233241234567',
+        amount: 10,
+        savingsId: '59656',
+      ),
+      throwsA(isA<GenericException>()),
+    );
+  });
 
   test(
     'sends documented airtime payload and reports empty response pending',
@@ -277,11 +401,33 @@ void main() {
       savingsId: '59656',
     );
 
-    expect(result['status'], 'success');
+    expect(result['status'], 'pending');
     expect(result['is_pending'], isTrue);
     expect(result['transaction_id'], isNotEmpty);
     expect(result['reference'], result['transaction_id']);
   });
+
+  test(
+    'keeps a success response without a provider reference pending',
+    () async {
+      adapter = _DepositResponseAdapter('{"status":1,"message":"Accepted"}');
+      dio.httpClientAdapter = adapter;
+
+      final result = await SavingsService().withdrawSavings(
+        phoneNumber: '233241234567',
+        accountNumber: '1234567890',
+        pin: '1234',
+        amount: 20,
+        imeiNumber: 123456,
+        savingsId: '59656',
+      );
+
+      expect(result['status'], 'pending');
+      expect(result['is_pending'], isTrue);
+      expect(result['message'], 'Accepted');
+      expect(result['transaction_id'], startsWith('ATCCU-W-'));
+    },
+  );
 
   test('rejects non-positive withdrawal amounts before posting', () async {
     await expectLater(

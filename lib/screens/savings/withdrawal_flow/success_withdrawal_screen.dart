@@ -76,7 +76,9 @@ class SuccessWithdrawalScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 16),
                 Text(
-                  isPending ? 'Withdrawal Pending' : 'Provider reported completion',
+                  isPending
+                      ? 'Withdrawal Pending'
+                      : 'Provider reported completion',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -113,9 +115,9 @@ class SuccessWithdrawalScreen extends StatelessWidget {
                           ],
                         ),
                         child: Icon(
-                        isPending
-                            ? Icons.hourglass_top_rounded
-                            : Icons.check_rounded,
+                          isPending
+                              ? Icons.hourglass_top_rounded
+                              : Icons.check_rounded,
                           size: 56,
                           color: Colors.white,
                         ),
@@ -125,7 +127,9 @@ class SuccessWithdrawalScreen extends StatelessWidget {
                   const SizedBox(height: 24),
                   // Title
                   Text(
-                    isPending ? 'Withdrawal Pending' : 'Provider reported completion',
+                    isPending
+                        ? 'Withdrawal Pending'
+                        : 'Provider reported completion',
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -167,7 +171,13 @@ class SuccessWithdrawalScreen extends StatelessWidget {
                         _DetailRow('From Account', data.fromAccount, theme),
                         _DetailRow('To', data.method, theme),
                         _DetailRow('Phone Number', data.phoneNumber, theme),
-                        _DetailRow('Reference', data.reference ?? '', theme),
+                        _DetailRow(
+                          isPending
+                              ? 'Request Reference'
+                              : 'Provider Reference',
+                          data.reference ?? 'Unavailable',
+                          theme,
+                        ),
                       ],
                     ),
                   ),

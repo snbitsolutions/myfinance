@@ -33,13 +33,13 @@ class AppScaffold extends StatelessWidget {
     Future<void> handleBackNavigation() async {
       if (!context.mounted) return;
 
-      if (context.canPop()) {
-        context.pop();
+      if (backRoute != null) {
+        context.go(backRoute!);
         return;
       }
 
-      if (backRoute != null) {
-        context.go(backRoute!);
+      if (context.canPop()) {
+        context.pop();
         return;
       }
 

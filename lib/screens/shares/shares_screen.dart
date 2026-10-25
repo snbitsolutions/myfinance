@@ -240,8 +240,12 @@ class _SharesScreenState extends ConsumerState<SharesScreen> {
                 children: [
                   Expanded(
                     child: _StatPill(
-                      label: 'Total Shares',
-                      value: sharesOwnedAvailable ? '$totalShares' : 'Unavailable',
+                      label: sharesOwnedAvailable
+                          ? 'Total Shares'
+                          : 'Share Holdings',
+                      value: sharesOwnedAvailable
+                          ? '$totalShares'
+                          : '${displayedShares.length}',
                       accent: const Color(0xFF2E8B57),
                     ),
                   ),
@@ -257,6 +261,15 @@ class _SharesScreenState extends ConsumerState<SharesScreen> {
                   ),
                 ],
               ),
+              if (displayedShares.isNotEmpty && !sharesOwnedAvailable) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Share unit totals are not included in the provider data.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
 
               Row(
@@ -502,6 +515,7 @@ class _SharesScreenState extends ConsumerState<SharesScreen> {
           item['share_id'] ??
           item['account_id'] ??
           item['product_id'] ??
+          item['savings_id'] ??
           item['symbol'] ??
           'share',
       'company':

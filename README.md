@@ -93,6 +93,39 @@ flutter pub get
 flutter run
 ```
 
+### Android release signing
+
+Create an upload keystore locally. `keytool` prompts for the keystore and key
+passwords; keep them private and make a secure backup of the keystore.
+
+```bash
+keytool -genkey -v \
+  -keystore android/upload-keystore.jks \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -alias upload
+```
+
+Create `android/key.properties` (this file and `.jks` files are ignored by
+Git), and set its values to match the keystore:
+
+```properties
+storePassword=YOUR_KEYSTORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=upload
+storeFile=../upload-keystore.jks
+```
+
+Build a Google Play upload bundle with:
+
+```bash
+flutter build appbundle
+```
+
+Release builds fail if signing is not configured; debug builds do not require
+the keystore. The Android application ID is `com.adepa.teachers`; confirm it
+matches the package name registered for the app in Google Play. Do not change
+that ID after publishing.
+
 ## Project Structure
 
 ```

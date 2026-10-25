@@ -216,17 +216,19 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           'newBalance': newBalance,
           'processedAt': DateTime.now().toIso8601String(),
           'message':
-            response['message']?.toString() ??
-            (_isReceiveMoneyFlow
-                ? 'The MoMo deposit request has been submitted.'
-                : 'Deposit submitted successfully.'),
+              response['message']?.toString() ??
+              (_isReceiveMoneyFlow
+                  ? 'The MoMo deposit request has been submitted.'
+                  : isPending
+                  ? 'Your deposit request is awaiting provider confirmation.'
+                  : 'The provider reported that the deposit request completed.'),
           'title': _isReceiveMoneyFlow
-            ? isPending
-                  ? 'Payment Request Pending'
-                  : 'Deposit Submitted'
-            : isPending
-            ? 'Deposit Pending'
-            : 'Deposit Successful',
+              ? isPending
+                    ? 'Payment Request Pending'
+                    : 'Deposit Submitted'
+              : isPending
+              ? 'Deposit Pending'
+              : 'Provider reported completion',
           'isPending': isPending,
           'primaryActionLabel': 'Back to Savings',
           'primaryActionRoute': widget.returnRoute ?? '/savings',

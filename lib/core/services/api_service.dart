@@ -361,7 +361,8 @@ class AuthService extends BaseService {
         'birth_date': birthDate,
         'password': ?normalizedPassword,
         if (normalizedTransactionPin != null)
-          'trans_pin': int.tryParse(normalizedTransactionPin) ??
+          'trans_pin':
+              int.tryParse(normalizedTransactionPin) ??
               normalizedTransactionPin,
         'imei_number': imeiNumber,
         'phone_make': phoneMake,
@@ -1045,6 +1046,23 @@ class SavingsService extends BaseService {
     return double.tryParse(v.toString().replaceAll(',', ''));
   }
 
+  static bool isShareProduct(Map<String, dynamic> product) {
+    final searchableFields = [
+      product['type'],
+      product['product_type'],
+      product['savings_type'],
+      product['name'],
+      product['product_name'],
+      product['pro_name'],
+      product['account_name'],
+    ].whereType<String>().join(' ');
+
+    return RegExp(
+      r'\bshares?\b',
+      caseSensitive: false,
+    ).hasMatch(searchableFields);
+  }
+
   /// Get list of savings products/accounts via live /getSavingsProducts endpoint
   Future<Map<String, dynamic>> getSavingsList({
     required String phoneNumber,
@@ -1129,6 +1147,10 @@ class SavingsService extends BaseService {
                 s['target'] ?? s['target_amount'] ?? s['goal_amount'],
               ),
               'interest_rate': _toDoubleOrNull(s['interest_rate'] ?? s['rate']),
+              'product_type': textValue([
+                s['product_type'],
+                s['savings_type'],
+              ], ''),
               'type': textValue([
                 s['type'],
                 s['product_type'],
@@ -1174,8 +1196,7 @@ class SavingsService extends BaseService {
       if (hasExplicitFailure(data)) {
         throw GenericException(
           message:
-              data['message']?.toString() ??
-              'Unable to load fixed deposits.',
+              data['message']?.toString() ?? 'Unable to load fixed deposits.',
         );
       }
 
@@ -1187,35 +1208,32 @@ class SavingsService extends BaseService {
         return fallback;
       }
 
-      final fixedDeposits = _findFirstList(data)
-          .whereType<Map>()
-          .map((record) {
-            final entry = Map<String, dynamic>.from(record);
-            return {
-              ...entry,
-              'savings_id': textValue([
-                entry['id'],
-                entry['fixed_deposit_id'],
-                entry['deposit_id'],
-                entry['fd_id'],
-                entry['account_number'],
-              ], ''),
-              'name': textValue([
-                entry['name'],
-                entry['product_name'],
-                entry['account_name'],
-              ], 'Fixed Deposit'),
-              'balance':
-                  entry['balance'] ??
-                  entry['principal_amount'] ??
-                  entry['deposit_amount'] ??
-                  entry['amount'] ??
-                  entry['initial_amount'] ??
-                  entry['current_balance'],
-              'type': 'fixed_deposit',
-            };
-          })
-          .toList();
+      final fixedDeposits = _findFirstList(data).whereType<Map>().map((record) {
+        final entry = Map<String, dynamic>.from(record);
+        return {
+          ...entry,
+          'savings_id': textValue([
+            entry['id'],
+            entry['fixed_deposit_id'],
+            entry['deposit_id'],
+            entry['fd_id'],
+            entry['account_number'],
+          ], ''),
+          'name': textValue([
+            entry['name'],
+            entry['product_name'],
+            entry['account_name'],
+          ], 'Fixed Deposit'),
+          'balance':
+              entry['balance'] ??
+              entry['principal_amount'] ??
+              entry['deposit_amount'] ??
+              entry['amount'] ??
+              entry['initial_amount'] ??
+              entry['current_balance'],
+          'type': 'fixed_deposit',
+        };
+      }).toList();
 
       return {'status': 'success', 'data': fixedDeposits};
     });
@@ -1335,24 +1353,79 @@ class SavingsService extends BaseService {
       AppLogger.logApiResponse('POST', ApiEndpoints.depositFunds, data);
 
       final status = data['status'];
-      if (!AuthSession.isSuccessStatus(status)) {
+      final normalizedStatus = status?.toString().trim().toLowerCase();
+      final isPending = const {
+        '0',
+        'accepted',
+        'awaiting_authorization',
+        'awaiting_confirmation',
+        'created',
+        'initiated',
+        'pending',
+        'processing',
+        'queued',
+      }.contains(normalizedStatus);
+      final isConfirmed =
+          AuthSession.isSuccessStatus(status) ||
+          AuthSession.isSuccessStatus(data['success']) ||
+          AuthSession.isSuccessStatus(data['is_success']) ||
+          const {
+            'complete',
+            'completed',
+            'paid',
+            'successful',
+          }.contains(normalizedStatus);
+      final isExplicitFailure =
+          status == false ||
+          data['success'] == false ||
+          data['is_success'] == false ||
+          const {
+            'cancelled',
+            'canceled',
+            'declined',
+            'denied',
+            'error',
+            'failed',
+            'failure',
+            'rejected',
+          }.contains(normalizedStatus);
+
+      if (isExplicitFailure) {
         throw GenericException(
           message: data['message'] as String? ?? 'Deposit failed.',
         );
       }
 
-      final transactionId = data['transaction_id'] ?? data['transactionId'];
-      if (transactionId == null || transactionId.toString().trim().isEmpty) {
-        throw GenericException(
-          message:
-              'Deposit succeeded but the server returned no transaction reference.',
-        );
-      }
+      final providerReference =
+          data['transaction_id'] ??
+          data['transactionId'] ??
+          data['reference'] ??
+          data['client_reference'];
+      final hasProviderReference =
+          providerReference != null &&
+          providerReference.toString().trim().isNotEmpty;
+      final isAwaitingConfirmation =
+          isPending || !isConfirmed || !hasProviderReference;
+      final transactionId = hasProviderReference
+          ? providerReference.toString()
+          : reference;
+      final backendMessage = data['message']?.toString().trim();
+      final message = isAwaitingConfirmation
+          ? [
+              if (backendMessage != null && backendMessage.isNotEmpty)
+                backendMessage,
+              'Do not submit another deposit until you confirm this transaction in your balance or transaction history.',
+            ].join(' ')
+          : backendMessage?.isNotEmpty == true
+          ? backendMessage!
+          : 'Deposit successful';
 
       return {
-        'status': 'success',
-        'message': data['message'] as String? ?? 'Deposit successful',
-        'transaction_id': transactionId.toString(),
+        'status': isAwaitingConfirmation ? 'pending' : 'success',
+        'is_pending': isAwaitingConfirmation,
+        'message': message,
+        'transaction_id': transactionId,
+        'reference': transactionId,
         'new_balance': _toDoubleOrNull(data['new_balance'] ?? data['balance']),
       };
     });
@@ -1405,7 +1478,7 @@ class SavingsService extends BaseService {
           response.statusCode! < 300 &&
           isBackendEmptyPayload(raw)) {
         return {
-          'status': 'success',
+          'status': 'pending',
           'is_pending': true,
           'message': 'Withdrawal initiated',
           'transaction_id': reference,
@@ -1426,17 +1499,29 @@ class SavingsService extends BaseService {
         );
       }
 
-      final transactionId =
+      final providerReference =
           data['transaction_id'] ??
           data['transactionId'] ??
           data['reference'] ??
-          reference;
+          data['provider_transaction_id'] ??
+          data['providerTransactionId'];
+      final isConfirmed =
+          !isPending &&
+          AuthSession.isSuccessStatus(status) &&
+          providerReference != null &&
+          providerReference.toString().trim().isNotEmpty;
+      final transactionId = isConfirmed ? providerReference : reference;
 
       return {
-        'status': 'success',
-        'is_pending': isPending,
-        'message': data['message'] as String? ?? 'Withdrawal successful',
+        'status': isConfirmed ? 'success' : 'pending',
+        'is_pending': !isConfirmed,
+        'message':
+            data['message'] as String? ??
+            (isConfirmed
+                ? 'Withdrawal successful'
+                : 'Withdrawal submitted and awaiting provider confirmation.'),
         'transaction_id': transactionId.toString(),
+        'reference': transactionId.toString(),
         'processed_at': data['processed_at'] ?? data['processedAt'],
         'new_balance': _toDoubleOrNull(data['new_balance'] ?? data['balance']),
       };

@@ -149,7 +149,9 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    data.isPending ? 'Withdrawal Requested' : 'Withdrawal Amount',
+                    data.isPending
+                        ? 'Withdrawal Requested'
+                        : 'Withdrawal Amount',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
                     ),
@@ -162,7 +164,9 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
                       children: [
                         _DetailRow(
                           'Transaction Status',
-                          data.isPending ? 'Pending' : 'Provider reported completion',
+                          data.isPending
+                              ? 'Pending'
+                              : 'Provider reported completion',
                           theme,
                         ),
                         _Divider(theme),
@@ -175,7 +179,9 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
                         _DetailRow('Date & Time', dateFormat, theme),
                         _Divider(theme),
                         _DetailRow(
-                          'Reference Number',
+                          data.isPending
+                              ? 'Request Reference'
+                              : 'Provider Reference',
                           data.reference ?? 'N/A',
                           theme,
                         ),

@@ -53,15 +53,6 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
     return null;
   }
 
-  String _readName(Map<String, dynamic>? profile) {
-    final direct = profile?['name']?.toString().trim() ?? '';
-    if (direct.isNotEmpty) return direct;
-
-    final first = profile?['first_name']?.toString().trim() ?? '';
-    final last = profile?['last_name']?.toString().trim() ?? '';
-    return [first, last].where((value) => value.isNotEmpty).join(' ');
-  }
-
   double _readAmount(Object? value) {
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString().replaceAll(',', '') ?? '') ?? 0;
@@ -76,6 +67,21 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
     });
   }
 
+  void _continueToPayment() {
+    final returnRoute = '/savings/${widget.savingsId}';
+    final destination = Uri(
+      path: '/payment',
+      queryParameters: {
+        'returnRoute': returnRoute,
+        'sourceLabel': 'Deposit',
+        'amount': _amount.toStringAsFixed(2),
+        'method': _selectedMethod == 'Mobile Money' ? 'MoMo' : 'Account',
+        'savingsId': widget.savingsId,
+      },
+    ).toString();
+    context.go(destination);
+  }
+
   @override
   void dispose() {
     _amountController.dispose();
@@ -85,8 +91,8 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final profileAsync = ref.watch(userProfileProvider);
-    final profile = profileAsync.valueOrNull;
+    final primary = theme.colorScheme.primary;
+    final profile = ref.watch(userProfileProvider).valueOrNull;
     final account = _selectedAccount(profile);
     final accountTitle =
         (account?['pro_name'] ??
@@ -102,52 +108,20 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
     final balance = _readAmount(
       account?['balance'] ?? account?['current_balance'],
     );
-    final customerName = _readName(profile);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6F3),
+      backgroundColor: const Color(0xFFF4F7F4),
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Deposit',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF2E8B57),
-              ),
-            ),
-            if (customerName.isNotEmpty)
-              Text(
-                customerName,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black54,
-                ),
-              ),
-          ],
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: theme.colorScheme.primary,
-        elevation: 0.5,
+        title: const Text('Deposit'),
+        backgroundColor: const Color(0xFFF4F7F4),
+        foregroundColor: theme.colorScheme.onSurface,
+        elevation: 0,
         leading: IconButton(
-          onPressed: () => context.go(
-            '/savings/${widget.savingsId}',
-            extra: widget.savings,
-          ),
+          onPressed: () =>
+              context.go('/savings/${widget.savingsId}', extra: widget.savings),
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           tooltip: 'Back',
         ),
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.help_outline_rounded),
-            tooltip: 'Help',
-          ),
-        ],
       ),
       body: SafeArea(
         top: false,
@@ -155,128 +129,62 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
           children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      customerName.isEmpty
-                          ? 'Savings Account'
-                          : 'Deposit for $customerName',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: Colors.black54,
-                        fontWeight: FontWeight.w600,
+                      'Add money to savings',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                        color: const Color(0xFF163A2A),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(22),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEAF5EE),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Icon(
-                              Icons.savings_rounded,
-                              color: Color(0xFF2E8B57),
-                              size: 26,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  accountTitle,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  accountNumber.isEmpty
-                                      ? 'Account number unavailable'
-                                      : 'A/C $accountNumber',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade600,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              const Text(
-                                'Available balance',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.black54,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'GH₵ ${balance.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF2E8B57),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                    const SizedBox(height: 6),
+                    Text(
+                      'Choose an amount and your preferred payment method.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF6D7B73),
+                        height: 1.4,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 22),
+                    _AccountBalanceCard(
+                      title: accountTitle,
+                      accountNumber: accountNumber,
+                      balance: balance,
+                    ),
+                    const SizedBox(height: 28),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Amount',
-                          style: TextStyle(
-                            fontSize: 18,
+                        Text(
+                          'Deposit amount',
+                          style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
-                            color: Colors.black87,
+                            color: const Color(0xFF1D2B23),
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
+                        DecoratedBox(
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEAF5EE),
-                            borderRadius: BorderRadius.circular(20),
+                            color: const Color(0xFFE5F1E9),
+                            borderRadius: BorderRadius.circular(30),
                           ),
-                          child: const Text(
-                            'Min GH₵ 10',
-                            style: TextStyle(
-                              color: Color(0xFF2E8B57),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 11,
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 11,
+                              vertical: 6,
+                            ),
+                            child: Text(
+                              'Min. GH₵ 10',
+                              style: TextStyle(
+                                color: Color(0xFF286B45),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ),
@@ -284,33 +192,24 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
                     ),
                     const SizedBox(height: 12),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 15),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 14,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(color: const Color(0xFFE5EBE6)),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const Text(
+                          Text(
                             'GH₵',
-                            style: TextStyle(
-                              fontSize: 30,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontSize: 21,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF2E8B57),
+                              color: primary,
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: TextField(
                               controller: _amountController,
@@ -318,319 +217,428 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
                                   const TextInputType.numberWithOptions(
                                     decimal: true,
                                   ),
-                              style: const TextStyle(
-                                fontSize: 30,
+                              style: theme.textTheme.headlineMedium?.copyWith(
+                                fontSize: 32,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.black87,
+                                letterSpacing: -0.5,
+                                color: const Color(0xFF1D2B23),
                               ),
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 border: InputBorder.none,
                                 hintText: '0.00',
-                                hintStyle: TextStyle(
-                                  color: Color(0xFFB7BABC),
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 30,
-                                ),
+                                hintStyle: theme.textTheme.headlineMedium
+                                    ?.copyWith(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFFB8C3BC),
+                                    ),
                                 isDense: true,
                                 contentPadding: EdgeInsets.zero,
                               ),
                               onChanged: (_) => setState(() {}),
                             ),
                           ),
+                          const Icon(
+                            Icons.edit_outlined,
+                            size: 18,
+                            color: Color(0xFF8A9990),
+                          ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: _quickAmounts
-                          .map(
-                            (amount) => GestureDetector(
-                              onTap: () => _applyQuickAmount(amount),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _amount == amount
-                                      ? const Color(0xFF2E8B57)
-                                      : const Color(0xFFF0F4F1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  'GH₵ $amount',
-                                  style: TextStyle(
-                                    color: _amount == amount
-                                        ? Colors.white
-                                        : Colors.black87,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          )
-                          .toList(),
+                      spacing: 9,
+                      runSpacing: 9,
+                      children: _quickAmounts.map((amount) {
+                        final selected = _amount == amount;
+                        return ChoiceChip(
+                          label: Text('GH₵ $amount'),
+                          selected: selected,
+                          showCheckmark: false,
+                          onSelected: (_) => _applyQuickAmount(amount),
+                          labelStyle: TextStyle(
+                            color: selected
+                                ? Colors.white
+                                : const Color(0xFF3B5144),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          backgroundColor: Colors.white,
+                          selectedColor: primary,
+                          side: BorderSide(
+                            color: selected ? primary : const Color(0xFFE1E9E3),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        );
+                      }).toList(),
                     ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Funding Method',
-                      style: TextStyle(
-                        fontSize: 18,
+                    const SizedBox(height: 28),
+                    Text(
+                      'Pay with',
+                      style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: Colors.black87,
+                        color: const Color(0xFF1D2B23),
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Column(
-                        children: [
-                          _FundingOption(
-                            title: 'Mobile Money',
-                            subtitle: 'MTN / Telecel / AirtelTigo',
-                            selected: _selectedMethod == 'Mobile Money',
-                            onTap: () => setState(
-                              () => _selectedMethod = 'Mobile Money',
-                            ),
+                    _FundingOption(
+                      icon: Icons.phone_android_rounded,
+                      title: 'Mobile Money',
+                      subtitle: 'MTN MoMo, Telecel Cash, AirtelTigo',
+                      selected: _selectedMethod == 'Mobile Money',
+                      onTap: () =>
+                          setState(() => _selectedMethod = 'Mobile Money'),
+                    ),
+                    const SizedBox(height: 10),
+                    _FundingOption(
+                      icon: Icons.account_balance_rounded,
+                      title: 'Bank account',
+                      subtitle: 'Bank deposits are not available yet',
+                      selected: _selectedMethod == 'Bank Account',
+                      unavailable: true,
+                      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Bank-account deposits are not available yet. Use Mobile Money.',
                           ),
-                          const Divider(height: 1),
-                          _FundingOption(
-                            title: 'Bank Account',
-                            subtitle:
-                                'Unavailable until bank deposits are connected',
-                            selected: _selectedMethod == 'Bank Account',
-                            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Bank-account deposits are not available yet. Use Mobile Money.',
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 18),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: const Color(0xFFEAF3ED),
                         borderRadius: BorderRadius.circular(18),
                       ),
-                      child: Column(
-                        children: [
-                          _SummaryRow(
-                            label: 'Deposit amount',
-                            value: 'GH₵ ${_amount.toStringAsFixed(2)}',
-                          ),
-                          const SizedBox(height: 8),
-                          _SummaryRow(
-                            label: 'Processing fee',
-                            value: 'Shown by payment provider',
-                          ),
-                          const SizedBox(height: 10),
-                          const Divider(),
-                          const SizedBox(height: 10),
-                          _SummaryRow(
-                            label: 'Total charged',
-                            value: 'Shown before provider confirmation',
-                            isTotal: true,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEAF7F0),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFCAE4D1)),
-                      ),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Icon(
-                            Icons.shield_rounded,
-                            color: Color(0xFF2E8B57),
+                            Icons.shield_outlined,
+                            size: 20,
+                            color: Color(0xFF286B45),
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 11),
                           Expanded(
                             child: Text(
-                              'The payment provider will confirm any fees and the final transaction status.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade700,
-                                fontWeight: FontWeight.w600,
+                              'Any payment fees and the final amount will be confirmed by your mobile money provider.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: const Color(0xFF53675A),
+                                height: 1.45,
                               ),
                             ),
                           ),
                         ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: FilledButton(
-                        onPressed: _canContinue
-                            ? () {
-                                final returnRoute =
-                                    '/savings/${widget.savingsId}';
-                                final destination = Uri(
-                                  path: '/payment',
-                                  queryParameters: {
-                                    'returnRoute': returnRoute,
-                                    'sourceLabel': 'Deposit',
-                                    'amount': _amount.toStringAsFixed(2),
-                                    'method': _selectedMethod == 'Mobile Money'
-                                        ? 'MoMo'
-                                        : 'Account',
-                                    'savingsId': widget.savingsId,
-                                  },
-                                ).toString();
-                                context.go(destination);
-                              }
-                            : null,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF2E8B57),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: const Text(
-                          'Continue',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9FBF9),
+                border: const Border(top: BorderSide(color: Color(0xFFE6ECE7))),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.035),
+                    blurRadius: 16,
+                    offset: const Offset(0, -5),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: FilledButton(
+                    onPressed: _canContinue ? _continueToPayment : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: primary,
+                      disabledBackgroundColor: const Color(0xFFCAD5CD),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'Continue',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (_canContinue) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            '· GH₵ ${_amount.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(width: 8),
+                        const Icon(Icons.arrow_forward_rounded, size: 19),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AccountBalanceCard extends StatelessWidget {
+  final String title;
+  final String accountNumber;
+  final double balance;
+
+  const _AccountBalanceCard({
+    required this.title,
+    required this.accountNumber,
+    required this.balance,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF26734A), Color(0xFF164B35)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF164B35).withValues(alpha: 0.18),
+            blurRadius: 20,
+            offset: const Offset(0, 9),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -6,
+            top: -28,
+            child: Icon(
+              Icons.account_balance_wallet_rounded,
+              size: 132,
+              color: Colors.white.withValues(alpha: 0.06),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.savings_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'DEPOSITING INTO',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.72),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.verified_rounded,
+                    color: Color(0xFFB7E2C4),
+                    size: 20,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              Text(
+                'AVAILABLE BALANCE',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.72),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.1,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                'GH₵ ${balance.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 25,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              if (accountNumber.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Account  $accountNumber',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.78),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
 class _FundingOption extends StatelessWidget {
+  final IconData icon;
   final String title;
   final String subtitle;
   final bool selected;
+  final bool unavailable;
   final VoidCallback onTap;
 
   const _FundingOption({
+    required this.icon,
     required this.title,
     required this.subtitle,
     required this.selected,
     required this.onTap,
+    this.unavailable = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: selected
-                      ? const Color(0xFF2E8B57)
-                      : Colors.grey.shade400,
-                  width: 2,
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected
+                  ? const Color(0xFF2E8B57)
+                  : const Color(0xFFE3EAE4),
+              width: selected ? 1.4 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: unavailable
+                      ? const Color(0xFFF0F2F0)
+                      : const Color(0xFFEAF3ED),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  icon,
+                  color: unavailable
+                      ? const Color(0xFF89948D)
+                      : const Color(0xFF286B45),
+                  size: 21,
                 ),
               ),
-              child: selected
-                  ? Center(
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF2E8B57),
-                          shape: BoxShape.circle,
-                        ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: unavailable
+                            ? const Color(0xFF7C8980)
+                            : const Color(0xFF25372B),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
                       ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                  ),
-                ],
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Color(0xFF7C8980),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              if (unavailable)
+                const Icon(
+                  Icons.lock_outline_rounded,
+                  color: Color(0xFF99A39C),
+                  size: 19,
+                )
+              else
+                Icon(
+                  selected
+                      ? Icons.radio_button_checked_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  color: selected
+                      ? const Color(0xFF2E8B57)
+                      : const Color(0xFFB6C0B9),
+                  size: 21,
+                ),
+            ],
+          ),
         ),
       ),
-    );
-  }
-}
-
-class _SummaryRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final bool isTotal;
-
-  const _SummaryRow({
-    required this.label,
-    required this.value,
-    this.isTotal = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: isTotal ? 16 : 14,
-            fontWeight: isTotal ? FontWeight.w700 : FontWeight.w500,
-            color: isTotal ? Colors.black87 : Colors.black54,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: isTotal ? 16 : 14,
-            fontWeight: isTotal ? FontWeight.w800 : FontWeight.w600,
-            color: isTotal ? const Color(0xFF2E8B57) : Colors.black87,
-          ),
-        ),
-      ],
     );
   }
 }

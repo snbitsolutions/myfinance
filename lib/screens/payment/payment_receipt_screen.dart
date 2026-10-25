@@ -172,7 +172,7 @@ class PaymentReceiptScreen extends StatelessWidget {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                  color: isPending ? Colors.orange : Colors.green,
+                                color: isPending ? Colors.orange : Colors.green,
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Row(
@@ -186,7 +186,9 @@ class PaymentReceiptScreen extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    isPending ? 'Pending' : 'Provider reported success',
+                                    isPending
+                                        ? 'Pending'
+                                        : 'Provider reported completion',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 11,
@@ -247,7 +249,11 @@ class PaymentReceiptScreen extends StatelessWidget {
                           paymentMethod ?? 'Mobile Money',
                           theme,
                         ),
-                        _ReceiptDetailRow('Transaction Fee', 'Unavailable', theme),
+                        _ReceiptDetailRow(
+                          'Transaction Fee',
+                          'Unavailable',
+                          theme,
+                        ),
                       ],
                     ),
                   ),
@@ -330,13 +336,14 @@ class PaymentReceiptScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 50,
                     child: OutlinedButton.icon(
-                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Receipt download is not available yet.',
+                      onPressed: () =>
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Receipt download is not available yet.',
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
                       icon: const Icon(Icons.download_rounded),
                       label: const Text('Download'),
                       style: OutlinedButton.styleFrom(
