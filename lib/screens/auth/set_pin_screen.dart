@@ -29,6 +29,7 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
   final TextEditingController _confirmController = TextEditingController();
   final TextEditingController _currentPinController = TextEditingController();
   bool _showPin = false;
+  bool _showCurrentPin = false;
   bool _isSubmitting = false;
 
   bool get _isRegisterMode => widget.mode == 'register';
@@ -98,7 +99,7 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
             .changePin(currentPin: _currentPinController.text, newPin: pin);
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PIN changed successfully.')),
+          const SnackBar(content: Text('PIN updated successfully.')),
         );
         router.go('/settings');
         return;
@@ -286,7 +287,7 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                                     inputFormatters: [
                                       FilteringTextInputFormatter.digitsOnly,
                                     ],
-                                    obscureText: true,
+                                    obscureText: !_showCurrentPin,
                                     textAlign: TextAlign.center,
                                     style: theme.textTheme.headlineMedium
                                         ?.copyWith(
@@ -299,6 +300,18 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                                       hintText: '••••',
                                       hintStyle: theme.textTheme.bodyMedium
                                           ?.copyWith(color: Colors.white54),
+                                      suffixIcon: IconButton(
+                                        icon: Icon(
+                                          _showCurrentPin
+                                              ? Icons.visibility
+                                              : Icons.visibility_off,
+                                          color: Colors.white70,
+                                        ),
+                                        onPressed: () => setState(
+                                          () => _showCurrentPin =
+                                              !_showCurrentPin,
+                                        ),
+                                      ),
                                       filled: true,
                                       fillColor: Colors.white.withOpacitySafe(
                                         0.15,
@@ -337,7 +350,7 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Security PIN',
+                                  _isChangeMode ? 'New PIN' : 'Security PIN',
                                   style: theme.textTheme.bodyLarge?.copyWith(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w500,
@@ -412,7 +425,9 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Confirm PIN',
+                                    _isChangeMode
+                                        ? 'Confirm new PIN'
+                                        : 'Confirm PIN',
                                     style: theme.textTheme.bodyLarge?.copyWith(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w500,
@@ -524,9 +539,11 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                                     : Text(
                                         _isRegisterMode
                                             ? 'Register'
-                                            : (_isSignInMode
-                                                  ? 'Sign In'
-                                                  : 'Save PIN'),
+                                            : _isSignInMode
+                                            ? 'Sign In'
+                                            : _isChangeMode
+                                            ? 'Update PIN'
+                                            : 'Save PIN',
                                         style: theme.textTheme.labelLarge
                                             ?.copyWith(
                                               color: _canSubmit

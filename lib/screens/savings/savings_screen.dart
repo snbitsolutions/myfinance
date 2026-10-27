@@ -688,34 +688,6 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.trending_up,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Change history unavailable',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                     const SizedBox(height: 14),
                     const Divider(color: Colors.white24, thickness: 1),
                     const SizedBox(height: 14),
@@ -1295,38 +1267,6 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.trending_up,
-                              color: Colors.green[300],
-                              size: 14,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Change history unavailable',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                   ),
                   const SizedBox(height: 8),
                   Container(

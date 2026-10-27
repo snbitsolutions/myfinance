@@ -122,35 +122,36 @@ class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
                                   investmentsAsync.isLoading
                               ? 'GH₵ —'
                               : balancesAvailable
-                                  ? 'GH₵ ${totalBalance.toStringAsFixed(2).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',')}'
-                                  : 'Unavailable',
+                              ? 'GH₵ ${totalBalance.toStringAsFixed(2).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',')}'
+                              : 'Unavailable',
                           style: theme.textTheme.headlineMedium?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 18),
-                        Text(
-                          investmentsAsync.hasError
-                              ? 'Investment data unavailable'
-                              : 'Performance history unavailable',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.82),
-                            fontWeight: FontWeight.w600,
+                        if (investmentsAsync.hasError) ...[
+                          const SizedBox(height: 18),
+                          Text(
+                            'Investment data unavailable',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.82),
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
+                        ],
                         const SizedBox(height: 16),
                         Row(
                           children: [
                             Expanded(
                               child: _PortfolioMetric(
                                 label: 'YTD Return',
-                                value: investmentsAsync.hasError ||
+                                value:
+                                    investmentsAsync.hasError ||
                                         investmentsAsync.isLoading
                                     ? '—'
                                     : earningsAvailable
-                                        ? 'GH₵ ${totalEarnings.toStringAsFixed(2)}'
-                                        : 'Unavailable',
+                                    ? 'GH₵ ${totalEarnings.toStringAsFixed(2)}'
+                                    : 'Unavailable',
                                 accent: Colors.white,
                               ),
                             ),
@@ -158,7 +159,8 @@ class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
                             Expanded(
                               child: _PortfolioMetric(
                                 label: 'Active Plans',
-                                value: investmentsAsync.hasError ||
+                                value:
+                                    investmentsAsync.hasError ||
                                         investmentsAsync.isLoading
                                     ? '—'
                                     : '${displayedInvestments.length}',
@@ -196,9 +198,7 @@ class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
               ),
               const SizedBox(height: 12),
               if (investmentsAsync.isLoading)
-                const AppCard(
-                  child: Center(child: CircularProgressIndicator()),
-                )
+                const AppCard(child: Center(child: CircularProgressIndicator()))
               else if (investmentsAsync.hasError)
                 AppCard(
                   child: Column(
@@ -268,12 +268,13 @@ class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
                           child: _OverviewItem(
                             icon: Icons.account_balance_wallet,
                             label: 'Total Invested',
-                            value: investmentsAsync.hasError ||
+                            value:
+                                investmentsAsync.hasError ||
                                     investmentsAsync.isLoading
                                 ? '—'
                                 : principalAvailable
-                                    ? 'GH₵ ${totalInvested.toStringAsFixed(2)}'
-                                    : 'Unavailable',
+                                ? 'GH₵ ${totalInvested.toStringAsFixed(2)}'
+                                : 'Unavailable',
                             theme: theme,
                           ),
                         ),
@@ -281,12 +282,13 @@ class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
                           child: _OverviewItem(
                             icon: Icons.trending_up,
                             label: 'Total Earnings',
-                            value: investmentsAsync.hasError ||
+                            value:
+                                investmentsAsync.hasError ||
                                     investmentsAsync.isLoading
                                 ? '—'
                                 : earningsAvailable
-                                    ? 'GH₵ ${totalEarnings.toStringAsFixed(2)}'
-                                    : 'Unavailable',
+                                ? 'GH₵ ${totalEarnings.toStringAsFixed(2)}'
+                                : 'Unavailable',
                             theme: theme,
                           ),
                         ),

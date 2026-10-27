@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/app_scaffold.dart';
 import '../../../core/color_ext.dart';
 import 'withdrawal_model.dart';
@@ -20,36 +21,6 @@ class ReviewWithdrawalScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Info message
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacitySafe(0.1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: theme.colorScheme.primary.withOpacitySafe(0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline_rounded,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Continuing will submit a withdrawal request to your savings provider. The provider has not supplied a fee estimate, so any additional charge is not shown here. A pending result means the provider has not confirmed completion.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
             // From Account
             _ReviewCard(
               child: Column(
@@ -155,8 +126,6 @@ class ReviewWithdrawalScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _SummaryRow('Provider fee', 'Not provided', theme),
-                  const Divider(height: 16),
                   _SummaryRow(
                     'Amount requested',
                     'GH₵ ${data.amount.toStringAsFixed(2)}',
@@ -167,47 +136,12 @@ class ReviewWithdrawalScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            // Limits
             _ReviewCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (data.dailyLimit != null) ...[
-                    _SummaryRow(
-                      'Daily Limit',
-                      'GH₵ ${data.dailyLimit!.toStringAsFixed(2)}',
-                      theme,
-                    ),
-                    Text(
-                      'Used: GH₵ ${data.usedDailyLimit.toStringAsFixed(2)} | Remaining: GH₵ ${(data.dailyLimit! - data.usedDailyLimit).toStringAsFixed(2)}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
-                      ),
-                    ),
-                  ],
-                  if (data.dailyLimit != null && data.monthlyLimit != null)
-                    const SizedBox(height: 12),
-                  if (data.monthlyLimit != null) ...[
-                    _SummaryRow(
-                      'Monthly Limit',
-                      'GH₵ ${data.monthlyLimit!.toStringAsFixed(2)}',
-                      theme,
-                    ),
-                    Text(
-                      'Used: GH₵ ${data.usedMonthlyLimit.toStringAsFixed(2)} | Remaining: GH₵ ${(data.monthlyLimit! - data.usedMonthlyLimit).toStringAsFixed(2)}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
-                      ),
-                    ),
-                  ],
-                  if (data.dailyLimit == null && data.monthlyLimit == null)
-                    Text(
-                      'Withdrawal limits are not available for this account.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
-                      ),
-                    ),
-                ],
+              child: Text(
+                'At least GH₵${AppConstants.minimumSavingsBalanceAfterWithdrawal.toStringAsFixed(2)} will remain in your account after this withdrawal.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withOpacitySafe(0.7),
+                ),
               ),
             ),
             const SizedBox(height: 24),

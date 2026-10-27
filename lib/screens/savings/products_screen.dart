@@ -26,15 +26,41 @@ class ProductsScreen extends ConsumerWidget {
       data: (value) => value,
       orElse: () => const <String, dynamic>{},
     );
-    final savingsBalance = _sumBalances(savingsAsync.valueOrNull);
-    final sharesBalance = _sumBalances(sharesAsync.valueOrNull);
-    final loanBalance = _sumLoanBalances(loansAsync.valueOrNull);
-    final profileBalance = _toDouble(profile['balance']);
-    final savingsPortfolioAmount = _portfolioAmount(
-      savingsAsync,
-      savingsBalance,
-      const ['balance', 'current_balance', 'amount'],
+    const savingsBalanceKeys = ['balance', 'current_balance', 'amount'];
+    const sharesBalanceKeys = [
+      'total_value',
+      'market_value',
+      'current_value',
+      'value',
+      'shares_value',
+      'balance',
+    ];
+    const investmentBalanceKeys = [
+      'balance',
+      'current_balance',
+      'amount',
+      'current_value',
+      'value',
+    ];
+    final savingsBalance = _sumBalances(
+      savingsAsync.valueOrNull,
+      savingsBalanceKeys,
     );
+    final sharesBalance = _sumBalances(
+      sharesAsync.valueOrNull,
+      sharesBalanceKeys,
+    );
+    final investmentsBalance = _sumBalances(
+      investmentsAsync.valueOrNull,
+      investmentBalanceKeys,
+    );
+    final loanBalance = _sumLoanBalances(loansAsync.valueOrNull);
+    final portfolioOverviewAmount =
+        _hasPortfolioBalances(savingsAsync, savingsBalanceKeys) &&
+            _hasPortfolioBalances(sharesAsync, sharesBalanceKeys) &&
+            _hasPortfolioBalances(investmentsAsync, investmentBalanceKeys)
+        ? _money(savingsBalance + sharesBalance + investmentsBalance)
+        : 'GH₵ —';
 
     final accountName =
         (profile['name'] ??
@@ -56,7 +82,11 @@ class ProductsScreen extends ConsumerWidget {
       _ProductCard(
         title: 'Savings',
         subtitle: 'All your savings accounts',
-        amount: _portfolioAmount(savingsAsync, savingsBalance, const ['balance', 'current_balance', 'amount']),
+        amount: _portfolioAmount(
+          savingsAsync,
+          savingsBalance,
+          savingsBalanceKeys,
+        ),
         icon: Icons.savings_rounded,
         accent: const Color(0xFF0C8B5A),
         tint: const Color(0xFFEAF5EE),
@@ -65,7 +95,7 @@ class ProductsScreen extends ConsumerWidget {
       _ProductCard(
         title: 'Shares',
         subtitle: 'Your equity portfolio',
-        amount: _portfolioAmount(sharesAsync, sharesBalance, const ['total_value', 'market_value', 'current_value', 'value', 'shares_value', 'balance']),
+        amount: _portfolioAmount(sharesAsync, sharesBalance, sharesBalanceKeys),
         icon: Icons.pie_chart_rounded,
         accent: const Color(0xFFE7A817),
         tint: const Color(0xFFFFF4DC),
@@ -78,8 +108,8 @@ class ProductsScreen extends ConsumerWidget {
             ? 'Unavailable'
             : _portfolioAmount(
                 investmentsAsync,
-                _sumBalances(investmentsAsync.valueOrNull),
-                const ['balance', 'current_balance', 'amount', 'current_value', 'value'],
+                investmentsBalance,
+                investmentBalanceKeys,
               ),
         icon: Icons.trending_up_rounded,
         accent: const Color(0xFF0C8B5A),
@@ -89,7 +119,11 @@ class ProductsScreen extends ConsumerWidget {
       _ProductCard(
         title: 'Loans',
         subtitle: 'Active loans and repayments',
-        amount: _portfolioAmount(loansAsync, loanBalance, const ['outstanding_balance', 'outstanding', 'balance']),
+        amount: _portfolioAmount(loansAsync, loanBalance, const [
+          'outstanding_balance',
+          'outstanding',
+          'balance',
+        ]),
         icon: Icons.receipt_long_rounded,
         accent: const Color(0xFF2F7DEB),
         tint: const Color(0xFFEAF3FF),
@@ -229,56 +263,14 @@ class ProductsScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          profile['balance'] == null
-                              ? savingsPortfolioAmount
-                              : _money(profileBalance),
-                          style: theme.textTheme.headlineSmall?.copyWith(
+                          portfolioOverviewAmount,
+                          style: theme.textTheme.displaySmall?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
-                            letterSpacing: -0.8,
+                            letterSpacing: -1,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(
-                                  0xFF9FD6B8,
-                                ).withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.trending_up_rounded,
-                                    color: Color(0xFF9FD6B8),
-                                    size: 13,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                  'Unavailable',
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: const Color(0xFF9FD6B8),
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Change unavailable',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.72),
-                              ),
-                            ),
-                          ],
-                        ),
+                        const SizedBox(height: 18),
                       ],
                     ),
                   ],
@@ -344,17 +336,30 @@ class ProductsScreen extends ConsumerWidget {
     return double.tryParse(value?.toString().replaceAll(',', '') ?? '') ?? 0;
   }
 
-  static double _sumBalances(List<Map<String, dynamic>>? accounts) {
-    return (accounts ?? const <Map<String, dynamic>>[]).fold<double>(
-      0,
-      (sum, account) =>
-          sum +
-          _toDouble(
-            account['balance'] ??
-                account['current_balance'] ??
-                account['amount'],
-          ),
-    );
+  static double _sumBalances(
+    List<Map<String, dynamic>>? accounts,
+    List<String> keys,
+  ) {
+    return (accounts ?? const <Map<String, dynamic>>[]).fold<double>(0, (
+      sum,
+      account,
+    ) {
+      for (final key in keys) {
+        final value = account[key];
+        if (value != null) return sum + _toDouble(value);
+      }
+      return sum;
+    });
+  }
+
+  static bool _hasPortfolioBalances(
+    AsyncValue<List<Map<String, dynamic>>> value,
+    List<String> keys,
+  ) {
+    if (value.isLoading || value.hasError) return false;
+    final accounts = value.valueOrNull;
+    return accounts != null &&
+        accounts.every((account) => keys.any((key) => account[key] != null));
   }
 
   static double _sumLoanBalances(List<Map<String, dynamic>>? loans) {

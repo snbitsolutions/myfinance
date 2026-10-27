@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/color_ext.dart';
 import '../../core/app_card.dart';
+import '../../core/utils/receipt_clipboard.dart';
 
 class PaymentReceiptScreen extends StatelessWidget {
   final double? amount;
@@ -54,6 +55,16 @@ class PaymentReceiptScreen extends StatelessWidget {
     final ref = reference?.trim().isNotEmpty == true
         ? reference!
         : 'Unavailable';
+    final receiptText = [
+      'ADEPA - Deposit Receipt',
+      'Status: ${isPending ? 'Pending' : 'Provider reported completion'}',
+      'Amount: ${_money(amount)}',
+      'Account: ${account ?? 'Member Savings'}',
+      'Date: ${date?.toIso8601String() ?? 'Unavailable'}',
+      'Reference: $ref',
+      'Payment method: ${paymentMethod ?? 'Mobile Money'}',
+      if (newBalance != null && !isPending) 'Balance: ${_money(newBalance)}',
+    ].join('\n');
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -249,11 +260,6 @@ class PaymentReceiptScreen extends StatelessWidget {
                           paymentMethod ?? 'Mobile Money',
                           theme,
                         ),
-                        _ReceiptDetailRow(
-                          'Transaction Fee',
-                          'Unavailable',
-                          theme,
-                        ),
                       ],
                     ),
                   ),
@@ -337,15 +343,9 @@ class PaymentReceiptScreen extends StatelessWidget {
                     height: 50,
                     child: OutlinedButton.icon(
                       onPressed: () =>
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Receipt download is not available yet.',
-                              ),
-                            ),
-                          ),
-                      icon: const Icon(Icons.download_rounded),
-                      label: const Text('Download'),
+                          copyReceiptToClipboard(context, text: receiptText),
+                      icon: const Icon(Icons.copy_rounded),
+                      label: const Text('Copy receipt'),
                       style: OutlinedButton.styleFrom(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),

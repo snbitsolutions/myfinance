@@ -46,6 +46,7 @@ class AppConstants {
   static const double savingsMinTarget = 50;
   static const double savingsMaxTarget = 1000000;
   static const double savingsInterestRate = 2.5; // 2.5% p.a.
+  static const double minimumSavingsBalanceAfterWithdrawal = 50;
 
   // UI
   static const double defaultPadding = 16;
@@ -189,8 +190,8 @@ class ApiEndpoints {
   static const String withdrawFunds = '/withdraw';
   static const String stccuConfirmWithdrawal = '/confirmWithdrawal';
   static const String repayLoanStccu = '/repayLoan';
-  // The documented Buy Airtime request is POST /deposit.
-  static const String buyAirtime = '/deposit';
+  // The documented Hubtel airtime request is POST /airtime.
+  static const String buyAirtime = '/airtime';
   static const String getBranches = '/getBranch';
   static const String getSavingsProductsList =
       '$mobileApiBaseUrl/getMemSavings';

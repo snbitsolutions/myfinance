@@ -141,7 +141,7 @@ class PaymentsHubScreen extends StatelessWidget {
                   tint: const Color(0xFFEAF5EE),
                   title: 'Loan Payment',
                   subtitle: 'Repay your loans\nand facilities',
-                  route: '/payment?type=loan-payment',
+                  route: '/repayment',
                 ),
                 _PaymentGridTile(
                   icon: Icons.favorite_rounded,

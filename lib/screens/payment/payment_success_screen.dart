@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/color_ext.dart';
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
+import '../../core/providers/app_providers.dart';
 import 'package:go_router/go_router.dart';
 
-class PaymentSuccessScreen extends StatelessWidget {
+class PaymentSuccessScreen extends ConsumerStatefulWidget {
   final double? amount;
   final DateTime? processedAt;
   final String? reference;
@@ -36,6 +40,195 @@ class PaymentSuccessScreen extends StatelessWidget {
     this.isPending = false,
   });
 
+  @override
+  ConsumerState<PaymentSuccessScreen> createState() =>
+      _PaymentSuccessScreenState();
+}
+
+class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
+  static const _statusCheckInterval = Duration(seconds: 10);
+  static const _maxAutomaticStatusChecks = 6;
+
+  Timer? _statusCheckTimer;
+  int _automaticStatusChecks = 0;
+  bool _isCheckingStatus = false;
+  bool _isConfirmed = false;
+  bool _isFailed = false;
+  String? _statusCheckMessage;
+
+  bool get _hasReference =>
+      widget.reference != null && widget.reference!.trim().isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isPending && _hasReference) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _checkTransactionStatus();
+      });
+      _statusCheckTimer = Timer.periodic(_statusCheckInterval, (_) {
+        if (_automaticStatusChecks >= _maxAutomaticStatusChecks) {
+          _statusCheckTimer?.cancel();
+          return;
+        }
+        _automaticStatusChecks++;
+        _checkTransactionStatus();
+      });
+    }
+  }
+
+  Future<void> _checkTransactionStatus() async {
+    if (!mounted ||
+        !widget.isPending ||
+        _isConfirmed ||
+        _isFailed ||
+        !_hasReference) {
+      return;
+    }
+    if (_isCheckingStatus) return;
+
+    setState(() {
+      _isCheckingStatus = true;
+      _statusCheckMessage = null;
+    });
+
+    try {
+      ref.invalidate(transactionsProvider);
+      final transactions = await ref.read(transactionsProvider.future);
+      if (!mounted) return;
+
+      final reference = widget.reference!.trim().toLowerCase();
+      final matchingTransaction = transactions.where((transaction) {
+        final transactionReference =
+            (transaction['transaction_id'] ?? transaction['reference'])
+                ?.toString()
+                .trim()
+                .toLowerCase();
+        return transactionReference == reference;
+      }).firstOrNull;
+      final status = matchingTransaction?['status']
+          ?.toString()
+          .trim()
+          .toLowerCase();
+
+      if (const {
+        '1',
+        'complete',
+        'completed',
+        'paid',
+        'success',
+        'successful',
+      }.contains(status)) {
+        _statusCheckTimer?.cancel();
+        ref.invalidate(savingsProvider);
+        ref.invalidate(userProfileProvider);
+        setState(() => _isConfirmed = true);
+      } else if (status == '0' ||
+          status == 'false' ||
+          const {
+            'cancelled',
+            'canceled',
+            'declined',
+            'denied',
+            'error',
+            'expired',
+            'failed',
+            'failure',
+            'rejected',
+          }.contains(status)) {
+        _statusCheckTimer?.cancel();
+        setState(() => _isFailed = true);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _statusCheckMessage =
+              'Could not check the latest status. Your request remains pending.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isCheckingStatus = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _statusCheckTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isPending = widget.isPending && !_isConfirmed && !_isFailed;
+    return _PaymentSuccessContent(
+      amount: widget.amount,
+      processedAt: widget.processedAt,
+      reference: widget.reference,
+      title: _isConfirmed
+          ? 'Deposit Successful'
+          : _isFailed
+          ? 'Deposit Failed'
+          : widget.title,
+      message: _isConfirmed
+          ? 'The provider confirmed your deposit.'
+          : _isFailed
+          ? 'The provider reported that your deposit failed. The amount was not deposited.'
+          : widget.message,
+      primaryActionLabel: widget.primaryActionLabel,
+      primaryActionRoute: widget.primaryActionRoute,
+      secondaryActionLabel: widget.secondaryActionLabel,
+      secondaryActionRoute: widget.secondaryActionRoute,
+      account: widget.account,
+      paymentMethod: widget.paymentMethod,
+      newBalance: widget.newBalance,
+      isPending: isPending,
+      isFailed: _isFailed,
+      isCheckingStatus: _isCheckingStatus,
+      statusCheckMessage: _statusCheckMessage,
+      onCheckStatus: _checkTransactionStatus,
+    );
+  }
+}
+
+class _PaymentSuccessContent extends StatelessWidget {
+  final double? amount;
+  final DateTime? processedAt;
+  final String? reference;
+  final String? title;
+  final String? message;
+  final String? primaryActionLabel;
+  final String? primaryActionRoute;
+  final String? secondaryActionLabel;
+  final String? secondaryActionRoute;
+  final String? account;
+  final String? paymentMethod;
+  final double? newBalance;
+  final bool isPending;
+  final bool isFailed;
+  final bool isCheckingStatus;
+  final String? statusCheckMessage;
+  final VoidCallback onCheckStatus;
+
+  const _PaymentSuccessContent({
+    this.amount,
+    this.processedAt,
+    this.reference,
+    this.title,
+    this.message,
+    this.primaryActionLabel,
+    this.primaryActionRoute,
+    this.secondaryActionLabel,
+    this.secondaryActionRoute,
+    this.account,
+    this.paymentMethod,
+    this.newBalance,
+    this.isPending = false,
+    this.isFailed = false,
+    this.isCheckingStatus = false,
+    this.statusCheckMessage,
+    required this.onCheckStatus,
+  });
+
   String _formatAmount() {
     final value = amount;
     return value == null ? 'Unavailable' : 'GH₵${value.toStringAsFixed(2)}';
@@ -53,9 +246,13 @@ class PaymentSuccessScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final resolvedTitle = (title != null && title!.trim().isNotEmpty)
         ? title!
+        : isFailed
+        ? 'Deposit Failed'
         : (isPending ? 'Deposit Pending' : 'Provider reported completion');
     final resolvedMessage = (message != null && message!.trim().isNotEmpty)
         ? message!
+        : isFailed
+        ? 'The provider reported that your deposit failed. The amount was not deposited.'
         : (isPending
               ? 'Your request is awaiting provider confirmation.'
               : 'The provider reported that the request completed.');
@@ -65,6 +262,68 @@ class PaymentSuccessScreen extends StatelessWidget {
 
     return AppScaffold(
       title: 'Deposit Status',
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isPending) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: isCheckingStatus ? null : onCheckStatus,
+                    icon: isCheckingStatus
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh_rounded),
+                    label: Text(
+                      isCheckingStatus
+                          ? 'Checking status...'
+                          : 'Check transaction status',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton(
+                  onPressed: () {
+                    if (primaryActionRoute != null &&
+                        primaryActionRoute!.trim().isNotEmpty) {
+                      context.go(primaryActionRoute!);
+                    } else {
+                      context.go('/savings');
+                    }
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(primaryActionLabel ?? 'Done'),
+                ),
+              ),
+              if (secondaryActionRoute != null &&
+                  secondaryActionRoute!.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                TextButton(
+                  onPressed: () => context.go(secondaryActionRoute!),
+                  child: Text(secondaryActionLabel ?? 'Home'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -79,18 +338,26 @@ class PaymentSuccessScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
+                    color: isFailed
+                        ? theme.colorScheme.error
+                        : theme.colorScheme.primary,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: theme.colorScheme.primary.withOpacitySafe(0.3),
+                        color:
+                            (isFailed
+                                    ? theme.colorScheme.error
+                                    : theme.colorScheme.primary)
+                                .withOpacitySafe(0.3),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
                     ],
                   ),
                   child: Icon(
-                    isPending
+                    isFailed
+                        ? Icons.close_rounded
+                        : isPending
                         ? Icons.hourglass_top_rounded
                         : Icons.check_rounded,
                     size: 56,
@@ -129,7 +396,7 @@ class PaymentSuccessScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              isPending ? 'Amount Requested' : 'Amount Deposited',
+              isPending || isFailed ? 'Amount Requested' : 'Amount Deposited',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
               ),
@@ -166,6 +433,8 @@ class PaymentSuccessScreen extends StatelessWidget {
                         Text(
                           isPending
                               ? 'Balance will update after confirmation'
+                              : isFailed
+                              ? 'Balance not updated'
                               : 'Balance',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurface.withOpacitySafe(
@@ -175,7 +444,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          isPending || resolvedNewBalance == null
+                          isPending || isFailed || resolvedNewBalance == null
                               ? 'Balance unavailable'
                               : 'GH₵${resolvedNewBalance.toStringAsFixed(2)}',
                           style: theme.textTheme.bodyLarge?.copyWith(
@@ -188,55 +457,14 @@ class PaymentSuccessScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-            // Action Buttons
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: FilledButton(
-                onPressed: () {
-                  if (primaryActionRoute != null &&
-                      primaryActionRoute!.trim().isNotEmpty) {
-                    context.go(primaryActionRoute!);
-                  } else {
-                    context.go('/savings');
-                  }
-                },
-                style: FilledButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Text(primaryActionLabel ?? 'Done'),
-              ),
-            ),
-            if (secondaryActionRoute != null &&
-                secondaryActionRoute!.trim().isNotEmpty) ...[
+            if (statusCheckMessage != null) ...[
               const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: OutlinedButton(
-                  onPressed: () => context.push(
-                    secondaryActionRoute!,
-                    extra: {
-                      'amount': amount,
-                      'processedAt': processedAt?.toIso8601String(),
-                      'reference': reference,
-                      'account': account,
-                      'paymentMethod': paymentMethod,
-                      'newBalance': newBalance,
-                      'isPending': isPending,
-                    },
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(secondaryActionLabel ?? 'View Receipt'),
+              Text(
+                statusCheckMessage!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
                 ),
+                textAlign: TextAlign.center,
               ),
             ],
           ],

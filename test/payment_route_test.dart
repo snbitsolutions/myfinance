@@ -135,6 +135,30 @@ void main() {
     expect(find.text('Request MoMo Deposit'), findsOneWidget);
   });
 
+  testWidgets('data purchase uses the shared mobile purchase form', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          userProfileProvider.overrideWith(
+            (ref) async => {'name': 'Test Member', 'phone': '0241234567'},
+          ),
+        ],
+        child: const AdepaTeachersApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    AppRouter.router.go('/payment?type=data');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Data Purchase'), findsOneWidget);
+    expect(find.text('Network'), findsOneWidget);
+    expect(find.text('Phone number'), findsOneWidget);
+    expect(find.text('Enter an amount'), findsNothing);
+  });
+
   testWidgets('deposit flow still works when sourceLabel is lowercase', (
     tester,
   ) async {

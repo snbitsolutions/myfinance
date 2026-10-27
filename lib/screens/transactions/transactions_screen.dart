@@ -7,6 +7,7 @@ import '../../core/app_scaffold.dart';
 import '../../core/app_card.dart';
 import '../../core/balance_card_shell.dart';
 import '../../core/providers/app_providers.dart';
+import '../../core/utils/receipt_clipboard.dart';
 import 'transaction_model.dart';
 
 class TransactionsScreen extends ConsumerStatefulWidget {
@@ -805,7 +806,6 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               : isDebit || isRepayment
               ? '-'
               : ''}GH₵${transaction.amount!.toStringAsFixed(2)}';
-
     Color getColor() {
       if (isCredit) return Colors.green;
       if (isRepayment) return Colors.orange;
@@ -952,6 +952,18 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               : isDebit || isRepayment
               ? '-'
               : ''}GH₵${transaction.amount!.toStringAsFixed(2)}';
+    final receiptText = [
+      'ADEPA - Transaction Receipt',
+      'Transaction: ${transaction.title}',
+      'Amount: $amountLabel',
+      'Date: ${DateFormat('MMM dd, yyyy • HH:mm').format(transaction.date)}',
+      'Transaction ID: ${transaction.id}',
+      if (transaction.description?.isNotEmpty == true)
+        'Description: ${transaction.description}',
+      if (transaction.category?.isNotEmpty == true)
+        'Category: ${transaction.category}',
+      'Status: Completed',
+    ].join('\n');
 
     showModalBottomSheet(
       context: context,
@@ -1107,34 +1119,14 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Receipt downloaded')),
-                        );
-                      },
-                      icon: const Icon(Icons.download),
-                      label: const Text('Download'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Receipt shared')),
-                        );
-                      },
-                      icon: const Icon(Icons.share),
-                      label: const Text('Share'),
-                    ),
-                  ),
-                ],
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      copyReceiptToClipboard(context, text: receiptText),
+                  icon: const Icon(Icons.copy_rounded),
+                  label: const Text('Copy receipt'),
+                ),
               ),
             ],
           ),

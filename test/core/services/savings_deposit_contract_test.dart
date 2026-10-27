@@ -291,13 +291,14 @@ void main() {
         channel: 'mtn-gh',
         amount: 10,
         username: 'Test Member',
-        productId: '59656',
+        productId: '51437',
+        pin: '1234',
       );
 
       final request = adapter.request!;
       final body = request.data as Map<String, dynamic>;
       expect(request.method, 'POST');
-      expect(request.uri.path, endsWith('/deposit'));
+      expect(request.uri.path, endsWith('/airtime'));
       expect(request.contentType, Headers.jsonContentType);
       expect(body['phone_number'], '233241234567');
       expect(body['channel'], 'mtn-gh');
@@ -305,12 +306,72 @@ void main() {
       expect(body['description'], 'Edeposit');
       expect(body['email'], '');
       expect(body['username'], 'Test Member');
-      expect(body['product_id'], '59656');
+      expect(body['product_id'], '51437');
+      expect(body['pin'], 1234);
       expect(body['s_key'], isNotEmpty);
       expect(result['status'], 'success');
       expect(result['is_pending'], isTrue);
     },
   );
+
+  test('requires a PIN before posting an airtime purchase', () async {
+    await expectLater(
+      PaymentService().buyAirtime(
+        phoneNumber: '233241234567',
+        channel: 'mtn-gh',
+        amount: 10,
+        username: 'Test Member',
+        productId: '51437',
+        pin: '',
+      ),
+      throwsA(isA<ValidationException>()),
+    );
+
+    expect(adapter.request, isNull);
+  });
+
+  test('sends data bundle purchases through the airtime endpoint', () async {
+    adapter = _DepositResponseAdapter('');
+    dio.httpClientAdapter = adapter;
+
+    final result = await PaymentService().buyDataBundle(
+      phoneNumber: '233241234567',
+      channel: 'mtn-gh',
+      amount: 10,
+      username: 'Test Member',
+      productId: '59656',
+      pin: '1234',
+    );
+
+    final request = adapter.request!;
+    final body = request.data as Map<String, dynamic>;
+    expect(request.method, 'POST');
+    expect(request.uri.path, endsWith('/airtime'));
+    expect(body['phone_number'], '233241234567');
+    expect(body['channel'], 'mtn-gh');
+    expect(body['amount'], 10);
+    expect(body['username'], 'Test Member');
+    expect(body['product_id'], '59656');
+    expect(body['pin'], 1234);
+    expect(result['status'], 'success');
+    expect(result['is_pending'], isTrue);
+  });
+
+  test('requires a PIN before posting a data bundle purchase', () async {
+    await expectLater(
+      PaymentService().buyDataBundle(
+        phoneNumber: '233241234567',
+        channel: 'mtn-gh',
+        amount: 10,
+        username: 'Test Member',
+        productId: '59656',
+        pin: '',
+      ),
+      throwsA(isA<ValidationException>()),
+    );
+
+    expect(adapter.request, isNull);
+  });
 
   test('treats an airtime authorization response as pending', () async {
     adapter = _DepositResponseAdapter(
@@ -325,11 +386,77 @@ void main() {
       amount: 10,
       username: 'Test Member',
       productId: '59656',
+      pin: '1234',
     );
 
     expect(result['status'], 'pending');
     expect(result['is_pending'], isTrue);
     expect(result['transaction_id'], 'airtime-123');
+  });
+
+  test(
+    'treats an accepted processing response as pending instead of failing',
+    () async {
+      adapter = _DepositResponseAdapter(
+        '{"status":"processing","message":"Airtime request received"}',
+      );
+      dio.httpClientAdapter = adapter;
+
+      final result = await PaymentService().buyAirtime(
+        phoneNumber: '233241234567',
+        channel: 'mtn-gh',
+        amount: 10,
+        username: 'Test Member',
+        productId: '59656',
+        pin: '1234',
+      );
+
+      expect(result['status'], 'pending');
+      expect(result['is_pending'], isTrue);
+      expect(result['message'], 'Airtime request received');
+    },
+  );
+
+  test('treats Hubtel ResponseCode 0001 as pending', () async {
+    adapter = _DepositResponseAdapter(
+      '{"Message":"Transaction pending. Expect callback request for final state.",'
+      '"ResponseCode":"0001","Data":{"TransactionId":"hubtel-123",'
+      '"ClientReference":"ATCCU-123","Amount":1.01}}',
+    );
+    dio.httpClientAdapter = adapter;
+
+    final result = await PaymentService().buyAirtime(
+      phoneNumber: '233241234567',
+      channel: 'mtn-gh',
+      amount: 10,
+      username: 'Test Member',
+      productId: '59656',
+      pin: '1234',
+    );
+
+    expect(result['status'], 'pending');
+    expect(result['is_pending'], isTrue);
+    expect(result['message'], contains('Transaction pending'));
+    expect(result['transaction_id'], 'hubtel-123');
+    expect(result['reference'], 'ATCCU-123');
+  });
+
+  test('treats an unknown successful HTTP response as pending', () async {
+    adapter = _DepositResponseAdapter('{"message":"Airtime request accepted"}');
+    dio.httpClientAdapter = adapter;
+
+    final result = await PaymentService().buyAirtime(
+      phoneNumber: '233241234567',
+      channel: 'mtn-gh',
+      amount: 10,
+      username: 'Test Member',
+      productId: '59656',
+      pin: '1234',
+    );
+
+    expect(result['status'], 'pending');
+    expect(result['is_pending'], isTrue);
+    expect(result['message'], 'Airtime request accepted');
   });
 
   test('continues to reject an explicitly failed airtime response', () async {
@@ -345,8 +472,34 @@ void main() {
         amount: 10,
         username: 'Test Member',
         productId: '59656',
+        pin: '1234',
       ),
       throwsA(isA<GenericException>()),
+    );
+  });
+
+  test('rejects documented non-success airtime status', () async {
+    adapter = _DepositResponseAdapter(
+      '{"status":"0","message":"Amount per transaction exceeded"}',
+    );
+    dio.httpClientAdapter = adapter;
+
+    await expectLater(
+      PaymentService().buyAirtime(
+        phoneNumber: '233241234567',
+        channel: 'mtn-gh',
+        amount: 10,
+        username: 'Test Member',
+        productId: '51437',
+        pin: '1234',
+      ),
+      throwsA(
+        isA<GenericException>().having(
+          (error) => error.message,
+          'message',
+          'Amount per transaction exceeded',
+        ),
+      ),
     );
   });
 
@@ -363,6 +516,7 @@ void main() {
         accountNumber: '1234567890',
         pin: '1234',
         amount: 20,
+        currentBalance: 500,
         imeiNumber: 123456,
         savingsId: '59656',
         username: 'Test Member',
@@ -397,6 +551,7 @@ void main() {
       accountNumber: '1234567890',
       pin: '1234',
       amount: 20,
+      currentBalance: 500,
       imeiNumber: 123456,
       savingsId: '59656',
     );
@@ -418,6 +573,7 @@ void main() {
         accountNumber: '1234567890',
         pin: '1234',
         amount: 20,
+        currentBalance: 500,
         imeiNumber: 123456,
         savingsId: '59656',
       );
@@ -436,11 +592,46 @@ void main() {
         accountNumber: '1234567890',
         pin: '1234',
         amount: 0,
+        currentBalance: 500,
         imeiNumber: 123456,
       ),
       throwsA(isA<Exception>()),
     );
 
     expect(adapter.request, isNull);
+  });
+
+  test('withdrawal cannot reduce balance below GH₵50', () async {
+    await expectLater(
+      SavingsService().withdrawSavings(
+        phoneNumber: '233241234567',
+        accountNumber: '1234567890',
+        pin: '1234',
+        amount: 451,
+        currentBalance: 500,
+        imeiNumber: 123456,
+      ),
+      throwsA(isA<ValidationException>()),
+    );
+
+    expect(adapter.request, isNull);
+  });
+
+  test('allows withdrawal that leaves exactly GH₵50', () async {
+    adapter = _DepositResponseAdapter(
+      '{"status":1,"transaction_id":"withdraw-boundary"}',
+    );
+    dio.httpClientAdapter = adapter;
+
+    await SavingsService().withdrawSavings(
+      phoneNumber: '233241234567',
+      accountNumber: '1234567890',
+      pin: '1234',
+      amount: 450,
+      currentBalance: 500,
+      imeiNumber: 123456,
+    );
+
+    expect(adapter.request, isNotNull);
   });
 }

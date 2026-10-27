@@ -40,6 +40,17 @@ class _ProcessingWithdrawalScreenState
         throw StateError("Withdrawal authentication is missing.");
       }
       final authState = ref.read(authProvider);
+      final savingsId = widget.data.savingsId ?? '';
+      final account = await ref.refresh(
+        withdrawalAccountProvider(savingsId).future,
+      );
+      final rawBalance = account['balance'];
+      final currentBalance = rawBalance is num
+          ? rawBalance.toDouble()
+          : double.tryParse(rawBalance?.toString().replaceAll(',', '') ?? '');
+      if (currentBalance == null) {
+        throw StateError('The savings balance could not be verified.');
+      }
       final response = await ref
           .read(savingsServiceProvider)
           .withdrawSavings(
@@ -47,6 +58,7 @@ class _ProcessingWithdrawalScreenState
             accountNumber: authState.userId ?? "",
             pin: pin,
             amount: widget.data.amount,
+            currentBalance: currentBalance,
             imeiNumber: await ref
                 .read(deviceIdentityServiceProvider)
                 .getBackendDeviceNumber(),
@@ -66,6 +78,7 @@ class _ProcessingWithdrawalScreenState
           ? newBalanceValue.toDouble()
           : double.tryParse(newBalanceValue?.toString() ?? '');
       final updatedData = widget.data.copyWith(
+        availableBalance: currentBalance,
         reference: transactionId,
         isPending: response['is_pending'] == true,
         processedAt: DateTime.tryParse(

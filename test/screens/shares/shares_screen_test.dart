@@ -43,6 +43,7 @@ void main() {
     expect(find.textContaining('12 shares'), findsOneWidget);
     expect(find.text('Total Shares'), findsOneWidget);
     expect(find.text('12'), findsOneWidget);
+    expect(find.text('Performance history unavailable'), findsNothing);
   });
 
   testWidgets('shows holding count when provider omits share unit totals', (

@@ -36,12 +36,34 @@ Widget _hubApp() {
           path: '/payroll-deduction-adjustment',
           builder: (context, state) => const PayrollDeductionAdjustmentScreen(),
         ),
+        GoRoute(
+          path: '/repayment',
+          builder: (context, state) =>
+              const Scaffold(body: Text('Loan repayment destination')),
+        ),
       ],
     ),
   );
 }
 
 void main() {
+  testWidgets('Loan Payment in Payments Hub opens the loan repayment flow', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_hubApp());
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Loan Payment'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Loan Payment'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Loan repayment destination'), findsOneWidget);
+  });
+
   testWidgets('Payments Hub exposes the named payroll adjustment preview', (
     tester,
   ) async {

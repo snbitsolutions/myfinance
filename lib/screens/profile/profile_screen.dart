@@ -329,7 +329,7 @@ class ProfileScreen extends ConsumerWidget {
                             label: 'Security',
                             value: 'Protected',
                             accent: const Color(0xFF0F8E5D),
-                            onTap: () => context.go('/set-pin'),
+                            onTap: () => context.go('/set-pin?mode=change'),
                           ),
                         ),
                       ],
@@ -396,7 +396,8 @@ class ProfileScreen extends ConsumerWidget {
                               icon: Icons.lock_outline,
                               title: 'Security & PIN',
                               subtitle: 'Manage your security settings',
-                              onTap: () => context.go('/set-pin'),
+                              onTap: () =>
+                                  context.go('/set-pin?mode=change'),
                             ),
                             _MenuItem(
                               icon: Icons.notifications_outlined,

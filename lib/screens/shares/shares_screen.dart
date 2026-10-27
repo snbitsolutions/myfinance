@@ -196,39 +196,6 @@ class _SharesScreenState extends ConsumerState<SharesScreen> {
                             letterSpacing: -0.8,
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.info_outline,
-                                    color: Color(0xFF7EF7B5),
-                                    size: 14,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Performance history unavailable',
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: const Color(0xFFDFFFEA),
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
                       ],
                     ),
                   ],
@@ -422,7 +389,8 @@ class _SharesScreenState extends ConsumerState<SharesScreen> {
                               child: _OverviewItem(
                                 icon: Icons.account_balance_wallet,
                                 label: 'Total Invested',
-                                value: hasInvestmentData && investedDataAvailable
+                                value:
+                                    hasInvestmentData && investedDataAvailable
                                     ? _formatCurrency(totalInvested)
                                     : '—',
                                 theme: theme,
@@ -474,28 +442,39 @@ class _SharesScreenState extends ConsumerState<SharesScreen> {
   }
 
   String _formatCurrency(double value) {
-    return 'GH₵ ${value.toStringAsFixed(2).replaceAllMapped(
-          RegExp(r'\B(?=(\d{3})+(?!\d))'),
-          (match) => ',',
-        )}';
+    return 'GH₵ ${value.toStringAsFixed(2).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
   }
 
   Map<String, dynamic> _mapApiShare(Map<String, dynamic> item) {
-    final ownedRaw = item['shares_owned'] ?? item['quantity'] ?? item['units'] ?? item['shares'];
+    final ownedRaw =
+        item['shares_owned'] ??
+        item['quantity'] ??
+        item['units'] ??
+        item['shares'];
     final owned = _asInt(
       item['shares_owned'] ??
           item['quantity'] ??
           item['units'] ??
           item['shares'],
     );
-    final priceRaw = item['current_price'] ?? item['unit_price'] ?? item['price'] ?? item['share_price'];
+    final priceRaw =
+        item['current_price'] ??
+        item['unit_price'] ??
+        item['price'] ??
+        item['share_price'];
     final price = _asDouble(
       item['current_price'] ??
           item['unit_price'] ??
           item['price'] ??
           item['share_price'],
     );
-    final valueRaw = item['total_value'] ?? item['market_value'] ?? item['current_value'] ?? item['value'] ?? item['shares_value'] ?? item['balance'];
+    final valueRaw =
+        item['total_value'] ??
+        item['market_value'] ??
+        item['current_value'] ??
+        item['value'] ??
+        item['shares_value'] ??
+        item['balance'];
     final value = _asDouble(
       item['total_value'] ??
           item['market_value'] ??
@@ -504,14 +483,16 @@ class _SharesScreenState extends ConsumerState<SharesScreen> {
           item['shares_value'] ??
           item['balance'],
     );
-    final investedValue = item['invested_value'] ??
+    final investedValue =
+        item['invested_value'] ??
         item['amount_invested'] ??
         item['purchase_value'] ??
         item['cost_basis'] ??
         item['principal'];
     return {
       ...item,
-      'id': item['id'] ??
+      'id':
+          item['id'] ??
           item['share_id'] ??
           item['account_id'] ??
           item['product_id'] ??
@@ -529,7 +510,8 @@ class _SharesScreenState extends ConsumerState<SharesScreen> {
       'total_value': valueRaw == null ? null : value,
       'invested_value': investedValue == null ? null : _asDouble(investedValue),
       'has_investment_data': investedValue != null,
-      'dividend_per_share': item['dividend_per_share'] == null && item['dividend'] == null
+      'dividend_per_share':
+          item['dividend_per_share'] == null && item['dividend'] == null
           ? null
           : _asDouble(item['dividend_per_share'] ?? item['dividend']),
       'change_24h': item['change_24h'] == null && item['change'] == null

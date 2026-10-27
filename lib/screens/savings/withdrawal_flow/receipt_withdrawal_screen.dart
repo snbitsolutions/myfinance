@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/app_card.dart';
 import '../../../core/color_ext.dart';
+import '../../../core/utils/receipt_clipboard.dart';
 import 'withdrawal_model.dart';
 
 class ReceiptWithdrawalScreen extends StatelessWidget {
@@ -15,6 +16,18 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
     final dateFormat = data.processedAt != null
         ? '${data.processedAt!.day}/${data.processedAt!.month}/${data.processedAt!.year} at ${data.processedAt!.hour}:${data.processedAt!.minute.toString().padLeft(2, '0')}'
         : 'N/A';
+    final receiptText = [
+      'ADEPA - Withdrawal Receipt',
+      'Status: ${data.isPending ? 'Pending' : 'Provider reported completion'}',
+      'Amount: GH₵ ${data.amount.toStringAsFixed(2)}',
+      'Date: $dateFormat',
+      'Reference: ${data.reference ?? 'N/A'}',
+      'Withdrawal method: ${data.method}',
+      'Destination: ${data.phoneNumber}',
+      'Account: ${data.fromAccount}',
+      if (data.newBalance != null && !data.isPending)
+        'New balance: GH₵ ${data.newBalance!.toStringAsFixed(2)}',
+    ].join('\n');
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -232,15 +245,9 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
                     height: 50,
                     child: FilledButton.icon(
                       onPressed: () =>
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Receipt download is not available yet.',
-                              ),
-                            ),
-                          ),
-                      icon: const Icon(Icons.download),
-                      label: const Text('Download Receipt'),
+                          copyReceiptToClipboard(context, text: receiptText),
+                      icon: const Icon(Icons.copy_rounded),
+                      label: const Text('Copy receipt'),
                       style: FilledButton.styleFrom(
                         backgroundColor: theme.colorScheme.primary,
                         shape: RoundedRectangleBorder(

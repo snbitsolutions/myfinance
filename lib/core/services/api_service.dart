@@ -1437,6 +1437,7 @@ class SavingsService extends BaseService {
     required String accountNumber,
     required String pin,
     required double amount,
+    required double currentBalance,
     required int imeiNumber,
     String? savingsId,
     String channel = 'mtn-gh',
@@ -1446,6 +1447,17 @@ class SavingsService extends BaseService {
     return handleApiCall(() async {
       if (amount <= 0) {
         throw ValidationException(message: 'Amount must be greater than zero');
+      }
+      if (currentBalance < AppConstants.minimumSavingsBalanceAfterWithdrawal ||
+          amount >
+              currentBalance -
+                  AppConstants.minimumSavingsBalanceAfterWithdrawal) {
+        throw ValidationException(
+          message:
+              'A minimum balance of GH₵'
+              '${AppConstants.minimumSavingsBalanceAfterWithdrawal.toStringAsFixed(2)} '
+              'must remain in your account after withdrawal.',
+        );
       }
 
       final reference =
@@ -1666,6 +1678,7 @@ class PaymentService extends BaseService {
     required double amount,
     required String username,
     required String productId,
+    required String pin,
     String email = '',
   }) async {
     return _submitMobilePurchase(
@@ -1675,6 +1688,7 @@ class PaymentService extends BaseService {
       amount: amount,
       username: username,
       productId: productId,
+      pin: pin,
       email: email,
       failureMessage: 'Airtime purchase failed.',
       emptyResponseMessage:
@@ -1688,15 +1702,17 @@ class PaymentService extends BaseService {
     required double amount,
     required String username,
     required String productId,
+    required String pin,
     String email = '',
   }) async {
     return _submitMobilePurchase(
-      description: 'Data',
+      description: 'Edeposit',
       phoneNumber: phoneNumber,
       channel: channel,
       amount: amount,
       username: username,
       productId: productId,
+      pin: pin,
       email: email,
       failureMessage: 'Data bundle purchase failed.',
       emptyResponseMessage:
@@ -1711,6 +1727,7 @@ class PaymentService extends BaseService {
     required double amount,
     required String username,
     required String productId,
+    required String pin,
     required String email,
     required String failureMessage,
     required String emptyResponseMessage,
@@ -1718,6 +1735,11 @@ class PaymentService extends BaseService {
     return handleApiCall(() async {
       if (amount <= 0) {
         throw ValidationException(message: 'Amount must be greater than zero');
+      }
+      if (pin.trim().isEmpty) {
+        throw ValidationException(
+          message: 'A saved PIN is required to authorize this purchase.',
+        );
       }
 
       final request = {
@@ -1728,6 +1750,7 @@ class PaymentService extends BaseService {
         'email': email,
         'username': username,
         'product_id': productId,
+        'pin': int.tryParse(pin) ?? pin,
         's_key': AppConstants.defaultMobileApiSKey,
       };
       final endpoint = ApiEndpoints.buyAirtime;
@@ -1748,16 +1771,83 @@ class PaymentService extends BaseService {
       AppLogger.logApiResponse('POST', endpoint, data);
 
       final status = data['status'];
-      final isPending =
-          data['is_pending'] == true ||
-          (status is String && status.trim().toLowerCase() == 'pending');
-      if (!AuthSession.isSuccessStatus(status) && !isPending) {
+      final normalizedStatus = status?.toString().trim().toLowerCase();
+      final responseCode = data['ResponseCode']?.toString().trim();
+      final isExplicitFailure =
+          status == false ||
+          normalizedStatus == '0' ||
+          data['success'] == false ||
+          data['is_success'] == false ||
+          const {
+            'cancelled',
+            'canceled',
+            'declined',
+            'denied',
+            'error',
+            'failed',
+            'failure',
+            'rejected',
+          }.contains(normalizedStatus);
+      if (isExplicitFailure) {
         throw GenericException(
-          message: data['message'] as String? ?? failureMessage,
+          message:
+              data['message']?.toString() ??
+              data['Message']?.toString() ??
+              failureMessage,
         );
       }
 
-      return {...data, 'is_pending': isPending};
+      final isAcceptedPending = const {
+        'accepted',
+        'awaiting_authorization',
+        'awaiting_confirmation',
+        'created',
+        'initiated',
+        'in_progress',
+        'pending',
+        'processing',
+        'queued',
+        'request_received',
+      }.contains(normalizedStatus);
+      final isProviderPending = responseCode == '0001';
+      final isConfirmed =
+          AuthSession.isSuccessStatus(status) ||
+          AuthSession.isSuccessStatus(data['success']) ||
+          AuthSession.isSuccessStatus(data['is_success']) ||
+          const {
+            'complete',
+            'completed',
+            'paid',
+            'successful',
+          }.contains(normalizedStatus);
+      final isPending =
+          data['is_pending'] == true ||
+          isProviderPending ||
+          isAcceptedPending ||
+          !isConfirmed;
+      final providerData = data['Data'] is Map
+          ? Map<String, dynamic>.from(data['Data'] as Map)
+          : const <String, dynamic>{};
+      final transactionId =
+          providerData['TransactionId'] ??
+          data['transaction_id'] ??
+          data['transactionId'];
+      final reference =
+          providerData['ClientReference'] ?? data['reference'] ?? transactionId;
+
+      return {
+        ...data,
+        'status': isPending ? 'pending' : 'success',
+        'is_pending': isPending,
+        'message':
+            data['message']?.toString() ??
+            data['Message']?.toString() ??
+            (isPending
+                ? 'The request was accepted and is awaiting provider confirmation.'
+                : 'The provider reported that the purchase completed.'),
+        if (transactionId != null) 'transaction_id': transactionId.toString(),
+        if (reference != null) 'reference': reference.toString(),
+      };
     });
   }
 

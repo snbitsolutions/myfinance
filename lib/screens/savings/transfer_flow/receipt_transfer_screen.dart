@@ -1,19 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/utils/receipt_clipboard.dart';
 import 'transfer_model.dart';
 
 class ReceiptTransferScreen extends StatelessWidget {
   final TransferData? initialData;
 
-  const ReceiptTransferScreen({
-    super.key,
-    this.initialData,
-  });
+  const ReceiptTransferScreen({super.key, this.initialData});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final data = initialData ?? TransferData();
+    final transferDetails = [
+      'ADEPA - Transfer Details (Not Submitted)',
+      'Recipient: ${data.recipientName ?? '-'}',
+      'Phone: ${data.recipientPhone ?? '-'}',
+      'Amount entered: GH₵${data.amount.toStringAsFixed(2)}',
+      'Transfer fee: Unavailable',
+      'No transaction reference was created; no transfer was submitted.',
+    ].join('\n');
 
     return PopScope(
       canPop: false,
@@ -32,10 +38,7 @@ class ReceiptTransferScreen extends StatelessWidget {
                 ),
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      Color(0xFF075D21),
-                      Color(0xFF08752B),
-                    ],
+                    colors: [Color(0xFF075D21), Color(0xFF08752B)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -61,7 +64,7 @@ class ReceiptTransferScreen extends StatelessWidget {
 
                     // Receipt title
                     Text(
-                      'Transfer Receipt',
+                      'Transfer Details',
                       style: theme.textTheme.headlineSmall?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -161,11 +164,7 @@ class ReceiptTransferScreen extends StatelessWidget {
                       'GH₵${data.amount.toStringAsFixed(2)}',
                     ),
                     const SizedBox(height: 12),
-                    _buildReceiptRow(
-                      context,
-                      'Transfer fee',
-                      'Unavailable',
-                    ),
+                    _buildReceiptRow(context, 'Transfer fee', 'Unavailable'),
                     const SizedBox(height: 12),
                     _buildReceiptRow(
                       context,
@@ -175,7 +174,6 @@ class ReceiptTransferScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 24),
 
-                    // Reference number
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12.0),
@@ -187,14 +185,14 @@ class ReceiptTransferScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Reference Number',
+                            'No transaction reference',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.outline,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'TXN-${DateTime.now().millisecondsSinceEpoch ~/ 1000}',
+                            'This transfer was not submitted.',
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                               fontFamily: 'monospace',
@@ -210,15 +208,12 @@ class ReceiptTransferScreen extends StatelessWidget {
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: () {
-                          // Share receipt functionality would go here
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Receipt shared'),
-                              duration: Duration(seconds: 2),
-                            ),
+                          copyReceiptToClipboard(
+                            context,
+                            text: transferDetails,
                           );
                         },
-                        child: const Text('Share Receipt'),
+                        child: const Text('Copy details'),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -251,14 +246,9 @@ class ReceiptTransferScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16.0,
-        vertical: 12.0,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       decoration: BoxDecoration(
-        border: Border.all(
-          color: theme.colorScheme.outline,
-        ),
+        border: Border.all(color: theme.colorScheme.outline),
         borderRadius: BorderRadius.circular(12),
         color: highlight ? theme.colorScheme.primaryContainer : null,
       ),

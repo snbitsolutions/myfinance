@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,6 +9,8 @@ import '../../core/app_card.dart';
 import '../../core/exceptions/app_exceptions.dart';
 import '../../core/modern_input.dart';
 import '../../core/providers/app_providers.dart';
+import '../../core/services/secure_auth_storage.dart';
+import '../../core/utils/receipt_clipboard.dart';
 
 class MobilePurchaseScreen extends ConsumerStatefulWidget {
   const MobilePurchaseScreen({super.key, this.isData = false});
@@ -20,14 +23,11 @@ class MobilePurchaseScreen extends ConsumerStatefulWidget {
 }
 
 class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
-  static const List<String> _networks = [
-    'MTN',
-    'Vodafone',
-    'Telecel',
-    'AirtelTigo',
-  ];
+  static const List<String> _networks = ['MTN', 'Telecel', 'AirtelTigo'];
 
   static const List<int> _presetAmounts = [5, 10, 20, 50, 100];
+  static const String _airtimeProductId = '51437';
+  static const String _dataProductId = '59656';
 
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
@@ -37,6 +37,8 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
   bool _isProcessing = false;
   bool _isPending = false;
   String? _transactionReference;
+  DateTime? _submittedAt;
+  String? _submissionError;
 
   bool get _isPhoneValid {
     final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
@@ -78,6 +80,7 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
     if (_currentStep == 2) {
       setState(() {
         _isProcessing = true;
+        _submissionError = null;
         _currentStep = 3;
       });
       try {
@@ -91,25 +94,38 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
           throw StateError('Customer name is unavailable.');
         }
 
-        final result = widget.isData
-            ? await ref.read(paymentServiceProvider).buyDataBundle(
-                phoneNumber: phone,
-                channel: channel,
-                amount: _selectedAmount,
-                username: username,
-                productId: '59656',
-              )
-            : await ref.read(paymentServiceProvider).buyAirtime(
-                phoneNumber: phone,
-                channel: channel,
-                amount: _selectedAmount,
-                username: username,
-                productId: '59656',
-              );
+        final paymentService = ref.read(paymentServiceProvider);
+        final pin = await SecureAuthStorage.instance.readPin();
+        if (pin == null || pin.isEmpty) {
+          throw StateError(
+            'A securely saved PIN is required. Sign in again before purchasing.',
+          );
+        }
+        final Map<String, dynamic> result;
+        if (widget.isData) {
+          result = await paymentService.buyDataBundle(
+            phoneNumber: phone,
+            channel: channel,
+            amount: _selectedAmount,
+            username: username,
+            productId: _dataProductId,
+            pin: pin,
+          );
+        } else {
+          result = await paymentService.buyAirtime(
+            phoneNumber: phone,
+            channel: channel,
+            amount: _selectedAmount,
+            username: username,
+            productId: _airtimeProductId,
+            pin: pin,
+          );
+        }
         if (!mounted) return;
         _isPending = result['is_pending'] == true;
         _transactionReference =
             (result['reference'] ?? result['transaction_id'])?.toString();
+        _submittedAt = DateTime.now();
         ref.invalidate(transactionsProvider);
         setState(() => _currentStep = 4);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -121,26 +137,23 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
         );
       } on AppException catch (error) {
         if (!mounted) return;
-        setState(() => _currentStep = 2);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.message)));
+        setState(() {
+          _submissionError = error.message;
+          _currentStep = 2;
+        });
       } on StateError catch (error) {
         if (!mounted) return;
-        setState(() => _currentStep = 2);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.message)));
+        setState(() {
+          _submissionError = error.message;
+          _currentStep = 2;
+        });
       } catch (_) {
         if (!mounted) return;
-        setState(() => _currentStep = 2);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Unable to process the $_serviceName request. Check transaction history before trying again.',
-            ),
-          ),
-        );
+        setState(() {
+          _submissionError =
+              'Unable to process the $_serviceName request. Check transaction history before trying again.';
+          _currentStep = 2;
+        });
       } finally {
         if (mounted) setState(() => _isProcessing = false);
       }
@@ -194,87 +207,6 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
     super.dispose();
   }
 
-  Widget _buildStepHeader() {
-    final steps = ['1', '2', '3', '4', '5', '6'];
-
-    return Column(
-      children: [
-        SizedBox(
-          width: double.infinity,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: List.generate(steps.length, (index) {
-                final isActive = index == _currentStep;
-                final isComplete = index < _currentStep;
-                final label = <String>[
-                  'Network',
-                  'Amount',
-                  'Review',
-                  'Processing',
-                  'Success',
-                  'Receipt',
-                ][index];
-
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: isActive
-                              ? const Color(0xFF2E8B57)
-                              : isComplete
-                              ? const Color(0xFF0F8B5B)
-                              : Colors.white,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isActive
-                                ? const Color(0xFF2E8B57)
-                                : isComplete
-                                ? const Color(0xFF0F8B5B)
-                                : const Color(0xFFE2E6E4),
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          steps[index],
-                          style: TextStyle(
-                            color: isActive || isComplete
-                                ? Colors.white
-                                : const Color(0xFF5A625D),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: isActive || isComplete
-                              ? const Color(0xFF1E312A)
-                              : Colors.grey[500],
-                          fontWeight: isActive
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ),
-          ),
-        ),
-        const SizedBox(height: 18),
-      ],
-    );
-  }
-
   Widget _buildNetworkStep() {
     return Column(
       children: [
@@ -289,31 +221,67 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
                 ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: _networks.map((network) {
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _networks.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  mainAxisExtent: 48,
+                ),
+                itemBuilder: (context, index) {
+                  final network = _networks[index];
                   final isSelected = network == _selectedNetwork;
-                  return ChoiceChip(
-                    label: Text(network),
-                    selected: isSelected,
-                    onSelected: (_) =>
-                        setState(() => _selectedNetwork = network),
-                    selectedColor: const Color(0xFF2E8B57),
-                    backgroundColor: Colors.white,
-                    labelStyle: TextStyle(
-                      color: isSelected
-                          ? Colors.white
-                          : const Color(0xFF1F2A25),
-                      fontWeight: FontWeight.w700,
-                    ),
-                    side: BorderSide(
-                      color: isSelected
-                          ? const Color(0xFF2E8B57)
-                          : const Color(0xFFE3EAE6),
+
+                  return Material(
+                    color: isSelected ? const Color(0xFF2E8B57) : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => setState(() => _selectedNetwork = network),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected
+                                ? const Color(0xFF2E8B57)
+                                : const Color(0xFFE3EAE6),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isSelected
+                                  ? Icons.radio_button_checked_rounded
+                                  : Icons.radio_button_off_rounded,
+                              size: 18,
+                              color: isSelected
+                                  ? Colors.white
+                                  : const Color(0xFF5A625D),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                network,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : const Color(0xFF1F2A25),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   );
-                }).toList(),
+                },
               ),
             ],
           ),
@@ -321,10 +289,18 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
         const SizedBox(height: 16),
         ModernInput(
           controller: _phoneController,
-          keyboardType: TextInputType.phone,
+          keyboardType: TextInputType.number,
           label: 'Phone number',
-          hintText: 'Enter the recipient phone number',
+          hintText: 'e.g. 024 123 4567',
           prefixIcon: Icons.phone_iphone_rounded,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(10),
+          ],
+          helperText: 'Enter a 10-digit Ghana number starting with 0.',
+          errorText: _phoneController.text.length == 10 && !_isPhoneValid
+              ? 'Enter a valid number starting with 0.'
+              : null,
           onChanged: (_) => setState(() {}),
         ),
       ],
@@ -394,13 +370,30 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
             value: 'GH₵ ${amount.toStringAsFixed(2)}',
           ),
           const SizedBox(height: 12),
-          _ReviewRow(label: 'Fee', value: 'Unavailable'),
+          const _ReviewRow(label: 'Fee', value: 'Not provided by provider'),
           const Divider(height: 24),
           _ReviewRow(
-            label: 'Total',
-            value: 'Unavailable',
+            label: 'Total before any unquoted fee',
+            value: 'GH₵ ${amount.toStringAsFixed(2)}',
             isStrong: true,
           ),
+          const SizedBox(height: 12),
+          Text(
+            'The provider has not supplied a fee quote. Any additional charge '
+            'is not included in this total.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: const Color(0xFF5A625D)),
+          ),
+          if (_submissionError case final error?) ...[
+            const SizedBox(height: 12),
+            Text(
+              error,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -458,7 +451,9 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              _isPending ? Icons.hourglass_top_rounded : Icons.info_outline_rounded,
+              _isPending
+                  ? Icons.hourglass_top_rounded
+                  : Icons.info_outline_rounded,
               size: 42,
               color: Color(0xFF2E8B57),
             ),
@@ -498,6 +493,16 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
   }
 
   Widget _buildReceiptStep() {
+    final receiptText = [
+      'ADEPA - $_serviceTitle Receipt',
+      'Status: ${_isPending ? 'Pending' : 'Provider reported completion'}',
+      'Network: $_selectedNetwork',
+      'Phone: ${_phoneController.text}',
+      'Amount: GH₵ ${_selectedAmount.toStringAsFixed(2)}',
+      'Date: ${_submittedAt?.toIso8601String() ?? 'Unavailable'}',
+      'Reference: ${_transactionReference ?? 'Unavailable'}',
+    ].join('\n');
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -535,16 +540,23 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
             value: 'GH₵ ${_selectedAmount.toStringAsFixed(2)}',
           ),
           const SizedBox(height: 10),
-          const _InfoRow(label: 'Date', value: 'Unavailable'),
+          _InfoRow(
+            label: 'Date',
+            value: _submittedAt?.toLocal().toString() ?? 'Unavailable',
+          ),
           const SizedBox(height: 10),
-          const _InfoRow(label: 'Reference', value: 'Unavailable'),
+          _InfoRow(
+            label: 'Reference',
+            value: _transactionReference ?? 'Unavailable',
+          ),
           const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.download_rounded),
-              label: const Text('Download Receipt'),
+              onPressed: () =>
+                  copyReceiptToClipboard(context, text: receiptText),
+              icon: const Icon(Icons.copy_rounded),
+              label: const Text('Copy receipt'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF2E8B57),
                 side: const BorderSide(color: Color(0xFF2E8B57)),
@@ -613,8 +625,6 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  _buildStepHeader(),
                   Expanded(
                     child: SingleChildScrollView(
                       keyboardDismissBehavior:
@@ -646,7 +656,9 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
                           ),
                         ),
                         child: Text(
-                          _currentStep == 4
+                          _currentStep == 2
+                              ? 'Buy $_serviceName'
+                              : _currentStep == 4
                               ? 'View Receipt'
                               : 'Continue',
                           style: const TextStyle(fontWeight: FontWeight.w700),

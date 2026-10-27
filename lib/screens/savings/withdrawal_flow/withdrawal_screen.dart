@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/app_scaffold.dart';
 import '../../../core/color_ext.dart';
 import '../../../core/modern_input.dart';
@@ -12,6 +13,11 @@ class WithdrawalScreen extends ConsumerStatefulWidget {
   final WithdrawalData? initialData;
 
   const WithdrawalScreen({super.key, this.savingsId, this.initialData});
+
+  static bool canWithdraw({required double amount, required double balance}) =>
+      amount > 0 &&
+      balance >= AppConstants.minimumSavingsBalanceAfterWithdrawal &&
+      amount <= balance - AppConstants.minimumSavingsBalanceAfterWithdrawal;
 
   @override
   ConsumerState<WithdrawalScreen> createState() => _WithdrawalScreenState();
@@ -73,27 +79,17 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
     return '•••• $suffix';
   }
 
-  double? get _availableDaily {
-    final limit = _number('daily_limit');
-    final used = _number('used_daily_limit') ?? 0;
-    return limit == null ? null : limit - used;
-  }
-
-  double? get _availableMonthly {
-    final limit = _number('monthly_limit');
-    final used = _number('used_monthly_limit') ?? 0;
-    return limit == null ? null : limit - used;
-  }
+  String get _backRoute => widget.savingsId?.trim().isNotEmpty == true
+      ? '/savings/${widget.savingsId}'
+      : '/savings';
 
   bool get _canContinue {
     if (_account == null) return false;
-    if (_amount <= 0) return false;
     final balance = _number('balance');
-    if (balance != null && _amount > balance) return false;
-    final daily = _availableDaily;
-    final monthly = _availableMonthly;
-    if (daily != null && _amount > daily) return false;
-    if (monthly != null && _amount > monthly) return false;
+    if (balance == null ||
+        !WithdrawalScreen.canWithdraw(amount: _amount, balance: balance)) {
+      return false;
+    }
     final phoneDigits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
     return (phoneDigits.length == 10 && phoneDigits.startsWith('0')) ||
         (phoneDigits.length == 12 && phoneDigits.startsWith('233'));
@@ -117,11 +113,7 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
       method: 'Mobile Money ($_selectedNetwork)',
       channel: channel,
       fromAccount: (_account?['name'] ?? 'Savings Account').toString(),
-      usedDailyLimit: _number('used_daily_limit') ?? 0,
-      usedMonthlyLimit: _number('used_monthly_limit') ?? 0,
       availableBalance: _number('balance'),
-      dailyLimit: _number('daily_limit'),
-      monthlyLimit: _number('monthly_limit'),
     );
     context.push('/withdrawal/review', extra: data);
   }
@@ -133,23 +125,24 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
       withdrawalAccountProvider(widget.savingsId ?? ''),
     );
     if (accountAsync.isLoading) {
-      return const AppScaffold(
+      return AppScaffold(
         title: 'Withdraw',
+        backRoute: _backRoute,
         child: Center(child: CircularProgressIndicator()),
       );
     }
     if (accountAsync.hasError) {
       return AppScaffold(
         title: 'Withdraw',
+        backRoute: _backRoute,
         child: Center(child: Text('Unable to load this savings account.')),
       );
     }
     final balance = _number('balance');
-    final dailyLimit = _number('daily_limit');
-    final monthlyLimit = _number('monthly_limit');
 
     return AppScaffold(
       title: 'Withdraw',
+      backRoute: _backRoute,
       child: ColoredBox(
         color: const Color(0xFFF4F7F4),
         child: Column(
@@ -202,10 +195,41 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
                       keyboardType: TextInputType.number,
                       onChanged: (_) => setState(() {}),
                     ),
-                    if (balance != null && _amount > balance) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        'At least GH₵${AppConstants.minimumSavingsBalanceAfterWithdrawal.toStringAsFixed(2)} must remain in this account.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacitySafe(
+                            0.65,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (balance == null &&
+                        _amountController.text.trim().isNotEmpty) ...[
                       const SizedBox(height: 6),
                       Text(
-                        'Amount exceeds the available balance.',
+                        'Your available balance could not be verified.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                    if (balance != null &&
+                        _amount > 0 &&
+                        !WithdrawalScreen.canWithdraw(
+                          amount: _amount,
+                          balance: balance,
+                        )) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        balance <
+                                AppConstants
+                                    .minimumSavingsBalanceAfterWithdrawal
+                            ? 'Your balance is below the required minimum of GH₵${AppConstants.minimumSavingsBalanceAfterWithdrawal.toStringAsFixed(2)}.'
+                            : 'Reduce the amount to leave at least GH₵${AppConstants.minimumSavingsBalanceAfterWithdrawal.toStringAsFixed(2)} in your account.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.error,
                           fontWeight: FontWeight.w600,
@@ -245,42 +269,6 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
                       }).toList(),
                     ),
                     const SizedBox(height: 16),
-                    // Withdrawal Limits
-                    Text(
-                      'Withdrawal Limits',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _WithdrawalCard(
-                      child: dailyLimit == null && monthlyLimit == null
-                          ? Text(
-                              'Withdrawal limits are not available for this account.',
-                              style: theme.textTheme.bodyMedium,
-                            )
-                          : Column(
-                              children: [
-                                if (dailyLimit != null)
-                                  _LimitRow(
-                                    label: 'Daily Limit',
-                                    total: dailyLimit,
-                                    used: _number('used_daily_limit') ?? 0,
-                                    theme: theme,
-                                  ),
-                                if (dailyLimit != null && monthlyLimit != null)
-                                  const Divider(height: 16),
-                                if (monthlyLimit != null)
-                                  _LimitRow(
-                                    label: 'Monthly Limit',
-                                    total: monthlyLimit,
-                                    used: _number('used_monthly_limit') ?? 0,
-                                    theme: theme,
-                                  ),
-                              ],
-                            ),
-                    ),
-                    const SizedBox(height: 16),
                     // Supported withdrawal network
                     Text(
                       'Mobile Money Network',
@@ -306,17 +294,6 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
                             .toList(),
                         onChanged: (network) => setState(
                           () => _selectedNetwork = network ?? _selectedNetwork,
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        'Bank account withdrawals are unavailable.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacitySafe(
-                            0.65,
-                          ),
                         ),
                       ),
                     ),
@@ -532,68 +509,6 @@ class _WithdrawalBalanceCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _LimitRow extends StatelessWidget {
-  final String label;
-  final double total;
-  final double used;
-  final ThemeData theme;
-
-  const _LimitRow({
-    required this.label,
-    required this.total,
-    required this.used,
-    required this.theme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final remaining = total - used;
-    final percentage = total > 0 ? (used / total).clamp(0.0, 1.0) : 0.0;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacitySafe(0.7),
-              ),
-            ),
-            Text(
-              'GH₵ ${remaining.toStringAsFixed(2)}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: LinearProgressIndicator(
-            value: percentage,
-            minHeight: 6,
-            backgroundColor: theme.colorScheme.primary.withOpacitySafe(0.1),
-            valueColor: AlwaysStoppedAnimation<Color>(
-              percentage > 0.7 ? Colors.red : theme.colorScheme.primary,
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Used: GH₵ ${used.toStringAsFixed(2)} | Remaining: GH₵ ${remaining.toStringAsFixed(2)}',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
-          ),
-        ),
-      ],
     );
   }
 }

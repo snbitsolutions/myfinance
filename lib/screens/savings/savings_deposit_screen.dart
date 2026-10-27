@@ -307,35 +307,6 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEAF3ED),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.shield_outlined,
-                            size: 20,
-                            color: Color(0xFF286B45),
-                          ),
-                          const SizedBox(width: 11),
-                          Expanded(
-                            child: Text(
-                              'Any payment fees and the final amount will be confirmed by your mobile money provider.',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: const Color(0xFF53675A),
-                                height: 1.45,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),

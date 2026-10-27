@@ -58,7 +58,7 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
   static const _repaymentNetworks = {
     'MTN Ghana': 'mtn-gh',
     'Tigo Ghana': 'tigo-gh',
-    'Vodafone Ghana': 'vodafone-gh',
+    'Telecel': 'telecel-gh',
   };
   static const _repaymentProductId = '59656';
   final TextEditingController _amountController = TextEditingController();
@@ -105,7 +105,7 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
   String get _momoProvider => switch (_selectedRepaymentChannel) {
     'mtn-gh' => 'MTN MoMo',
     'tigo-gh' => 'Tigo MoMo',
-    'vodafone-gh' => 'Vodafone Cash',
+    'telecel-gh' => 'Telecel Cash',
     _ => 'Mobile Money',
   };
 
