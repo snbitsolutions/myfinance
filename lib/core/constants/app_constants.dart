@@ -56,6 +56,7 @@ class AppConstants {
   // Durations
   static const Duration splashDuration = Duration(seconds: 5);
   static const Duration pageTransitionDuration = Duration(milliseconds: 300);
+  static const String termsOfServiceVersion = '1.0';
 
   // Error Messages
   static const String genericErrorMessage =
@@ -104,6 +105,9 @@ class AppConstants {
 
   // Shared Preferences Keys
   static const String sharedPrefKeyOnboarding = 'seenOnboarding';
+  static const String sharedPrefKeyAcceptedTermsVersion =
+      'acceptedTermsVersion';
+  static const String sharedPrefKeyTermsAcceptedAt = 'termsAcceptedAt';
   static const String sharedPrefKeyDebugBypassAuth = 'debugBypassAuth';
   static const String sharedPrefKeyUserToken = 'userToken';
   static const String sharedPrefKeyUserRefreshToken = 'userRefreshToken';

@@ -11,6 +11,7 @@ import 'package:adepa_teachers/router/app_router.dart';
 import 'package:adepa_teachers/screens/auth/otp_screen.dart';
 import 'package:adepa_teachers/screens/auth/signup_screen.dart';
 import 'package:adepa_teachers/screens/dashboard/dashboard_screen.dart';
+import 'package:adepa_teachers/screens/legal/terms_of_service_screen.dart';
 import 'package:adepa_teachers/screens/onboarding/onboarding_screen.dart';
 import 'package:adepa_teachers/screens/auth/login_screen.dart';
 
@@ -61,6 +62,8 @@ void main() {
     AppRouter.resetSessionCache();
     SharedPreferences.setMockInitialValues({
       AppConstants.sharedPrefKeyOnboarding: false,
+      AppConstants.sharedPrefKeyAcceptedTermsVersion:
+          AppConstants.termsOfServiceVersion,
     });
     secureStore.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -99,6 +102,48 @@ void main() {
     expect(find.byType(OnboardingScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
     expect(find.byType(DashboardScreen), findsNothing);
+  });
+
+  testWidgets(
+    'shows Terms after splash until the current version is accepted',
+    (tester) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(AppConstants.sharedPrefKeyAcceptedTermsVersion);
+
+      await pumpAt(tester, '/', settle: false);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TermsOfServiceScreen), findsOneWidget);
+      expect(find.byType(OnboardingScreen), findsNothing);
+
+      await tester.tap(find.text('I Agree'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump();
+
+      expect(
+        prefs.getString(AppConstants.sharedPrefKeyAcceptedTermsVersion),
+        AppConstants.termsOfServiceVersion,
+      );
+      expect(
+        prefs.getString(AppConstants.sharedPrefKeyTermsAcceptedAt),
+        isNotNull,
+      );
+      expect(find.byType(OnboardingScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets('requires Terms acceptance before opening auth routes', (
+    tester,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(AppConstants.sharedPrefKeyAcceptedTermsVersion);
+
+    await pumpAt(tester, '/login');
+
+    expect(find.byType(TermsOfServiceScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
   });
 
   testWidgets('redirects protected routes to login when onboarding not seen', (

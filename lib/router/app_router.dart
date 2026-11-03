@@ -16,6 +16,7 @@ import '../core/app_scaffold.dart';
 import '../core/app_card.dart' as core_app_card;
 import '../screens/splash/splash_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
+import '../screens/legal/terms_of_service_screen.dart';
 
 // Auth
 import '../screens/auth/login_screen.dart';
@@ -115,6 +116,7 @@ class AppRouter {
 
   static const Set<String> _preAuthRoutes = {
     '/',
+    '/terms',
     '/onboarding',
     ..._authRoutes,
   };
@@ -249,6 +251,19 @@ class AppRouter {
   static Future<String?> _computeRedirect(GoRouterState state) async {
     final path = state.uri.path;
 
+    final prefs = await SharedPreferences.getInstance();
+    final acceptedTermsVersion = prefs.getString(
+      AppConstants.sharedPrefKeyAcceptedTermsVersion,
+    );
+    final requiresTermsAcceptance =
+        path == '/onboarding' || _isInRouteSet(path, _authRoutes);
+    if (path != '/' &&
+        path != '/terms' &&
+        requiresTermsAcceptance &&
+        acceptedTermsVersion != AppConstants.termsOfServiceVersion) {
+      return '/terms';
+    }
+
     if (_temporarilyBypassLoginForDev) {
       if (path == '/' ||
           path == '/onboarding' ||
@@ -258,7 +273,6 @@ class AppRouter {
       return null;
     }
 
-    final prefs = await SharedPreferences.getInstance();
     final seenOnboarding =
         prefs.getBool(AppConstants.sharedPrefKeyOnboarding) ?? false;
     final debugBypassAuth = isDebugAuthBypassEnabled(
@@ -311,6 +325,10 @@ class AppRouter {
         // Splash & Onboarding
         // ===================
         GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
+        GoRoute(
+          path: '/terms',
+          builder: (context, state) => const TermsOfServiceScreen(),
+        ),
         GoRoute(
           path: '/onboarding',
           builder: (context, state) => const OnboardingScreen(),

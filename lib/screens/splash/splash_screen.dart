@@ -79,18 +79,21 @@ class _SplashScreenState extends State<SplashScreen>
 
     try {
       final prefs = await SharedPreferences.getInstance();
+      final acceptedTermsVersion = prefs.getString(
+        AppConstants.sharedPrefKeyAcceptedTermsVersion,
+      );
       final seenOnboarding =
           prefs.getBool(AppConstants.sharedPrefKeyOnboarding) ?? false;
       if (!mounted) return;
 
-      if (seenOnboarding) {
-        context.go('/login');
-      } else {
-        context.go('/onboarding');
-      }
+      context.go(
+        acceptedTermsVersion == AppConstants.termsOfServiceVersion
+            ? (seenOnboarding ? '/login' : '/onboarding')
+            : '/terms',
+      );
     } catch (_) {
       if (!mounted) return;
-      context.go('/onboarding');
+      context.go('/terms');
     }
   }
 

@@ -15,29 +15,28 @@ class _GhanaCardInputFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     final raw = newValue.text.toUpperCase().replaceAll(
-      RegExp(r'[^A-Z0-9-]'),
+      RegExp(r'[^A-Z0-9]'),
       '',
     );
-    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
-    final hasPrefix =
-        raw.isEmpty || 'GHA'.startsWith(raw) || raw.startsWith('GHA');
+    final prefixLength = raw.startsWith('GHA')
+        ? 3
+        : 'GHA'.startsWith(raw)
+        ? raw.length
+        : 0;
+    final hasInvalidLetters = raw
+        .substring(prefixLength)
+        .contains(RegExp(r'[A-Z]'));
+    if (hasInvalidLetters) return oldValue;
 
-    if (!hasPrefix) {
-      return oldValue;
-    }
-
-    // Preserve the partial prefix while the user types G, then GH, then GHA.
-    if (raw.length <= 3 && digits.isEmpty) {
+    if (prefixLength > 0 && raw.length == prefixLength) {
       return TextEditingValue(
         text: raw,
         selection: TextSelection.collapsed(offset: raw.length),
       );
     }
 
-    final limitedDigits = digits.substring(
-      0,
-      digits.length > 10 ? 10 : digits.length,
-    );
+    final digits = raw.substring(prefixLength).replaceAll(RegExp(r'\D'), '');
+    final limitedDigits = digits.substring(0, digits.length.clamp(0, 10));
     var formatted = limitedDigits.isEmpty ? '' : 'GHA-$limitedDigits';
     if (limitedDigits.length > 9) {
       formatted =
@@ -47,6 +46,29 @@ class _GhanaCardInputFormatter extends TextInputFormatter {
     return TextEditingValue(
       text: formatted,
       selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+class _BirthDateInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final limitedDigits = digits.substring(0, digits.length.clamp(0, 8));
+    final formatted = StringBuffer();
+
+    for (var index = 0; index < limitedDigits.length; index++) {
+      if (index == 4 || index == 6) formatted.write('-');
+      formatted.write(limitedDigits[index]);
+    }
+
+    final text = formatted.toString();
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
     );
   }
 }
@@ -87,8 +109,43 @@ class _ExistingMemberEnrollmentScreenState
   int? _selectedSharesProductId;
   String? _fundingMethod;
   bool _isSubmittingRegistration = false;
+  bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
   int _currentStep = 0;
   bool get _isNewMember => widget.memberType == 'new';
+
+  String get _normalizedMemberId =>
+      _memberIdController.text.replaceAll(RegExp(r'\D'), '');
+
+  bool get _isValidExistingPhoneNumber {
+    final phone = _existingPhoneController.text.replaceAll(RegExp(r'\D'), '');
+    return (phone.length == 10 && phone.startsWith('0')) ||
+        (phone.length == 12 && phone.startsWith('233'));
+  }
+
+  bool get _isValidExistingBirthDate {
+    return _isValidBirthDate(_birthDateController.text);
+  }
+
+  bool get _isValidGhanaCard {
+    return RegExp(r'^GHA-\d{9}-\d$').hasMatch(_ghanaCardController.text);
+  }
+
+  bool _isValidBirthDate(String input) {
+    final value = input.trim();
+    final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(value);
+    if (match == null) return false;
+
+    final year = int.parse(match.group(1)!);
+    final month = int.parse(match.group(2)!);
+    final day = int.parse(match.group(3)!);
+    final date = DateTime(year, month, day);
+    final today = DateTime.now();
+    return date.year == year &&
+        date.month == month &&
+        date.day == day &&
+        !date.isAfter(DateTime(today.year, today.month, today.day));
+  }
 
   late final List<_EnrollmentStep> _steps;
 
@@ -147,7 +204,8 @@ class _ExistingMemberEnrollmentScreenState
           number: 6,
           title: 'Create Login Credentials',
           subtitle: 'Create a password',
-          description: 'Use a secure password to sign in with your phone number.',
+          description:
+              'Use a secure password to sign in with your phone number.',
           label: 'Create Login Credentials',
           body: _buildCredentialsBody,
         ),
@@ -191,8 +249,7 @@ class _ExistingMemberEnrollmentScreenState
         number: 3,
         title: 'Create Login Credentials',
         subtitle: 'Create a password',
-        description:
-            'Use a secure password to sign in with your phone number.',
+        description: 'Use a secure password to sign in with your phone number.',
         label: 'Create Login Credentials',
         body: _buildCredentialsBody,
       ),
@@ -225,18 +282,16 @@ class _ExistingMemberEnrollmentScreenState
       return fullName.isNotEmpty && phone.length >= 9;
     }
     if (title == 'Verify Identity (KYC)') {
-      return _ghanaCardController.text.trim().isNotEmpty &&
-          _birthDateController.text.trim().isNotEmpty;
+      return _isValidGhanaCard && _isValidBirthDate(_birthDateController.text);
     }
     if (title == 'Additional Information') {
       return _genderController.text.trim().isNotEmpty &&
           _addressController.text.trim().isNotEmpty;
     }
     if (title == 'Verify Membership') {
-      final phone = _existingPhoneController.text.replaceAll(RegExp(r'\D'), '');
-      return _memberIdController.text.trim().isNotEmpty &&
-          phone.length >= 9 &&
-          _birthDateController.text.trim().isNotEmpty;
+      return _normalizedMemberId.length >= 5 &&
+          _isValidExistingPhoneNumber &&
+          _isValidExistingBirthDate;
     }
     if (title == 'Create Login Credentials') {
       return _passwordController.text.trim().length >= 8 &&
@@ -276,6 +331,18 @@ class _ExistingMemberEnrollmentScreenState
 
     if (!_canContinue) {
       final message = switch (_steps[_currentStep].title) {
+        'Verify Identity (KYC)' when !_isValidGhanaCard =>
+          'Enter a valid Ghana Card number in the format GHA-XXXXXXXXX-X.',
+        'Verify Identity (KYC)'
+            when !_isValidBirthDate(_birthDateController.text) =>
+          'Enter a valid date of birth in YYYY-MM-DD format.',
+        'Verify Membership' when _normalizedMemberId.length < 5 =>
+          'Enter the account number shown on your ADEPA records.',
+        'Verify Membership' when !_isValidExistingPhoneNumber =>
+          'Enter the registered Ghana phone number as 0XXXXXXXXX or '
+              '233XXXXXXXXX.',
+        'Verify Membership' when !_isValidExistingBirthDate =>
+          'Enter a valid date of birth in YYYY-MM-DD format.',
         'Create Login Credentials' =>
           'Enter a password with at least 8 characters and confirm it.',
         'Set Transaction PIN' =>
@@ -298,7 +365,10 @@ class _ExistingMemberEnrollmentScreenState
             ? await authNotifier.submitNewMemberRegistration(
                 fullName: _fullNameController.text.trim(),
                 ghanaCard: _ghanaCardController.text.trim(),
-                phoneNumber: _phoneController.text.replaceAll(RegExp(r'\D'), ''),
+                phoneNumber: _phoneController.text.replaceAll(
+                  RegExp(r'\D'),
+                  '',
+                ),
                 birthDate: _birthDateController.text.trim(),
                 gender: _genderController.text.trim(),
                 address: _addressController.text.trim(),
@@ -312,7 +382,7 @@ class _ExistingMemberEnrollmentScreenState
             : await ref
                   .read(authProvider.notifier)
                   .submitRegistration(
-                    accountNumber: _memberIdController.text.trim(),
+                    accountNumber: _normalizedMemberId,
                     phoneNumber: _existingPhoneController.text.replaceAll(
                       RegExp(r'\D'),
                       '',
@@ -329,7 +399,9 @@ class _ExistingMemberEnrollmentScreenState
         // Persist phone/account for OTP flow and navigate to OTP screen
         final prefs = await SharedPreferences.getInstance();
         final normalizedPhone =
-            (_isNewMember ? _phoneController.text : _existingPhoneController.text)
+            (_isNewMember
+                    ? _phoneController.text
+                    : _existingPhoneController.text)
                 .replaceAll(RegExp(r'\D'), '');
         final accountNumber = _isNewMember
             ? (authNotifier.lastRegisteredAccountNumber?.trim().isNotEmpty ==
@@ -337,7 +409,7 @@ class _ExistingMemberEnrollmentScreenState
                   ? authNotifier.lastRegisteredAccountNumber!.trim()
                   : prefs.getString(AppConstants.sharedPrefKeyUserId)?.trim() ??
                         '')
-            : _memberIdController.text.trim();
+            : _normalizedMemberId;
         await prefs.setString(
           AppConstants.sharedPrefKeyUserEmail,
           normalizedPhone,
@@ -383,8 +455,12 @@ class _ExistingMemberEnrollmentScreenState
     _goToStep(_currentStep + 1);
   }
 
-  Widget _buildContentCard(BuildContext context, ThemeData theme) {
-    final step = _steps[_currentStep];
+  Widget _buildContentCard(
+    BuildContext context,
+    ThemeData theme,
+    int stepIndex,
+  ) {
+    final step = _steps[stepIndex];
     final primary = theme.colorScheme.primary;
     final formTheme = theme.copyWith(
       textTheme: theme.textTheme.copyWith(
@@ -619,7 +695,11 @@ class _ExistingMemberEnrollmentScreenState
                                 onPageChanged: (index) =>
                                     setState(() => _currentStep = index),
                                 itemBuilder: (context, index) {
-                                  return _buildContentCard(context, theme);
+                                  return _buildContentCard(
+                                    context,
+                                    theme,
+                                    index,
+                                  );
                                 },
                               ),
                             ),
@@ -719,6 +799,7 @@ class _ExistingMemberEnrollmentScreenState
           controller: _fullNameController,
           hint: 'Enter your full name',
           icon: Icons.person_outline_rounded,
+          fieldKey: const ValueKey('new-member-full-name'),
         ),
         const SizedBox(height: 14),
         _buildTextField(
@@ -726,6 +807,7 @@ class _ExistingMemberEnrollmentScreenState
           controller: _phoneController,
           hint: 'Enter your active phone number',
           icon: Icons.phone_rounded,
+          fieldKey: const ValueKey('new-member-phone-number'),
           keyboardType: TextInputType.phone,
           inputFormatters: [
             FilteringTextInputFormatter.digitsOnly,
@@ -768,7 +850,9 @@ class _ExistingMemberEnrollmentScreenState
           controller: _ghanaCardController,
           hint: 'GHA-XXXXXXXXX-X',
           icon: Icons.badge_outlined,
+          fieldKey: const ValueKey('ghana-card-number'),
           keyboardType: TextInputType.text,
+          textCapitalization: TextCapitalization.characters,
           inputFormatters: [_GhanaCardInputFormatter()],
         ),
         const SizedBox(height: 14),
@@ -777,11 +861,9 @@ class _ExistingMemberEnrollmentScreenState
           controller: _birthDateController,
           hint: 'YYYY-MM-DD',
           icon: Icons.calendar_today_outlined,
+          fieldKey: const ValueKey('new-member-date-of-birth'),
           keyboardType: TextInputType.datetime,
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'[\d-]')),
-            LengthLimitingTextInputFormatter(10),
-          ],
+          inputFormatters: [_BirthDateInputFormatter()],
         ),
       ],
     );
@@ -1217,7 +1299,7 @@ class _ExistingMemberEnrollmentScreenState
         _buildTextField(
           label: 'Account Number',
           controller: _memberIdController,
-          hint: 'Enter your full credit union account number',
+          hint: 'Enter your account number (spaces and dashes are okay)',
           icon: Icons.badge_outlined,
           keyboardType: TextInputType.text,
         ),
@@ -1239,11 +1321,9 @@ class _ExistingMemberEnrollmentScreenState
           controller: _birthDateController,
           hint: 'YYYY-MM-DD',
           icon: Icons.calendar_today_outlined,
+          fieldKey: const ValueKey('existing-member-date-of-birth'),
           keyboardType: TextInputType.datetime,
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'[\d-]')),
-            LengthLimitingTextInputFormatter(10),
-          ],
+          inputFormatters: [_BirthDateInputFormatter()],
         ),
       ],
     );
@@ -1273,7 +1353,18 @@ class _ExistingMemberEnrollmentScreenState
           controller: _passwordController,
           hint: 'Create a strong password',
           icon: Icons.lock_outline_rounded,
-          obscureText: true,
+          obscureText: !_isPasswordVisible,
+          suffixIcon: IconButton(
+            tooltip: _isPasswordVisible ? 'Hide password' : 'Show password',
+            icon: Icon(
+              _isPasswordVisible
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+            ),
+            onPressed: () {
+              setState(() => _isPasswordVisible = !_isPasswordVisible);
+            },
+          ),
         ),
         const SizedBox(height: 14),
         _buildTextField(
@@ -1281,7 +1372,22 @@ class _ExistingMemberEnrollmentScreenState
           controller: _confirmPasswordController,
           hint: 'Confirm your password',
           icon: Icons.lock_outline_rounded,
-          obscureText: true,
+          obscureText: !_isConfirmPasswordVisible,
+          suffixIcon: IconButton(
+            tooltip: _isConfirmPasswordVisible
+                ? 'Hide confirmation password'
+                : 'Show confirmation password',
+            icon: Icon(
+              _isConfirmPasswordVisible
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+            ),
+            onPressed: () {
+              setState(() {
+                _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+              });
+            },
+          ),
         ),
       ],
     );
@@ -1338,7 +1444,7 @@ class _ExistingMemberEnrollmentScreenState
   }
 
   Widget _buildReviewBody(BuildContext context, ThemeData theme) {
-    final memberId = _memberIdController.text.trim();
+    final memberId = _normalizedMemberId;
     final phone = _phoneController.text.trim();
     final fullName = _fullNameController.text.trim();
     final ghanaCard = _ghanaCardController.text.trim();
@@ -1426,7 +1532,9 @@ class _ExistingMemberEnrollmentScreenState
     required TextEditingController controller,
     required String hint,
     required IconData icon,
+    Key? fieldKey,
     bool obscureText = false,
+    Widget? suffixIcon,
     TextInputType keyboardType = TextInputType.text,
     int? maxLength,
     List<TextInputFormatter>? inputFormatters,
@@ -1458,6 +1566,7 @@ class _ExistingMemberEnrollmentScreenState
             ],
           ),
           child: TextField(
+            key: fieldKey,
             controller: controller,
             obscureText: obscureText,
             keyboardType: keyboardType,
@@ -1492,6 +1601,7 @@ class _ExistingMemberEnrollmentScreenState
                 fontSize: 13,
               ),
               counterText: '',
+              suffixIcon: suffixIcon,
               filled: true,
               fillColor: Colors.white,
               border: OutlineInputBorder(
@@ -1594,7 +1704,6 @@ class _ExistingMemberEnrollmentScreenState
       ),
     );
   }
-
 }
 
 class _EnrollmentStep {
