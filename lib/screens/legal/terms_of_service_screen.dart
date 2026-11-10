@@ -6,7 +6,9 @@ import '../../core/constants/app_constants.dart';
 import '../../core/app_card.dart';
 
 class TermsOfServiceScreen extends StatefulWidget {
-  const TermsOfServiceScreen({super.key});
+  const TermsOfServiceScreen({super.key, this.reviewOnly = false});
+
+  final bool reviewOnly;
 
   @override
   State<TermsOfServiceScreen> createState() => _TermsOfServiceScreenState();
@@ -55,6 +57,13 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
       appBar: AppBar(
         title: const Text('Terms of Service'),
         automaticallyImplyLeading: false,
+        leading: widget.reviewOnly
+            ? IconButton(
+                tooltip: 'Back to settings',
+                onPressed: () => context.go('/settings'),
+                icon: const Icon(Icons.arrow_back),
+              )
+            : null,
         centerTitle: true,
       ),
       body: SafeArea(
@@ -85,24 +94,6 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
                           'Effective date: To be confirmed',
                           style: theme.textTheme.bodySmall,
                         ),
-                        const SizedBox(height: 16),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.tertiaryContainer,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            'Draft for ADEPA management review. The Terms '
-                            'and official contact details must be verified '
-                            'and reviewed by a Ghana-qualified lawyer before '
-                            'publication.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onTertiaryContainer,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -130,18 +121,34 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _isAccepting ? null : _acceptTerms,
-                  child: _isAccepting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('I Agree'),
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton(
+                    onPressed: () => context.go('/privacy-policy'),
+                    child: const Text('Read Privacy Policy'),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: widget.reviewOnly
+                        ? OutlinedButton(
+                            onPressed: () => context.go('/settings'),
+                            child: const Text('Close'),
+                          )
+                        : FilledButton(
+                            onPressed: _isAccepting ? null : _acceptTerms,
+                            child: _isAccepting
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text('I Agree'),
+                          ),
+                  ),
+                ],
               ),
             ),
           ],

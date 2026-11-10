@@ -16,7 +16,7 @@ class ShareDetailScreen extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Share Details',
-      backRoute: '/home',
+      backRoute: '/shares',
       child: shares.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) {
@@ -250,6 +250,26 @@ class _ShareDetails extends StatelessWidget {
                       ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => context.go('/shares/buy'),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Buy Shares'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => context.go('/shares/sell'),
+                      icon: const Icon(Icons.call_made_rounded),
+                      label: const Text('Sell Shares'),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 22),
               Text(

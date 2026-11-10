@@ -348,9 +348,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                                     label: 'Income',
                                     value:
                                         'GH₵${totalIncome.toStringAsFixed(2)}',
-                                    background: Colors.green.withValues(
-                                      alpha: 0.18,
-                                    ),
+                                    background: Colors.white,
+                                    textColor: theme.colorScheme.primary,
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -359,9 +358,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                                     label: 'Expense',
                                     value:
                                         'GH₵${totalExpense.toStringAsFixed(2)}',
-                                    background: Colors.red.withValues(
-                                      alpha: 0.18,
-                                    ),
+                                    background: Colors.white,
+                                    textColor: theme.colorScheme.error,
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -370,9 +368,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                                     label: 'Repayment',
                                     value:
                                         'GH₵${totalRepayment.toStringAsFixed(2)}',
-                                    background: Colors.orange.withValues(
-                                      alpha: 0.18,
-                                    ),
+                                    background: Colors.white,
+                                    textColor: Colors.deepOrange,
                                   ),
                                 ),
                               ],
@@ -532,7 +529,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         .map((txn) {
           final typeStr = txn['type']?.toString().toLowerCase() ?? 'unknown';
           final type = switch (typeStr) {
-            'credit' => TransactionType.deposit,
+            'credit' || 'deposit' => TransactionType.deposit,
             'repayment' => TransactionType.repayment,
             'debit' || 'withdraw' || 'withdrawal' => TransactionType.withdrawal,
             _ => TransactionType.unknown,
@@ -555,7 +552,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
             amount: amount,
             type: type,
             date: date,
-            category: typeStr == 'credit' ? 'Income' : 'Expense',
+            category: type == TransactionType.deposit ? 'Income' : 'Expense',
           );
         })
         .whereType<AppTransaction>()
@@ -740,6 +737,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     required String label,
     required String value,
     required Color background,
+    required Color textColor,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -753,16 +751,15 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
           Text(
             label,
             style: const TextStyle(
-              color: Colors.white70,
               fontSize: 10,
               fontWeight: FontWeight.w600,
-            ),
+            ).copyWith(color: textColor.withValues(alpha: 0.78)),
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: textColor,
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -807,17 +804,17 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               ? '-'
               : ''}GH₵${transaction.amount!.toStringAsFixed(2)}';
     Color getColor() {
-      if (isCredit) return Colors.green;
+      if (isCredit) return theme.colorScheme.primary;
       if (isRepayment) return Colors.orange;
-      if (!isDebit) return theme.colorScheme.outline;
-      return Colors.red;
+      if (isDebit) return theme.colorScheme.error;
+      return theme.colorScheme.outline;
     }
 
     IconData getIcon() {
-      if (isCredit) return Icons.arrow_downward;
+      if (isCredit) return Icons.call_received_rounded;
       if (isRepayment) return Icons.credit_card;
       if (!isDebit) return Icons.receipt_long_outlined;
-      return Icons.arrow_upward;
+      return Icons.call_made_rounded;
     }
 
     return InkWell(
@@ -945,6 +942,13 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     final isCredit = transaction.type == TransactionType.deposit;
     final isRepayment = transaction.type == TransactionType.repayment;
     final isDebit = transaction.type == TransactionType.withdrawal;
+    final transactionColor = isCredit
+        ? theme.colorScheme.primary
+        : isRepayment
+        ? Colors.orange
+        : isDebit
+        ? theme.colorScheme.error
+        : theme.colorScheme.outline;
     final amountLabel = transaction.amount == null
         ? 'GH₵ —'
         : '${isCredit
@@ -1002,26 +1006,16 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color:
-                            (isCredit
-                                    ? Colors.green
-                                    : isRepayment
-                                    ? Colors.orange
-                                    : Colors.red)
-                                .withOpacitySafe(0.12),
+                        color: transactionColor.withOpacitySafe(0.12),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         isCredit
-                            ? Icons.arrow_downward
+                            ? Icons.call_received_rounded
                             : isRepayment
                             ? Icons.credit_card
-                            : Icons.arrow_upward,
-                        color: isCredit
-                            ? Colors.green
-                            : isRepayment
-                            ? Colors.orange
-                            : Colors.red,
+                            : Icons.call_made_rounded,
+                        color: transactionColor,
                         size: 26,
                       ),
                     ),
@@ -1055,10 +1049,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               const SizedBox(height: 14),
               BalanceCardShell(
                 gradientColors: [
-                  theme.colorScheme.primary,
-                  theme.colorScheme.primary.withOpacitySafe(0.82),
+                  theme.colorScheme.surface,
+                  theme.colorScheme.surface,
                 ],
-                shadowColor: theme.colorScheme.primary.withOpacitySafe(0.28),
+                shadowColor: transactionColor.withOpacitySafe(0.18),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 14,
                   vertical: 12,
@@ -1072,7 +1066,9 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodyLarge?.copyWith(
-                          color: Colors.white.withOpacitySafe(0.92),
+                          color: theme.colorScheme.onSurface.withOpacitySafe(
+                            0.72,
+                          ),
                         ),
                       ),
                     ),
@@ -1083,7 +1079,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: transactionColor,
                       ),
                     ),
                   ],

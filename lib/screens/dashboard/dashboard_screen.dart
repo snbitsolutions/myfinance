@@ -1469,10 +1469,7 @@ String? _readProfileImageUrl(Map<String, dynamic>? profile) {
   return null;
 }
 
-double? _readOptionalProfileDouble(
-  Map<String, dynamic>? profile,
-  String key,
-) {
+double? _readOptionalProfileDouble(Map<String, dynamic>? profile, String key) {
   final value = profile?[key];
   if (value is num) return value.toDouble();
   if (value is String) return double.tryParse(value.replaceAll(',', ''));
@@ -1749,8 +1746,13 @@ class _DashboardTransactionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final transactionType = (txn['type'] as String? ?? 'unknown').toLowerCase();
-    final isCredit = transactionType == 'credit';
-    final isDebit = transactionType == 'debit';
+    final isCredit =
+        transactionType == 'credit' || transactionType == 'deposit';
+    final isDebit = const {
+      'debit',
+      'withdraw',
+      'withdrawal',
+    }.contains(transactionType);
     final amount = (txn['amount'] as num?)?.toDouble();
     final description = txn['description'] as String? ?? '';
     final dateStr = txn['date'] as String? ?? '';
@@ -1762,18 +1764,22 @@ class _DashboardTransactionTile extends StatelessWidget {
     } catch (_) {}
 
     final accentColor = isCredit
-        ? const Color(0xFF2E8B57)
-        : const Color(0xFF1C1F1E);
+        ? theme.colorScheme.primary
+        : isDebit
+        ? theme.colorScheme.error
+        : theme.colorScheme.onSurface;
     final badgeColor = status == 'pending'
         ? const Color(0xFFE2A93B)
         : status == 'completed' || status == 'success' || status == 'successful'
-        ? const Color(0xFF2E8B57)
+        ? theme.colorScheme.primary
         : theme.colorScheme.outline;
 
     final label = description.isEmpty ? 'Transaction' : description;
-    final icon = isCredit || isDebit
-        ? _transactionIcon(label, isCredit)
-        : Icons.receipt_long_outlined;
+    final icon = isCredit
+        ? Icons.call_received_rounded
+        : isDebit
+        ? Icons.call_made_rounded
+        : _transactionIcon(label);
 
     return Row(
       children: [
@@ -1782,7 +1788,9 @@ class _DashboardTransactionTile extends StatelessWidget {
           height: 42,
           decoration: BoxDecoration(
             color: isCredit
-                ? const Color(0xFFEAF5EE)
+                ? theme.colorScheme.primary.withValues(alpha: 0.10)
+                : isDebit
+                ? theme.colorScheme.error.withValues(alpha: 0.10)
                 : theme.colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: accentColor.withValues(alpha: 0.12)),
@@ -1818,7 +1826,11 @@ class _DashboardTransactionTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              '${isCredit ? '+' : isDebit ? '-' : ''} ₵${amount?.toStringAsFixed(2) ?? '—'}',
+              '${isCredit
+                  ? '+'
+                  : isDebit
+                  ? '-'
+                  : ''} ₵${amount?.toStringAsFixed(2) ?? '—'}',
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w800,
                 color: accentColor,
@@ -1852,7 +1864,7 @@ class _DashboardTransactionTile extends StatelessWidget {
     );
   }
 
-  IconData _transactionIcon(String label, bool isCredit) {
+  IconData _transactionIcon(String label) {
     final value = label.toLowerCase();
     if (value.contains('airtime') ||
         value.contains('bill') ||
@@ -1870,10 +1882,7 @@ class _DashboardTransactionTile extends StatelessWidget {
         value.contains('investment')) {
       return Icons.trending_up_rounded;
     }
-    if (isCredit) {
-      return Icons.arrow_downward_rounded;
-    }
-    return Icons.arrow_upward_rounded;
+    return Icons.receipt_long_outlined;
   }
 }
 

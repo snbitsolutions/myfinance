@@ -11,6 +11,7 @@ import 'package:adepa_teachers/router/app_router.dart';
 import 'package:adepa_teachers/screens/auth/otp_screen.dart';
 import 'package:adepa_teachers/screens/auth/signup_screen.dart';
 import 'package:adepa_teachers/screens/dashboard/dashboard_screen.dart';
+import 'package:adepa_teachers/screens/legal/privacy_policy_screen.dart';
 import 'package:adepa_teachers/screens/legal/terms_of_service_screen.dart';
 import 'package:adepa_teachers/screens/onboarding/onboarding_screen.dart';
 import 'package:adepa_teachers/screens/auth/login_screen.dart';
@@ -133,6 +134,44 @@ void main() {
       expect(find.byType(OnboardingScreen), findsOneWidget);
     },
   );
+
+  testWidgets('lets users review Terms without accepting them again', (
+    tester,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final acceptedVersion = prefs.getString(
+      AppConstants.sharedPrefKeyAcceptedTermsVersion,
+    );
+
+    await pumpAt(tester, '/terms?viewOnly=true');
+
+    expect(find.byType(TermsOfServiceScreen), findsOneWidget);
+    expect(find.text('Close'), findsOneWidget);
+    expect(find.text('I Agree'), findsNothing);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+
+    expect(
+      prefs.getString(AppConstants.sharedPrefKeyAcceptedTermsVersion),
+      acceptedVersion,
+    );
+    expect(find.byType(LoginScreen), findsOneWidget);
+  });
+
+  testWidgets('makes the Privacy Policy available before authentication', (
+    tester,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(AppConstants.sharedPrefKeyAcceptedTermsVersion);
+
+    await pumpAt(tester, '/privacy-policy');
+
+    expect(find.byType(PrivacyPolicyScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+    await tester.scrollUntilVisible(find.text('Privacy contact'), 400);
+    expect(find.text('Privacy contact'), findsOneWidget);
+    expect(find.textContaining('swedruteachers@yahoo.com'), findsOneWidget);
+  });
 
   testWidgets('requires Terms acceptance before opening auth routes', (
     tester,

@@ -218,6 +218,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Previous month transaction'), findsNWidgets(2));
+    final theme = Theme.of(tester.element(find.byType(TransactionsScreen)));
+    expect(
+      tester.widget<Text>(find.text('GH₵25.00')).style?.color,
+      theme.colorScheme.primary,
+    );
+    expect(
+      tester.widget<Text>(find.text('GH₵10.00')).style?.color,
+      theme.colorScheme.error,
+    );
     expect(tester.takeException(), isNull);
   });
 }

@@ -50,29 +50,6 @@ class _GhanaCardInputFormatter extends TextInputFormatter {
   }
 }
 
-class _BirthDateInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-    final limitedDigits = digits.substring(0, digits.length.clamp(0, 8));
-    final formatted = StringBuffer();
-
-    for (var index = 0; index < limitedDigits.length; index++) {
-      if (index == 4 || index == 6) formatted.write('-');
-      formatted.write(limitedDigits[index]);
-    }
-
-    final text = formatted.toString();
-    return TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
-    );
-  }
-}
-
 class ExistingMemberEnrollmentScreen extends ConsumerStatefulWidget {
   const ExistingMemberEnrollmentScreen({
     super.key,
@@ -109,10 +86,11 @@ class _ExistingMemberEnrollmentScreenState
   int? _selectedSharesProductId;
   String? _fundingMethod;
   bool _isSubmittingRegistration = false;
+  bool _isVerifyingMembership = false;
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   int _currentStep = 0;
-  bool get _isNewMember => widget.memberType == 'new';
+  bool get _isNewMember => widget.memberType.trim().toLowerCase() == 'new';
 
   String get _normalizedMemberId =>
       _memberIdController.text.replaceAll(RegExp(r'\D'), '');
@@ -128,7 +106,7 @@ class _ExistingMemberEnrollmentScreenState
   }
 
   bool get _isValidGhanaCard {
-    return RegExp(r'^GHA-\d{9}-\d$').hasMatch(_ghanaCardController.text);
+    return RegExp(r'^GHA-\d{8,9}-\d$').hasMatch(_ghanaCardController.text);
   }
 
   bool _isValidBirthDate(String input) {
@@ -145,6 +123,23 @@ class _ExistingMemberEnrollmentScreenState
         date.month == month &&
         date.day == day &&
         !date.isAfter(DateTime(today.year, today.month, today.day));
+  }
+
+  Future<void> _pickBirthDate() async {
+    final today = DateTime.now();
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime(2000, 1, 1),
+      firstDate: DateTime(1900),
+      lastDate: DateTime(today.year, today.month, today.day),
+      helpText: 'Select date of birth',
+    );
+    if (selectedDate == null || !mounted) return;
+
+    _birthDateController.text =
+        '${selectedDate.year.toString().padLeft(4, '0')}-'
+        '${selectedDate.month.toString().padLeft(2, '0')}-'
+        '${selectedDate.day.toString().padLeft(2, '0')}';
   }
 
   late final List<_EnrollmentStep> _steps;
@@ -211,10 +206,10 @@ class _ExistingMemberEnrollmentScreenState
         ),
         _EnrollmentStep(
           number: 7,
-          title: 'Set Transaction PIN',
-          subtitle: 'Secure your transactions',
-          description: 'Create a 4-digit PIN for transaction authorization.',
-          label: 'Set Transaction PIN',
+          title: 'Set Transfer PIN',
+          subtitle: 'Secure your transfers',
+          description: 'Create a 4-digit PIN to authorize transfers.',
+          label: 'Set Transfer PIN',
           body: _buildPinBody,
         ),
         _EnrollmentStep(
@@ -255,11 +250,11 @@ class _ExistingMemberEnrollmentScreenState
       ),
       _EnrollmentStep(
         number: 4,
-        title: 'Set Transaction PIN',
-        subtitle: 'Secure your transactions',
-        description: 'Create a 4-digit PIN for transaction authorization.',
-        label: 'Set Transaction PIN',
-        body: _buildPinBody,
+        title: 'Set Transfer PIN',
+        subtitle: 'Secure your transfers',
+        description: 'Create a 4-digit PIN to authorize transfers.',
+        label: 'Set Transfer PIN',
+        body: _buildExistingMemberPinsBody,
       ),
       _EnrollmentStep(
         number: 5,
@@ -275,6 +270,11 @@ class _ExistingMemberEnrollmentScreenState
   bool get _canContinue {
     final current = _steps[_currentStep];
     final title = current.title;
+    if (title == 'Set Transfer PIN') {
+      final transferPin = _pinController.text.trim();
+      return RegExp(r'^\d{4}$').hasMatch(transferPin) &&
+          _confirmPinController.text.trim() == transferPin;
+    }
 
     if (title == 'Personal Information') {
       final fullName = _fullNameController.text.trim();
@@ -297,10 +297,6 @@ class _ExistingMemberEnrollmentScreenState
       return _passwordController.text.trim().length >= 8 &&
           _confirmPasswordController.text.trim() ==
               _passwordController.text.trim();
-    }
-    if (title == 'Set Transaction PIN') {
-      return _pinController.text.trim().length == 4 &&
-          _confirmPinController.text.trim() == _pinController.text.trim();
     }
     if (title == 'Choose Products') {
       return _selectedSavingsProductId != null ||
@@ -345,14 +341,43 @@ class _ExistingMemberEnrollmentScreenState
           'Enter a valid date of birth in YYYY-MM-DD format.',
         'Create Login Credentials' =>
           'Enter a password with at least 8 characters and confirm it.',
-        'Set Transaction PIN' =>
-          'Enter a 4-digit PIN and confirm that both PINs match.',
+        'Set Transfer PIN' =>
+          'Enter and confirm the same 4-digit transfer PIN.',
         'Choose Products' => 'Select at least one product to continue.',
         _ => 'Please complete the required information.',
       };
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
+      return;
+    }
+
+    if (_steps[_currentStep].title == 'Verify Membership') {
+      if (_isVerifyingMembership) return;
+      setState(() => _isVerifyingMembership = true);
+      try {
+        await ref
+            .read(authProvider.notifier)
+            .confirmAccountNumber(
+              phoneNumber: _existingPhoneController.text.replaceAll(
+                RegExp(r'\D'),
+                '',
+              ),
+              accountNumber: _normalizedMemberId,
+              birthDate: _birthDateController.text.trim(),
+            );
+        if (!mounted) return;
+        _goToStep(_currentStep + 1);
+      } on AppException catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      } finally {
+        if (mounted) {
+          setState(() => _isVerifyingMembership = false);
+        }
+      }
       return;
     }
 
@@ -377,7 +402,6 @@ class _ExistingMemberEnrollmentScreenState
                 sharesProduct: _selectedSharesProductId ?? 0,
                 password: _passwordController.text.trim(),
                 transactionPin: _pinController.text.trim(),
-                phoneMake: 'Flutter mobile app',
               )
             : await ref
                   .read(authProvider.notifier)
@@ -389,8 +413,8 @@ class _ExistingMemberEnrollmentScreenState
                     ),
                     birthDate: _birthDateController.text.trim(),
                     password: _passwordController.text.trim(),
+                    pin: null,
                     transactionPin: _pinController.text.trim(),
-                    phoneMake: 'Flutter mobile app',
                   );
         if (!mounted) return;
         ScaffoldMessenger.of(
@@ -434,8 +458,8 @@ class _ExistingMemberEnrollmentScreenState
             'phoneNumber': normalizedPhone,
             'accountNumber': accountNumber,
             'isRegistration': true,
-            'transactionPin': _pinController.text.trim(),
             'transactionPinAlreadyProvisioned': true,
+            'requiresPinSetup': false,
           },
         );
         return;
@@ -709,7 +733,9 @@ class _ExistingMemberEnrollmentScreenState
                                 width: double.infinity,
                                 height: 50,
                                 child: ElevatedButton(
-                                  onPressed: _isSubmittingRegistration
+                                  onPressed:
+                                      _isSubmittingRegistration ||
+                                          _isVerifyingMembership
                                       ? null
                                       : _nextStep,
                                   style: ElevatedButton.styleFrom(
@@ -718,7 +744,9 @@ class _ExistingMemberEnrollmentScreenState
                                       borderRadius: BorderRadius.circular(14),
                                     ),
                                   ),
-                                  child: _isSubmittingRegistration
+                                  child:
+                                      _isSubmittingRegistration ||
+                                          _isVerifyingMembership
                                       ? const SizedBox(
                                           width: 20,
                                           height: 20,
@@ -862,8 +890,13 @@ class _ExistingMemberEnrollmentScreenState
           hint: 'YYYY-MM-DD',
           icon: Icons.calendar_today_outlined,
           fieldKey: const ValueKey('new-member-date-of-birth'),
-          keyboardType: TextInputType.datetime,
-          inputFormatters: [_BirthDateInputFormatter()],
+          readOnly: true,
+          onTap: () => _pickBirthDate(),
+          suffixIcon: IconButton(
+            tooltip: 'Choose date of birth',
+            onPressed: () => _pickBirthDate(),
+            icon: const Icon(Icons.calendar_today_outlined),
+          ),
         ),
       ],
     );
@@ -1322,8 +1355,13 @@ class _ExistingMemberEnrollmentScreenState
           hint: 'YYYY-MM-DD',
           icon: Icons.calendar_today_outlined,
           fieldKey: const ValueKey('existing-member-date-of-birth'),
-          keyboardType: TextInputType.datetime,
-          inputFormatters: [_BirthDateInputFormatter()],
+          readOnly: true,
+          onTap: () => _pickBirthDate(),
+          suffixIcon: IconButton(
+            tooltip: 'Choose date of birth',
+            onPressed: () => _pickBirthDate(),
+            icon: const Icon(Icons.calendar_today_outlined),
+          ),
         ),
       ],
     );
@@ -1398,7 +1436,7 @@ class _ExistingMemberEnrollmentScreenState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Set Transaction PIN',
+          'Set Transfer PIN',
           style: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w800,
             color: const Color(0xFF0E2B28),
@@ -1406,14 +1444,15 @@ class _ExistingMemberEnrollmentScreenState
         ),
         const SizedBox(height: 6),
         Text(
-          'This PIN will be used to authorize transactions',
+          'This 4-digit PIN will authorize transfers. Sign in to the app with '
+          'your password.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: const Color(0xFF4B5E59),
           ),
         ),
         const SizedBox(height: 14),
         _buildTextField(
-          label: 'PIN',
+          label: 'Transfer PIN',
           controller: _pinController,
           hint: 'Enter 4-digit PIN',
           icon: Icons.pin_rounded,
@@ -1427,7 +1466,7 @@ class _ExistingMemberEnrollmentScreenState
         ),
         const SizedBox(height: 14),
         _buildTextField(
-          label: 'Confirm PIN',
+          label: 'Confirm Transfer PIN',
           controller: _confirmPinController,
           hint: 'Re-enter PIN',
           icon: Icons.pin_rounded,
@@ -1438,6 +1477,55 @@ class _ExistingMemberEnrollmentScreenState
             FilteringTextInputFormatter.digitsOnly,
             LengthLimitingTextInputFormatter(4),
           ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExistingMemberPinsBody(BuildContext context, ThemeData theme) {
+    Widget pinField({
+      required String label,
+      required TextEditingController controller,
+    }) {
+      return _buildTextField(
+        label: label,
+        controller: controller,
+        hint: 'Enter 4-digit PIN',
+        icon: Icons.pin_rounded,
+        keyboardType: TextInputType.number,
+        maxLength: 4,
+        obscureText: true,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(4),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Set Transfer PIN',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFF0E2B28),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'This 4-digit PIN will authorize transfers. Sign in to the app with '
+          'your password.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: const Color(0xFF4B5E59),
+          ),
+        ),
+        const SizedBox(height: 14),
+        pinField(label: 'Transfer PIN', controller: _pinController),
+        const SizedBox(height: 14),
+        pinField(
+          label: 'Confirm Transfer PIN',
+          controller: _confirmPinController,
         ),
       ],
     );
@@ -1534,6 +1622,8 @@ class _ExistingMemberEnrollmentScreenState
     required IconData icon,
     Key? fieldKey,
     bool obscureText = false,
+    bool readOnly = false,
+    VoidCallback? onTap,
     Widget? suffixIcon,
     TextInputType keyboardType = TextInputType.text,
     int? maxLength,
@@ -1569,6 +1659,8 @@ class _ExistingMemberEnrollmentScreenState
             key: fieldKey,
             controller: controller,
             obscureText: obscureText,
+            readOnly: readOnly,
+            onTap: onTap,
             keyboardType: keyboardType,
             maxLength: maxLength,
             inputFormatters: inputFormatters,

@@ -9,7 +9,11 @@ void main() {
     test('uses the documented mobileapp-api auth routes', () {
       expect(
         ApiEndpoints.register,
-        'https://adepaye.com/mobileapp-api/register',
+        'https://adepaye.com/api/mobileapp-api/register',
+      );
+      expect(
+        ApiEndpoints.confirmAccountNumber,
+        'https://adepaye.com/api/mobileapp-api/confirmAccountNumber',
       );
       expect(ApiEndpoints.login, 'https://adepaye.com/api/mobileapp-api/login');
       expect(
@@ -49,7 +53,6 @@ void main() {
 
     test('keeps the documented mobile API defaults for auth requests', () {
       expect(AppConstants.defaultMobileApiSKey, isNotEmpty);
-      expect(AppConstants.defaultMobileApiImeiNumber, 100200300);
     });
 
     test('accepts common success status values for OTP verification', () {

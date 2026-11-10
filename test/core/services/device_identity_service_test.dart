@@ -32,9 +32,13 @@ void main() {
     test('backendDeviceNumber is stable and numeric', () {
       final first = DeviceIdentityService.backendDeviceNumber('installation');
       final second = DeviceIdentityService.backendDeviceNumber('installation');
+      final otherInstallation = DeviceIdentityService.backendDeviceNumber(
+        'another-installation',
+      );
 
       expect(first, second);
       expect(first, inInclusiveRange(100000000000000, 999999999999999));
+      expect(otherInstallation, isNot(first));
     });
 
     test('shortenFingerprint keeps only the start and end of long values', () {

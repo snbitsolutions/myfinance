@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/app_scaffold.dart';
+import '../../core/action_triple_row.dart';
+import '../../core/app_card.dart';
 import '../../core/balance_card_shell.dart';
 import '../../core/providers/app_providers.dart';
 
@@ -17,45 +18,48 @@ class _SharesScreenState extends ConsumerState<SharesScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
     final sharesAsync = ref.watch(sharesProvider);
 
     if (sharesAsync.isLoading) {
-      return const AppScaffold(
-        title: 'Shares',
-        child: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: const Color(0xFFF6F8F7),
+        appBar: _buildAppBar(theme),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (sharesAsync.hasError) {
-      return AppScaffold(
-        title: 'Shares',
-        child: Center(
+      return Scaffold(
+        backgroundColor: const Color(0xFFF6F8F7),
+        appBar: _buildAppBar(theme),
+        body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.error_outline, size: 42),
-                const SizedBox(height: 12),
-                Text(
-                  'Unable to load your shares.',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleMedium,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Please check your connection and try again.',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: () => ref.invalidate(sharesProvider),
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Try again'),
-                ),
-              ],
+            child: AppCard(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, size: 42),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Unable to load your shares.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Please check your connection and try again.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: () => ref.invalidate(sharesProvider),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Try again'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -108,125 +112,93 @@ class _SharesScreenState extends ConsumerState<SharesScreen> {
         ? (totalGain! / totalInvested) * 100
         : null;
 
-    return AppScaffold(
-      title: 'Shares',
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F8F7),
+      appBar: _buildAppBar(theme),
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      primary,
-                      primary.withValues(alpha: 0.9),
-                      const Color(0xFF0C4A34),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primary.withValues(alpha: 0.22),
-                      blurRadius: 24,
-                      offset: const Offset(0, 12),
-                    ),
-                  ],
-                ),
-                child: Stack(
+              BalanceCardShell(
+                gradientColors: const [Color(0xFF0D6B4D), Color(0xFF2D8E66)],
+                shadowColor: const Color(0xFF0D6B4D).withValues(alpha: 0.25),
+                contentPadding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Positioned(
-                      top: -18,
-                      right: -12,
-                      child: Container(
-                        width: 140,
-                        height: 140,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.07),
-                          borderRadius: BorderRadius.circular(70),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Total Share Value',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
+                        const Icon(
+                          Icons.visibility_outlined,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      sharesAsync.hasValue && shareValuesAvailable
+                          ? _formatCurrency(totalPortfolioValue)
+                          : 'GH₵ —',
+                      style: theme.textTheme.displaySmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const Positioned(
-                      right: -2,
-                      bottom: -2,
-                      child: AdepaLogoBadge(size: 128, opacity: 0.2),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 14),
+                    const Divider(color: Colors.white24, thickness: 1),
+                    const SizedBox(height: 14),
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            Text(
-                              'Total Portfolio Value',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.82),
-                                fontSize: 12,
-                                letterSpacing: 0.4,
-                              ),
-                            ),
-                            const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.visibility,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                            ),
-                          ],
+                        Expanded(
+                          child: _buildStatColumn(
+                            context,
+                            icon: Icons.pie_chart_outline_rounded,
+                            label: sharesOwnedAvailable
+                                ? 'Total Shares'
+                                : 'Share Holdings',
+                            value: sharesAsync.hasValue
+                                ? sharesOwnedAvailable
+                                      ? '$totalShares'
+                                      : '${displayedShares.length}'
+                                : '—',
+                          ),
                         ),
-                        const SizedBox(height: 14),
-                        Text(
-                          shareValuesAvailable
-                              ? 'GH₵ ${totalPortfolioValue.toStringAsFixed(2).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',')}'
-                              : 'Unavailable',
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.8,
+                        Expanded(
+                          child: _buildStatColumn(
+                            context,
+                            icon: Icons.payments_outlined,
+                            label: 'Dividends',
+                            value: dividendDataAvailable
+                                ? _formatCurrency(totalDividends)
+                                : '—',
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildStatColumn(
+                            context,
+                            icon: Icons.account_balance_wallet_outlined,
+                            label: 'Total Invested',
+                            value: hasInvestmentData && investedDataAvailable
+                                ? _formatCurrency(totalInvested)
+                                : '—',
                           ),
                         ),
                       ],
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 16),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: _StatPill(
-                      label: sharesOwnedAvailable
-                          ? 'Total Shares'
-                          : 'Share Holdings',
-                      value: sharesOwnedAvailable
-                          ? '$totalShares'
-                          : '${displayedShares.length}',
-                      accent: const Color(0xFF2E8B57),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _StatPill(
-                      label: 'Dividends',
-                      value: dividendDataAvailable
-                          ? 'GH₵ ${totalDividends.toStringAsFixed(2)}'
-                          : 'Unavailable',
-                      accent: const Color(0xFF0E8F87),
-                    ),
-                  ),
-                ],
               ),
               if (displayedShares.isNotEmpty && !sharesOwnedAvailable) ...[
                 const SizedBox(height: 8),
@@ -237,93 +209,76 @@ class _SharesScreenState extends ConsumerState<SharesScreen> {
                   ),
                 ),
               ],
-              const SizedBox(height: 16),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: _ActionButton(
-                      icon: Icons.add,
-                      label: 'Buy\nShares',
-                      onTap: () => context.go('/shares/buy'),
-                    ),
+              const SizedBox(height: 18),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Quick Actions',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _ActionButton(
-                      icon: Icons.arrow_forward,
-                      label: 'Sell\nShares',
-                      onTap: () => context.go('/shares/sell'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _ActionButton(
-                      icon: Icons.description,
-                      label: 'Statement',
-                      onTap: () => context.go('/shares/statement'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _ActionButton(
-                      icon: Icons.payments,
-                      label: 'Dividends',
-                      onTap: () => context.go('/shares/dividends'),
-                    ),
-                  ),
-                ],
+                ),
               ),
-              const SizedBox(height: 24),
-
-              // My Shares Section
+              const SizedBox(height: 10),
+              ActionTripleRow(
+                deposit: ActionItem(
+                  label: 'Buy Shares',
+                  icon: Icons.add_circle_outline,
+                  color: theme.colorScheme.primary,
+                  onTap: () => context.go('/shares/buy'),
+                ),
+                withdraw: ActionItem(
+                  label: 'Sell Shares',
+                  icon: Icons.remove_circle_outline,
+                  color: theme.colorScheme.error,
+                  onTap: () => context.go('/shares/sell'),
+                ),
+                transfer: ActionItem(
+                  label: 'Statement',
+                  icon: Icons.receipt_long_outlined,
+                  color: const Color(0xFF1B8A9B),
+                  onTap: () => context.go('/shares/statement'),
+                ),
+                extra: ActionItem(
+                  label: 'Dividend history',
+                  icon: Icons.payments_outlined,
+                  color: theme.colorScheme.primary,
+                  onTap: () => context.go('/shares/dividends'),
+                ),
+              ),
+              const SizedBox(height: 18),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'My Shares',
+                    'My Share Holdings',
                     style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {},
-                    child: Text(
-                      'Watchlist →',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: primary,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      color: const Color(0xFF1D2B26),
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              if (displayedShares.isEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.18),
+              const SizedBox(height: 10),
+              if (!sharesAsync.hasValue)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: AppCard(
+                    child: Text(
+                      'Share account data is unavailable. Holdings are not shown until the backend responds.',
+                      style: theme.textTheme.bodyMedium,
                     ),
                   ),
+                ),
+              if (displayedShares.isEmpty)
+                const AppCard(
                   child: Text(
                     'No shares are currently linked to this account.',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(
-                        alpha: 0.68,
-                      ),
-                    ),
                   ),
                 )
               else
                 ...displayedShares.map(
                   (share) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.only(bottom: 10),
                     child: _ShareCard(
                       share: share,
                       theme: theme,
@@ -332,102 +287,121 @@ class _SharesScreenState extends ConsumerState<SharesScreen> {
                     ),
                   ),
                 ),
-              const SizedBox(height: 16),
-
-              // Portfolio Overview Section
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.18),
+              if (hasInvestmentData) ...[
+                const SizedBox(height: 8),
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Portfolio Overview',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _OverviewItem(
+                              icon: Icons.account_balance_wallet_outlined,
+                              label: 'Total Invested',
+                              value: investedDataAvailable
+                                  ? _formatCurrency(totalInvested)
+                                  : '—',
+                              theme: theme,
+                            ),
+                          ),
+                          Expanded(
+                            child: _OverviewItem(
+                              icon: Icons.trending_up,
+                              label: 'Total Gain',
+                              value: totalGain == null
+                                  ? '—'
+                                  : _formatCurrency(totalGain),
+                              theme: theme,
+                            ),
+                          ),
+                          Expanded(
+                            child: _OverviewItem(
+                              icon: Icons.percent,
+                              label: 'Overall Return',
+                              value: returnPercent == null
+                                  ? '—'
+                                  : '${returnPercent.toStringAsFixed(1)}%',
+                              theme: theme,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
-                child: Stack(
-                  children: [
-                    const Positioned(
-                      top: -8,
-                      right: -4,
-                      child: AdepaLogoBadge(size: 108),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Portfolio Overview',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () {},
-                              child: Text(
-                                'View Analytics →',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: primary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _OverviewItem(
-                                icon: Icons.account_balance_wallet,
-                                label: 'Total Invested',
-                                value:
-                                    hasInvestmentData && investedDataAvailable
-                                    ? _formatCurrency(totalInvested)
-                                    : '—',
-                                theme: theme,
-                              ),
-                            ),
-                            Expanded(
-                              child: _OverviewItem(
-                                icon: Icons.trending_up,
-                                label: 'Total Gain',
-                                value: totalGain == null
-                                    ? '—'
-                                    : _formatCurrency(totalGain),
-                                theme: theme,
-                              ),
-                            ),
-                            Expanded(
-                              child: _OverviewItem(
-                                icon: Icons.percent,
-                                label: 'Overall Return',
-                                value: returnPercent == null
-                                    ? '—'
-                                    : '${returnPercent.toStringAsFixed(1)}%',
-                                theme: theme,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
+              ],
             ],
           ),
         ),
       ),
+    );
+  }
+
+  AppBar _buildAppBar(ThemeData theme) {
+    return AppBar(
+      title: const Text('Shares'),
+      backgroundColor: Colors.white,
+      foregroundColor: theme.colorScheme.primary,
+      elevation: 0.5,
+      leading: IconButton(
+        onPressed: () => context.go('/home'),
+        icon: const Icon(Icons.arrow_back_ios_new_rounded),
+        tooltip: 'Back',
+      ),
+      actions: [
+        IconButton(
+          onPressed: () => context.go('/shares/buy'),
+          icon: const Icon(Icons.add_circle_outline_rounded),
+          tooltip: 'Buy Shares',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatColumn(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: Colors.white.withValues(alpha: 0.9),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
     );
   }
 
@@ -520,136 +494,6 @@ class _SharesScreenState extends ConsumerState<SharesScreen> {
       'change_color': _asDouble(item['change_24h'] ?? item['change']) >= 0,
       'icon': Icons.business,
     };
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: theme.colorScheme.outline.withValues(alpha: 0.18),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      theme.colorScheme.primary.withValues(alpha: 0.18),
-                      theme.colorScheme.primary.withValues(alpha: 0.08),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: theme.colorScheme.primary, size: 20),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  height: 1.15,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatPill extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color accent;
-
-  const _StatPill({
-    required this.label,
-    required this.value,
-    required this.accent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.18),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontSize: 11,
-              color: theme.textTheme.bodySmall?.color,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: accent,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
   }
 }
 

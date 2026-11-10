@@ -157,7 +157,7 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
                     'GH₵ ${data.amount.toStringAsFixed(2)}',
                     style: theme.textTheme.displaySmall?.copyWith(
                       fontWeight: FontWeight.w800,
-                      color: theme.colorScheme.primary,
+                      color: theme.colorScheme.error,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -187,6 +187,7 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
                           'Amount',
                           'GH₵ ${data.amount.toStringAsFixed(2)}',
                           theme,
+                          valueColor: theme.colorScheme.error,
                         ),
                         _Divider(theme),
                         _DetailRow('Date & Time', dateFormat, theme),
@@ -284,8 +285,9 @@ class _DetailRow extends StatelessWidget {
   final String label;
   final String value;
   final ThemeData theme;
+  final Color? valueColor;
 
-  const _DetailRow(this.label, this.value, this.theme);
+  const _DetailRow(this.label, this.value, this.theme, {this.valueColor});
 
   @override
   Widget build(BuildContext context) {
@@ -305,6 +307,7 @@ class _DetailRow extends StatelessWidget {
             value,
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w600,
+              color: valueColor,
             ),
           ),
         ],

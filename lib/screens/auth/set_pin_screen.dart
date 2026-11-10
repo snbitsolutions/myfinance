@@ -223,7 +223,26 @@ class _SetPinScreenState extends ConsumerState<SetPinScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const SizedBox(height: 24),
+                      if (_isChangeMode)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: IconButton(
+                            tooltip: 'Back to settings',
+                            icon: const Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              color: Colors.white,
+                            ),
+                            onPressed: () {
+                              if (context.canPop()) {
+                                context.pop();
+                              } else {
+                                context.go('/settings');
+                              }
+                            },
+                          ),
+                        )
+                      else
+                        const SizedBox(height: 24),
                       Text(
                         _isRegisterMode
                             ? 'Create PIN'

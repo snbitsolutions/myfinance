@@ -10,6 +10,7 @@ class SellSharesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AppScaffold(
     title: 'Sell Shares',
+    backRoute: '/shares',
     child: Center(
       child: Padding(
         padding: const EdgeInsets.all(24),

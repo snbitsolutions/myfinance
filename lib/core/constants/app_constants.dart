@@ -8,6 +8,7 @@ class AppConstants {
   // App Info
   static const String appName = 'ADEPA TEACHERS';
   static const String appVersion = '1.0.0';
+  static const String supportPhoneNumber = '+233 596 921 255';
 
   // Timeouts
   static const Duration apiTimeout = Duration(seconds: 30);
@@ -86,10 +87,6 @@ class AppConstants {
   static const String pinResetUnavailableMessage =
       'Forgot-PIN reset is not available because the backend does not document a PIN recovery endpoint.';
   static const String defaultMobileApiSKey = 'ArTM3c8yq0Lhlh';
-  static const int defaultMobileApiImeiNumber = int.fromEnvironment(
-    'DEBUG_API_IMEI',
-    defaultValue: 100200300,
-  );
   static const String pinTooSimpleMessage =
       'PIN is too simple. Please choose a different PIN.';
 
@@ -179,7 +176,7 @@ class ApiEndpoints {
   static const String verifyLoginOtp =
       'https://adepaye.com/api/mobileapp-api/verifyOtp';
   static const String confirmPin = '$mobileApiBaseUrl/verifyPin';
-  static const String register = 'https://adepaye.com/mobileapp-api/register';
+  static const String register = '$mobileApiBaseUrl/register';
   static const String createMember = '$mobileApiBaseUrl/create';
   static const String changePin = '$mobileApiBaseUrl/changePin';
   static const String setPin = '$mobileApiBaseUrl/setPin';
@@ -188,6 +185,7 @@ class ApiEndpoints {
   static const String getAccountBalance = '$mobileApiBaseUrl/getAccountBalance';
   static const String getLoans = '$mobileApiBaseUrl/getMemLoans';
   static const String miniStatement = '$mobileApiBaseUrl/miniStatement';
+  static const String savingsStatement = '$mobileApiBaseUrl/savingsStatement';
   static const String checkBalance = '$mobileApiBaseUrl/checkBalance';
   // The documented mobile-money funding endpoint is POST /deposit.
   static const String depositFunds = '/deposit';

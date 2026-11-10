@@ -337,6 +337,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final isSuccess =
           AuthSession.isSuccessStatus(status) ||
           AuthSession.isSuccessStatus(response['success']) ||
+          AuthSession.isSuccessStatus(response['is_success']) ||
           session != null;
 
       if (!isSuccess) {
@@ -579,11 +580,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> confirmAccountNumber({
     required String phoneNumber,
     required String accountNumber,
+    required String birthDate,
   }) async {
     try {
       await authService.confirmAccountNumber(
         phoneNumber: phoneNumber,
         accountNumber: accountNumber,
+        birthDate: birthDate,
       );
       AppLogger.info('Account number confirmed: $accountNumber');
     } on AppException catch (e) {
@@ -944,16 +947,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String phoneNumber,
     required String birthDate,
     required String password,
+    required String? pin,
     required String transactionPin,
-    required String phoneMake,
   }) async {
     try {
       final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
+      final phoneMake = await deviceIdentityService.getBackendDeviceMake();
       final response = await authService.register(
         accountNumber: accountNumber,
         phoneNumber: phoneNumber,
         birthDate: birthDate,
         password: password,
+        pin: pin,
         transactionPin: transactionPin,
         imeiNumber: imeiNumber,
         phoneMake: phoneMake,
@@ -1001,9 +1006,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required int sharesProduct,
     required String password,
     required String transactionPin,
-    required String phoneMake,
   }) async {
     final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
+    final phoneMake = await deviceIdentityService.getBackendDeviceMake();
     final normalizedPhoneNumber = _normalizePhoneNumber(phoneNumber);
     final response = await authService.createMember(
       fullName: fullName,
@@ -1483,11 +1488,7 @@ final investmentsApiProvider = FutureProvider<List<Map<String, dynamic>>>((
     try {
       final response = await ref
           .watch(investmentServiceProvider)
-          .getInvestments(
-            phoneNumber: phone,
-            accountNumber: account,
-            pin: pin,
-          );
+          .getInvestments(phoneNumber: phone, accountNumber: account, pin: pin);
       final data = response['data'];
       if (data is List) {
         investmentRecords.addAll(data.whereType<Map<String, dynamic>>());
@@ -1605,6 +1606,13 @@ final withdrawalAccountProvider =
     });
 
 // Transactions provider
+final productStatementProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, String>((ref, productId) {
+      return ref
+          .watch(transactionServiceProvider)
+          .getProductStatement(productId: productId);
+    });
+
 final transactionsProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
@@ -1797,15 +1805,15 @@ final debugRegistrationProbeProvider = FutureProvider<Map<String, String>>((
 
   try {
     final authService = ref.watch(authServiceProvider);
-    final imeiNumber = await ref
-        .watch(deviceIdentityServiceProvider)
-        .getBackendDeviceNumber();
+    final deviceIdentityService = ref.watch(deviceIdentityServiceProvider);
+    final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
+    final phoneMake = await deviceIdentityService.getBackendDeviceMake();
     final response = await authService.register(
       accountNumber: auth.userId!,
       phoneNumber: auth.userEmail!,
       birthDate: '',
       imeiNumber: imeiNumber,
-      phoneMake: 'Flutter mobile app',
+      phoneMake: phoneMake,
     );
 
     final status = response['status'];

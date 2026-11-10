@@ -16,6 +16,7 @@ import '../core/app_scaffold.dart';
 import '../core/app_card.dart' as core_app_card;
 import '../screens/splash/splash_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
+import '../screens/legal/privacy_policy_screen.dart';
 import '../screens/legal/terms_of_service_screen.dart';
 
 // Auth
@@ -117,6 +118,7 @@ class AppRouter {
   static const Set<String> _preAuthRoutes = {
     '/',
     '/terms',
+    '/privacy-policy',
     '/onboarding',
     ..._authRoutes,
   };
@@ -327,7 +329,13 @@ class AppRouter {
         GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
         GoRoute(
           path: '/terms',
-          builder: (context, state) => const TermsOfServiceScreen(),
+          builder: (context, state) => TermsOfServiceScreen(
+            reviewOnly: state.uri.queryParameters['viewOnly'] == 'true',
+          ),
+        ),
+        GoRoute(
+          path: '/privacy-policy',
+          builder: (context, state) => const PrivacyPolicyScreen(),
         ),
         GoRoute(
           path: '/onboarding',
@@ -350,7 +358,9 @@ class AppRouter {
           path: '/existing-member-enrollment',
           builder: (context, state) {
             final memberType =
-                state.uri.queryParameters['memberType'] ?? 'existing';
+                (state.uri.queryParameters['memberType'] ?? 'existing')
+                    .trim()
+                    .toLowerCase();
             return ExistingMemberEnrollmentScreen(memberType: memberType);
           },
         ),
@@ -372,6 +382,7 @@ class AppRouter {
               transactionPin: extra?['transactionPin'] as String?,
               transactionPinAlreadyProvisioned:
                   extra?['transactionPinAlreadyProvisioned'] as bool? ?? false,
+              requiresPinSetup: extra?['requiresPinSetup'] as bool?,
             );
           },
         ),
@@ -834,9 +845,12 @@ class AppRouter {
               builder: (context, state) {
                 final id = state.pathParameters['id'] ?? 'custom-savings';
                 final savings = state.extra;
-                return SavingsDetailScreen(
-                  savingsId: id,
-                  savings: savings is Savings ? savings : null,
+                final remoteSavings = savings is Savings ? savings : null;
+                return PortfolioStatementScreen(
+                  productId: remoteSavings != null && !remoteSavings.isRemote
+                      ? null
+                      : id,
+                  accountTitle: remoteSavings?.title,
                 );
               },
             ),
@@ -874,13 +888,6 @@ class AppRouter {
               builder: (context, state) => const SharesScreen(),
               routes: [
                 GoRoute(
-                  path: ':id',
-                  builder: (context, state) {
-                    final shareId = state.pathParameters['id'];
-                    return ShareDetailScreen(shareId: shareId);
-                  },
-                ),
-                GoRoute(
                   path: 'buy',
                   builder: (context, state) => const BuySharesScreen(),
                 ),
@@ -904,11 +911,19 @@ class AppRouter {
                 ),
                 GoRoute(
                   path: 'statement',
-                  builder: (context, state) => const PortfolioStatementScreen(),
+                  builder: (context, state) =>
+                      const PortfolioStatementScreen(isShares: true),
                 ),
                 GoRoute(
                   path: 'dividends',
                   builder: (context, state) => const DividendHistoryScreen(),
+                ),
+                GoRoute(
+                  path: ':id',
+                  builder: (context, state) {
+                    final shareId = state.pathParameters['id'];
+                    return ShareDetailScreen(shareId: shareId);
+                  },
                 ),
               ],
             ),

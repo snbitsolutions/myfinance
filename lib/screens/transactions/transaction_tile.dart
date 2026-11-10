@@ -9,17 +9,29 @@ class TransactionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isCredit = transaction.type == TransactionType.deposit;
     final scheme = Theme.of(context).colorScheme;
+    final accentColor = switch (transaction.type) {
+      TransactionType.deposit => scheme.primary,
+      TransactionType.withdrawal => scheme.error,
+      TransactionType.repayment => Colors.orange,
+      TransactionType.unknown => scheme.outline,
+    };
+    final amountSign = switch (transaction.type) {
+      TransactionType.deposit => '+',
+      TransactionType.withdrawal || TransactionType.repayment => '-',
+      TransactionType.unknown => '',
+    };
+    final icon = switch (transaction.type) {
+      TransactionType.deposit => Icons.call_received_rounded,
+      TransactionType.withdrawal => Icons.call_made_rounded,
+      TransactionType.repayment => Icons.credit_card,
+      TransactionType.unknown => Icons.receipt_long_outlined,
+    };
 
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: (isCredit ? scheme.primary : scheme.error)
-            .withOpacitySafe(0.12),
-        child: Icon(
-          isCredit ? Icons.arrow_downward : Icons.arrow_upward,
-          color: isCredit ? scheme.primary : scheme.error,
-        ),
+        backgroundColor: accentColor.withOpacitySafe(0.12),
+        child: Icon(icon, color: accentColor),
       ),
       title: Text(transaction.title, style: TextStyle(color: scheme.onSurface)),
       subtitle: Text(
@@ -27,11 +39,8 @@ class TransactionTile extends StatelessWidget {
         style: TextStyle(color: scheme.onSurface.withOpacitySafe(0.7)),
       ),
       trailing: Text(
-        '${isCredit ? '+' : '-'} GHS ${transaction.amount}',
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: isCredit ? scheme.primary : scheme.error,
-        ),
+        '$amountSign GHS ${transaction.amount}',
+        style: TextStyle(fontWeight: FontWeight.bold, color: accentColor),
       ),
     );
   }

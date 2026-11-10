@@ -86,9 +86,9 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
     }
 
     try {
-      final response = await ref.read(savingsServiceProvider).getSavingsBalance(
-        productId: productId,
-      );
+      final response = await ref
+          .read(savingsServiceProvider)
+          .getSavingsBalance(productId: productId);
       final balance = response['balance'];
       if (balance is num && mounted) {
         setState(() => _resolvedBalance = balance.toDouble());
@@ -190,14 +190,20 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
             itemBuilder: (context, index) {
               final transaction = transactions[index];
               final isCredit = transaction['positive'] == true;
+              final colorScheme = Theme.of(context).colorScheme;
+              final transactionColor = isCredit
+                  ? colorScheme.primary
+                  : colorScheme.error;
               final amount = (transaction['amount'] as num?)?.toDouble() ?? 0;
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
+                  backgroundColor: transactionColor.withValues(alpha: 0.12),
                   child: Icon(
                     isCredit
-                        ? Icons.arrow_downward_rounded
-                        : Icons.arrow_upward_rounded,
+                        ? Icons.call_received_rounded
+                        : Icons.call_made_rounded,
+                    color: transactionColor,
                   ),
                 ),
                 title: Text(
@@ -210,7 +216,7 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
                 trailing: Text(
                   '${isCredit ? '+' : '-'}GH₵${amount.toStringAsFixed(2)}',
                   style: TextStyle(
-                    color: isCredit ? const Color(0xFF1FA66E) : Colors.red,
+                    color: transactionColor,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -289,7 +295,10 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
           title: name,
           balance: balance,
           target: _toAmount(
-            record['target'] ?? record['target_amount'] ?? record['goal_amount'] ?? 0,
+            record['target'] ??
+                record['target_amount'] ??
+                record['goal_amount'] ??
+                0,
           ),
           type: SavingsType.memberSaving,
           interestRate: _toOptionalAmount(
@@ -539,7 +548,7 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _ActionButton(
-                      icon: Icons.arrow_downward,
+                      icon: Icons.call_received_rounded,
                       label: 'Deposit',
                       active: true,
                       onTap: () => savings.isRemote
@@ -550,8 +559,9 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
                           : _showLocalGoalMessage(),
                     ),
                     _ActionButton(
-                      icon: Icons.arrow_upward,
+                      icon: Icons.call_made_rounded,
                       label: 'Withdraw',
+                      color: Theme.of(context).colorScheme.error,
                       onTap: () => savings.isRemote
                           ? context.go('/savings/${widget.savingsId}/withdraw')
                           : _showLocalGoalMessage(),
@@ -599,7 +609,7 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _OverviewTile(
-                      icon: Icons.arrow_upward_rounded,
+                      icon: Icons.call_made_rounded,
                       iconColor: const Color(0xFFDD7F7F),
                       label: 'Total Withdrawals',
                       value: '—',
@@ -760,6 +770,9 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
               ...transactionRows.map((tx) {
                 final isPositive = tx['positive'] as bool;
                 final amount = (tx['amount'] as num).toDouble();
+                final transactionColor = isPositive
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.error;
                 final amountText =
                     '${isPositive ? '+' : '-'}GH₵ ${amount.toStringAsFixed(2)}';
                 return Container(
@@ -778,12 +791,14 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
                         width: 38,
                         height: 38,
                         decoration: BoxDecoration(
-                          color: (tx['color'] as Color).withValues(alpha: 0.12),
+                          color: transactionColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
-                          tx['icon'] as IconData,
-                          color: tx['color'] as Color,
+                          isPositive
+                              ? Icons.call_received_rounded
+                              : Icons.call_made_rounded,
+                          color: transactionColor,
                           size: 20,
                         ),
                       ),
@@ -822,9 +837,7 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
                           Text(
                             amountText,
                             style: TextStyle(
-                              color: isPositive
-                                  ? const Color(0xFF2E8B57)
-                                  : const Color(0xFFDA5F5F),
+                              color: transactionColor,
                               fontWeight: FontWeight.w700,
                               fontSize: 15,
                             ),
@@ -854,12 +867,14 @@ class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool active;
+  final Color? color;
   final VoidCallback? onTap;
 
   const _ActionButton({
     required this.icon,
     required this.label,
     this.active = false,
+    this.color,
     this.onTap,
   });
 
@@ -884,7 +899,9 @@ class _ActionButton extends StatelessWidget {
               ),
               child: Icon(
                 icon,
-                color: active ? const Color(0xFF2E8B57) : Colors.black87,
+                color:
+                    color ??
+                    (active ? const Color(0xFF2E8B57) : Colors.black87),
                 size: 22,
               ),
             ),
@@ -896,7 +913,9 @@ class _ActionButton extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11,
-                color: active ? const Color(0xFF2E8B57) : Colors.black87,
+                color:
+                    color ??
+                    (active ? const Color(0xFF2E8B57) : Colors.black87),
                 fontWeight: FontWeight.w500,
               ),
             ),

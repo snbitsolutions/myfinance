@@ -904,7 +904,7 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                                 Expanded(
                                   child: _buildActionIcon(
                                     context,
-                                    icon: Icons.arrow_downward,
+                                    icon: Icons.call_received_rounded,
                                     label: 'Deposit',
                                     color: const Color(0xFF1A8F5A),
                                     onTap: () => item.isRemote
@@ -918,9 +918,9 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                                 Expanded(
                                   child: _buildActionIcon(
                                     context,
-                                    icon: Icons.arrow_upward,
+                                    icon: Icons.call_made_rounded,
                                     label: 'Withdraw',
-                                    color: const Color(0xFF1A8F5A),
+                                    color: theme.colorScheme.error,
                                     onTap: () => item.isRemote
                                         ? context.go(
                                             '/savings/${item.id}/withdraw',
@@ -1847,7 +1847,7 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                 children: [
                   _savingsActionItem(
                     context,
-                    icon: Icons.arrow_downward,
+                    icon: Icons.call_received_rounded,
                     label: 'Deposit',
                     onTap: () => s.isRemote
                         ? context.go('/savings/${s.id}/deposit', extra: s)
@@ -1856,7 +1856,7 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                   ),
                   _savingsActionItem(
                     context,
-                    icon: Icons.arrow_upward,
+                    icon: Icons.call_made_rounded,
                     label: 'Withdraw',
                     onTap: () => s.isRemote
                         ? context.go('/savings/${s.id}/withdraw')

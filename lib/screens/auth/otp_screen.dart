@@ -20,6 +20,7 @@ class OtpScreen extends ConsumerStatefulWidget {
     this.isRegistration = false,
     this.transactionPin,
     this.transactionPinAlreadyProvisioned = false,
+    this.requiresPinSetup,
   });
 
   final String phoneNumber;
@@ -27,6 +28,7 @@ class OtpScreen extends ConsumerStatefulWidget {
   final bool isRegistration;
   final String? transactionPin;
   final bool transactionPinAlreadyProvisioned;
+  final bool? requiresPinSetup;
 
   @override
   ConsumerState<OtpScreen> createState() => _OtpScreenState();
@@ -147,7 +149,10 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       ref.invalidate(savingsProvider);
       if (!mounted) return;
 
-      if (widget.isRegistration && widget.transactionPin == null) {
+      final requiresPinSetup =
+          widget.requiresPinSetup ??
+          (widget.isRegistration && widget.transactionPin == null);
+      if (requiresPinSetup) {
         context.go(
           '/set-pin',
           extra: {

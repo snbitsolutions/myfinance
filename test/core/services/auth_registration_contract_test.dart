@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:adepa_teachers/core/exceptions/app_exceptions.dart';
 import 'package:adepa_teachers/core/services/api_service.dart';
 import 'package:adepa_teachers/core/services/http_client.dart';
 import 'package:dio/dio.dart';
@@ -57,6 +58,7 @@ void main() {
         phoneNumber: '0241234567',
         birthDate: '1989-10-07',
         password: 'member-pass-123',
+        pin: '1357',
         transactionPin: '2468',
         imeiNumber: 100200300,
         phoneMake: 'Flutter mobile app',
@@ -67,18 +69,82 @@ void main() {
       expect(request.method, 'POST');
       expect(
         request.uri.toString(),
-        'https://adepaye.com/mobileapp-api/register',
+        'https://adepaye.com/api/mobileapp-api/register',
       );
       expect(body['acc_number'], 10600000040752);
       expect(body['phone_number'], 233241234567);
       expect(body['birth_date'], '1989-10-07');
       expect(body['password'], 'member-pass-123');
+      expect(body['pin'], 1357);
       expect(body['trans_pin'], 2468);
       expect(body['imei_number'], 100200300);
       expect(body['phone_make'], 'Flutter mobile app');
       expect(response['status'], 1);
     },
   );
+
+  test('sends date of birth and accepts an explicit confirmation', () async {
+    adapter = _RegistrationResponseAdapter(
+      '{"status":1,"message":"Registration Successful"}',
+    );
+    dio.httpClientAdapter = adapter;
+
+    await AuthService().confirmAccountNumber(
+      accountNumber: '0010600000040752',
+      phoneNumber: '0241234567',
+      birthDate: '1989-10-07',
+    );
+
+    final request = adapter.request!;
+    expect(
+      request.uri.toString(),
+      'https://adepaye.com/api/mobileapp-api/confirmAccountNumber',
+    );
+    expect(request.contentType, Headers.formUrlEncodedContentType);
+    final body = request.data as Map<String, dynamic>;
+    expect(body['account_number'], '0010600000040752');
+    expect(body['phone_number'], '0241234567');
+    expect(body['birth_date'], '1989-10-07');
+    expect(body['s_key'], isNotEmpty);
+    expect(body, isNot(contains('imei_number')));
+    expect(body, isNot(contains('phone_make')));
+  });
+
+  test('accepts empty membership confirmation responses', () async {
+    adapter = _RegistrationResponseAdapter('');
+    dio.httpClientAdapter = adapter;
+
+    await AuthService().confirmAccountNumber(
+      accountNumber: '0010600000040752',
+      phoneNumber: '0241234567',
+      birthDate: '1989-10-07',
+    );
+
+    expect(
+      adapter.request!.uri.toString(),
+      'https://adepaye.com/api/mobileapp-api/confirmAccountNumber',
+    );
+  });
+
+  test('rejects explicit membership confirmation failures', () async {
+    adapter = _RegistrationResponseAdapter(
+      '{"status":0,"message":"Account number was not found"}',
+    );
+    dio.httpClientAdapter = adapter;
+
+    await expectLater(
+      AuthService().confirmAccountNumber(
+        accountNumber: '0010600000040752',
+        phoneNumber: '0241234567',
+        birthDate: '1989-10-07',
+      ),
+      throwsA(isA<AuthException>()),
+    );
+    expect(
+      adapter.request!.uri.toString(),
+      'https://adepaye.com/api/mobileapp-api/confirmAccountNumber',
+    );
+  });
 
   test(
     'sends new-member account creation details in documented format',

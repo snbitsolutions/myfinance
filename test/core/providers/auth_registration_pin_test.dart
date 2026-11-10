@@ -12,6 +12,7 @@ class _RegistrationOtpAuthService extends AuthService {
   String? setPinValue;
   String? loginPassword;
   String? loginMemberName;
+  Map<String, dynamic>? loginResponse;
   String? otpPhoneNumber;
   String? otpAccountNumber;
 
@@ -22,12 +23,13 @@ class _RegistrationOtpAuthService extends AuthService {
     required int imeiNumber,
   }) async {
     loginPassword = password;
-    return {
-      'status': 1,
-      'member_id': '40752',
-      'account_number': '0010100000144795',
-      if (loginMemberName != null) 'member_name': loginMemberName,
-    };
+    return loginResponse ??
+        {
+          'status': 1,
+          'member_id': '40752',
+          'account_number': '0010100000144795',
+          if (loginMemberName != null) 'member_name': loginMemberName,
+        };
   }
 
   @override
@@ -189,6 +191,28 @@ void main() {
       secureStore[AppConstants.secureStorageKeyDeviceVerifiedSession],
       'true',
     );
+  });
+
+  test('password login accepts an is_success-only response', () async {
+    final authService = _RegistrationOtpAuthService()
+      ..loginResponse = {
+        'is_success': true,
+        'account_number': '0010100000144795',
+      };
+    final notifier = AuthNotifier(
+      authService: authService,
+      userService: UserService(),
+      deviceIdentityService: _RegistrationDeviceIdentityService(),
+    );
+    addTearDown(notifier.dispose);
+
+    final accountNumber = await notifier.login(
+      phoneNumber: '233241952608',
+      password: 'member-password',
+    );
+
+    expect(accountNumber, '0010100000144795');
+    expect(notifier.state.isAuthenticated, isTrue);
   });
 
   test(

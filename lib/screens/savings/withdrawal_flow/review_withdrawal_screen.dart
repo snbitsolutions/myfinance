@@ -114,7 +114,7 @@ class ReviewWithdrawalScreen extends StatelessWidget {
                     'GH₵ ${data.amount.toStringAsFixed(2)}',
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
-                      color: theme.colorScheme.primary,
+                      color: theme.colorScheme.error,
                     ),
                   ),
                 ],
@@ -131,6 +131,7 @@ class ReviewWithdrawalScreen extends StatelessWidget {
                     'GH₵ ${data.amount.toStringAsFixed(2)}',
                     theme,
                     isBold: true,
+                    valueColor: theme.colorScheme.error,
                   ),
                 ],
               ),
@@ -187,8 +188,15 @@ class _SummaryRow extends StatelessWidget {
   final String value;
   final ThemeData theme;
   final bool isBold;
+  final Color? valueColor;
 
-  const _SummaryRow(this.label, this.value, this.theme, {this.isBold = false});
+  const _SummaryRow(
+    this.label,
+    this.value,
+    this.theme, {
+    this.isBold = false,
+    this.valueColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -208,6 +216,7 @@ class _SummaryRow extends StatelessWidget {
           value,
           style: theme.textTheme.bodyMedium?.copyWith(
             fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
+            color: valueColor,
           ),
         ),
       ],

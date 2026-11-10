@@ -421,8 +421,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       context,
                       icon: Icons.chat_bubble_outline,
                       title: 'Contact Support',
-                      subtitle: 'Chat with our support team',
-                      onTap: () => _showComingSoon(context),
+                      subtitle: AppConstants.supportPhoneNumber,
+                      onTap: () => _showSupportContact(context),
                     ),
                     Divider(
                       height: 1,
@@ -454,7 +454,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       context,
                       icon: Icons.description_outlined,
                       title: 'Terms & Conditions',
-                      onTap: () => _showComingSoon(context),
+                      onTap: () => context.go('/terms?viewOnly=true'),
                     ),
                     Divider(
                       height: 1,
@@ -464,7 +464,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       context,
                       icon: Icons.privacy_tip_outlined,
                       title: 'Privacy Policy',
-                      onTap: () => _showComingSoon(context),
+                      subtitle: 'How we handle your information',
+                      onTap: () => context.go('/privacy-policy'),
                     ),
                     Divider(
                       height: 1,
@@ -831,6 +832,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       SnackBar(
         content: const Text('Coming soon!'),
         backgroundColor: Colors.orange,
+      ),
+    );
+  }
+
+  void _showSupportContact(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Contact Support'),
+        content: const Text('Call support: ${AppConstants.supportPhoneNumber}'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }

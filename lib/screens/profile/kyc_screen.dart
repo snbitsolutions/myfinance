@@ -38,6 +38,23 @@ class _KycScreenState extends ConsumerState<KycScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _pickDateOfBirth() async {
+    final today = DateTime.now();
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime(2000, 1, 1),
+      firstDate: DateTime(1900),
+      lastDate: DateTime(today.year, today.month, today.day),
+      helpText: 'Select date of birth',
+    );
+    if (selectedDate == null || !mounted) return;
+
+    _dateOfBirthController.text =
+        '${selectedDate.year.toString().padLeft(4, '0')}-'
+        '${selectedDate.month.toString().padLeft(2, '0')}-'
+        '${selectedDate.day.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
@@ -77,18 +94,21 @@ class _KycScreenState extends ConsumerState<KycScreen> {
               ),
               validator: (value) {
                 final card = value?.trim().toUpperCase() ?? '';
-                return RegExp(r'^GHA-\d{9}-\d$').hasMatch(card)
+                return RegExp(r'^GHA-\d{8,9}-\d$').hasMatch(card)
                     ? null
                     : 'Use the format GHA-XXXXXXXXX-X';
               },
             ),
             const SizedBox(height: 16),
             TextFormField(
+              key: const ValueKey('kyc-date-of-birth'),
               controller: _dateOfBirthController,
-              keyboardType: TextInputType.datetime,
+              readOnly: true,
+              onTap: () => _pickDateOfBirth(),
               decoration: const InputDecoration(
                 labelText: 'Date of birth',
                 hintText: 'YYYY-MM-DD',
+                suffixIcon: Icon(Icons.calendar_today_outlined),
               ),
               validator: (value) {
                 final date = value?.trim() ?? '';

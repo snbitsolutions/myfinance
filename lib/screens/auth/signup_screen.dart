@@ -24,6 +24,7 @@ class _SignupScreenState extends State<SignupScreen> {
   Widget _buildSelectionCard({
     required IconData icon,
     required String title,
+    required String description,
     required VoidCallback onTap,
     required ThemeData theme,
     bool isPrimary = false,
@@ -92,6 +93,14 @@ class _SignupScreenState extends State<SignupScreen> {
                             ? FontWeight.w800
                             : FontWeight.w700,
                         fontSize: isPrimary ? 16 : 15,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: contentColor.withOpacitySafe(0.78),
+                        height: 1.35,
                       ),
                     ),
                   ],
@@ -213,6 +222,7 @@ class _SignupScreenState extends State<SignupScreen> {
               _buildSelectionCard(
                 icon: Icons.account_balance_wallet_outlined,
                 title: 'I have an account',
+                description: 'Proceed if you already have an account with us.',
                 onTap: _handleExistingMemberSelection,
                 theme: theme,
                 isPrimary: true,
@@ -221,19 +231,41 @@ class _SignupScreenState extends State<SignupScreen> {
               _buildSelectionCard(
                 icon: Icons.person_add_alt_1_rounded,
                 title: 'I need a new account',
+                description:
+                    'Open a new account and start your journey with us.',
                 onTap: _handleNewMemberSelection,
                 theme: theme,
                 emphasizeTitle: true,
               ),
               const SizedBox(height: 20),
-              TextButton(
-                onPressed: () => context.go('/login'),
-                child: Text(
-                  'Already enrolled for mobile banking? Sign in',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      'Already enrolled for mobile banking?',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => context.go('/login'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Sign in',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

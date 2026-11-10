@@ -140,11 +140,13 @@ class AuthService extends BaseService {
   Future<void> confirmAccountNumber({
     required String phoneNumber,
     required String accountNumber,
+    required String birthDate,
   }) async {
     return handleApiCall(() async {
       final request = {
         'phone_number': phoneNumber,
         'account_number': accountNumber,
+        'birth_date': _validBirthDate(birthDate),
         's_key': AppConstants.defaultMobileApiSKey,
       };
 
@@ -165,20 +167,14 @@ class AuthService extends BaseService {
 
       AppLogger.logApiResponse('POST', ApiEndpoints.confirmAccountNumber, data);
 
-      if (data.isNotEmpty) {
-        final status = data['status'];
-        final isExplicitFailure =
-            status != null &&
-            status != 1 &&
-            status != '1' &&
-            !(status is String && status.toLowerCase() == 'success');
-
-        if (isExplicitFailure) {
-          throw AuthException(
-            message:
-                data['message'] as String? ?? 'Account verification failed.',
-          );
-        }
+      final status = data['status'] ?? data['success'] ?? data['is_success'];
+      if (status != null && !AuthSession.isSuccessStatus(status)) {
+        throw AuthException(
+          message:
+              data['message'] as String? ??
+              'We could not verify your account details. Check your account '
+                  'number, phone number, and date of birth, then try again.',
+        );
       }
     });
   }
@@ -320,6 +316,51 @@ class AuthService extends BaseService {
     return int.parse(digits.substring(digits.length - 5));
   }
 
+  String _validAccountNumber(String accountNumber) {
+    final digits = accountNumber.replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 5) {
+      throw ValidationException(
+        message: 'Account number must contain at least five digits.',
+      );
+    }
+    return digits;
+  }
+
+  String _validBirthDate(String birthDate) {
+    final trimmed = birthDate.trim();
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(trimmed)) {
+      throw ValidationException(
+        message: 'Date of birth must use the format YYYY-MM-DD.',
+      );
+    }
+
+    final year = int.tryParse(trimmed.substring(0, 4));
+    final month = int.tryParse(trimmed.substring(5, 7));
+    final day = int.tryParse(trimmed.substring(8, 10));
+    if (year == null || month == null || day == null) {
+      throw ValidationException(
+        message: 'Date of birth must use the format YYYY-MM-DD.',
+      );
+    }
+
+    final parsed = DateTime(year, month, day);
+    if (parsed.year != year || parsed.month != month || parsed.day != day) {
+      throw ValidationException(
+        message: 'Date of birth must be a valid calendar date.',
+      );
+    }
+
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    if (parsed.isAfter(todayDate)) {
+      throw ValidationException(
+        message: 'Date of birth cannot be later than today.',
+      );
+    }
+
+    return trimmed;
+  }
+
   String _toInternationalPhoneNumber(String phoneNumber) {
     final digits = phoneNumber.replaceAll(RegExp(r'\D'), '');
     if (digits.startsWith('233')) return digits;
@@ -335,16 +376,25 @@ class AuthService extends BaseService {
     required String phoneNumber,
     required String birthDate,
     String? password,
+    String? pin,
     String? transactionPin,
     required int imeiNumber,
     required String phoneMake,
   }) async {
     return handleApiCall(() async {
+      final normalizedAccountNumber = _validAccountNumber(accountNumber);
+      final normalizedBirthDate = _validBirthDate(birthDate);
       final normalizedPassword = password?.trim();
       if (normalizedPassword != null && normalizedPassword.length < 8) {
         throw ValidationException(
           message: 'Password must be at least 8 characters.',
         );
+      }
+
+      final normalizedPin = pin?.trim();
+      if (normalizedPin != null &&
+          !RegExp(r'^\d{4}$').hasMatch(normalizedPin)) {
+        throw ValidationException(message: 'App PIN must be exactly 4 digits.');
       }
 
       final normalizedTransactionPin = transactionPin?.trim();
@@ -356,14 +406,19 @@ class AuthService extends BaseService {
       }
 
       final request = <String, dynamic>{
-        'acc_number': int.tryParse(accountNumber) ?? accountNumber,
+        'acc_number':
+            int.tryParse(normalizedAccountNumber) ?? normalizedAccountNumber,
         'phone_number': int.parse(_toInternationalPhoneNumber(phoneNumber)),
-        'birth_date': birthDate,
+        'birth_date': normalizedBirthDate,
         'password': ?normalizedPassword,
+        if (normalizedPin != null)
+          'pin': int.tryParse(normalizedPin) ?? normalizedPin,
         if (normalizedTransactionPin != null)
           'trans_pin':
               int.tryParse(normalizedTransactionPin) ??
               normalizedTransactionPin,
+        // The API's legacy field name is imei_number; the value is an
+        // app-installation ID because iOS and modern Android do not expose IMEI.
         'imei_number': imeiNumber,
         'phone_make': phoneMake,
         's_key': AppConstants.defaultMobileApiSKey,
@@ -400,11 +455,27 @@ class AuthService extends BaseService {
   }) async {
     return handleApiCall(() async {
       final normalizedPhoneNumber = _toInternationalPhoneNumber(phoneNumber);
+      final normalizedBirthDate = _validBirthDate(birthDate);
+      if (fullName.trim().isEmpty) {
+        throw ValidationException(message: 'Full name is required.');
+      }
+      if (!RegExp(r'^GHA-\d{8,9}-\d$').hasMatch(ghanaCard.trim())) {
+        throw ValidationException(
+          message:
+              'Enter a valid Ghana Card number in the format GHA-XXXXXXXXX-X.',
+        );
+      }
+      if (!RegExp(r'^\d{4}$').hasMatch(transactionPin.trim())) {
+        throw ValidationException(
+          message: 'Transaction PIN must be exactly 4 digits.',
+        );
+      }
+
       final request = <String, dynamic>{
         'full_name': fullName,
         'ghana_card': ghanaCard,
         'phone_number': int.parse(normalizedPhoneNumber),
-        'birth_date': birthDate,
+        'birth_date': normalizedBirthDate,
         'gender': gender,
         'address': address,
         'email': email,
@@ -413,6 +484,8 @@ class AuthService extends BaseService {
         // Passwords must remain strings even when the user enters only digits.
         'password': password,
         'trans_pin': int.tryParse(transactionPin) ?? transactionPin,
+        // The API's legacy field name is imei_number; the value is an
+        // app-installation ID because iOS and modern Android do not expose IMEI.
         'imei_number': imeiNumber,
         'phone_make': phoneMake,
         's_key': AppConstants.defaultMobileApiSKey,
@@ -463,7 +536,7 @@ class AuthService extends BaseService {
 
       final request = <String, dynamic>{
         'phone_number': int.parse(normalizedPhone),
-        'password': _normalizeNumberLikeJsonValue(normalizedPassword),
+        'password': normalizedPassword,
         's_key': AppConstants.defaultMobileApiSKey,
         'imei_number': imeiNumber,
       };
@@ -1963,6 +2036,82 @@ class TransactionService extends BaseService {
     if (v == null) return null;
     if (v is num) return v.toDouble();
     return double.tryParse(v.toString().replaceAll(',', ''));
+  }
+
+  Future<List<Map<String, dynamic>>> getProductStatement({
+    required String productId,
+  }) async {
+    return handleApiCall(() async {
+      final normalizedProductId = productId.trim();
+      if (normalizedProductId.isEmpty) {
+        throw ValidationException(message: 'A product ID is required.');
+      }
+
+      final request = {
+        'product_id': int.tryParse(normalizedProductId) ?? normalizedProductId,
+        's_key': AppConstants.defaultMobileApiSKey,
+      };
+      AppLogger.logApiRequest('POST', ApiEndpoints.savingsStatement, request);
+
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.savingsStatement,
+        data: request,
+      );
+      if (isBackendEmptyPayload(response.data)) {
+        throw GenericException(
+          message: 'The statement service returned an empty response.',
+        );
+      }
+
+      final data = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse('POST', ApiEndpoints.savingsStatement, data);
+      if (hasExplicitFailure(data)) {
+        throw GenericException(
+          message: data['message']?.toString() ?? 'Unable to load statement.',
+        );
+      }
+
+      final nestedData = data['data'];
+      final transactions =
+          <dynamic>[
+                data['transactions'],
+                data['statement'],
+                if (nestedData is Map) nestedData['transactions'],
+                if (nestedData is Map) nestedData['statement'],
+                nestedData,
+              ].firstWhere(
+                (value) => value is List,
+                orElse: () => const <dynamic>[],
+              )
+              as List;
+
+      return transactions.whereType<Map>().map((rawTransaction) {
+        final transaction = Map<String, dynamic>.from(rawTransaction);
+        return {
+          ...transaction,
+          'transaction_id':
+              (transaction['trans_id'] ??
+                      transaction['transaction_id'] ??
+                      transaction['id'])
+                  ?.toString() ??
+              '',
+          'description':
+              (transaction['description'] ?? transaction['narration'])
+                  ?.toString() ??
+              '',
+          'amount': _toDoubleOrNull(transaction['amount']),
+          'type':
+              (transaction['trans_type'] ?? transaction['type'])?.toString() ??
+              'unknown',
+          'date':
+              (transaction['entry_date'] ??
+                      transaction['transaction_date'] ??
+                      transaction['date'])
+                  ?.toString() ??
+              '',
+        };
+      }).toList();
+    });
   }
 
   /// Get transactions for user via live /miniStatement endpoint

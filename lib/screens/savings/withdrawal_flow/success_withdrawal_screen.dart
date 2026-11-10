@@ -152,7 +152,7 @@ class SuccessWithdrawalScreen extends StatelessWidget {
                     'GH₵ ${data.amount.toStringAsFixed(2)}',
                     style: theme.textTheme.displaySmall?.copyWith(
                       fontWeight: FontWeight.w800,
-                      color: theme.colorScheme.primary,
+                      color: theme.colorScheme.error,
                     ),
                   ),
                   const SizedBox(height: 12),

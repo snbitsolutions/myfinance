@@ -222,7 +222,7 @@ class PaymentReceiptScreen extends StatelessWidget {
                         Text(
                           _money(amount),
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: Color(0xFFC8F7D0),
                             fontSize: 36,
                             fontWeight: FontWeight.w800,
                           ),

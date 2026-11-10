@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/providers/app_providers.dart';
 import 'user_model.dart';
 
@@ -67,7 +68,7 @@ class ProfileScreen extends ConsumerWidget {
         builder: (dialogContext) => AlertDialog(
           title: const Text('Help & Support'),
           content: const Text(
-            'Call support: +233 20 000 0000\n\nEmail: support@adepateachers.app',
+            'Call support: ${AppConstants.supportPhoneNumber}',
           ),
           actions: [
             TextButton(
@@ -396,8 +397,7 @@ class ProfileScreen extends ConsumerWidget {
                               icon: Icons.lock_outline,
                               title: 'Security & PIN',
                               subtitle: 'Manage your security settings',
-                              onTap: () =>
-                                  context.go('/set-pin?mode=change'),
+                              onTap: () => context.go('/set-pin?mode=change'),
                             ),
                             _MenuItem(
                               icon: Icons.notifications_outlined,
