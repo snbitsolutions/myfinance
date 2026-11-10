@@ -170,8 +170,8 @@ const _termsSections = <_TermsSection>[
     '1. About These Terms',
     'These Terms of Service (“Terms”) govern your access to and use of the '
         'ADEPA Teachers’ Co-operative Credit Union Ltd mobile application '
-        '(“App”), operated by ADEPA Teachers’ Co-operative Credit Union Ltd '
-        '(“ADEPA”, “we”, “us” or “our”). The App may provide access to '
+        '(“App”), operated by ADEPA Teachers’ Co-operative Credit Union Ltd'
+        '. The App may provide access to '
         'services such as account balances, transaction history, savings '
         'information, loan information, transfers, payments, profile '
         'management and notifications, depending on available features. By '

@@ -38,8 +38,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   'This Privacy Policy explains how ADEPA Teachers’ '
-                  'Co-operative Credit Union Ltd (“ADEPA”, “we”, “us” or '
-                  '“our”) handles personal information when you use the '
+                  'Co-operative Credit Union Ltd handles personal information when you use the '
                   'ADEPA TEACHERS mobile application (“App”).',
                   style: theme.textTheme.bodyMedium,
                 ),
