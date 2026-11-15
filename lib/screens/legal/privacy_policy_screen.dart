@@ -78,6 +78,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                 const Text(
                   'ADEPA Teachers’ Co-operative Credit Union Ltd\n'
                   'Akim Oda Road, Agona Swedru, Ghana\n'
+                  'Telephone: +233596921255\n'
                   'Email: swedruteachers@yahoo.com',
                 ),
               ],
