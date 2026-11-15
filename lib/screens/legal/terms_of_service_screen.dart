@@ -91,7 +91,7 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Effective date: To be confirmed',
+                          'Effective date: 9 November 2026',
                           style: theme.textTheme.bodySmall,
                         ),
                       ],
