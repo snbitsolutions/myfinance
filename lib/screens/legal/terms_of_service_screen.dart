@@ -344,12 +344,12 @@ const _termsSections = <_TermsSection>[
   _TermsSection(
     '19. Contact Details',
     'Organisation: ADEPA Teachers’ Co-operative Credit Union Ltd\n'
-        'Support email: To be confirmed\n'
-        'Support telephone: To be confirmed\n'
-        'Office address: To be confirmed\n'
-        'Website: To be confirmed, if applicable\n\n'
-        'These details must be replaced with verified official details '
-        'before publication.',
+        'Support email: swedruteachers@yahoo.com\n'
+        'Support telephone: +233596921255\n'
+        'Office address: Akim Oda Road, Agona Swedru, Ghana\n'
+        'Website: atccugh.com\n\n'
+        'For questions about these Terms or the App, contact ADEPA using '
+        'the details above.',
   ),
   _TermsSection(
     '20. Acceptance',
