@@ -536,7 +536,7 @@ class AuthService extends BaseService {
 
       final request = <String, dynamic>{
         'phone_number': int.parse(normalizedPhone),
-        'password': normalizedPassword,
+        'password': _normalizeNumberLikeJsonValue(normalizedPassword),
         's_key': AppConstants.defaultMobileApiSKey,
         'imei_number': imeiNumber,
       };
@@ -611,6 +611,249 @@ class AuthService extends BaseService {
         data,
         statusCode: response.statusCode,
       );
+
+      return data;
+    });
+  }
+
+  /// Request a password reset code using the documented mobile-app contract.
+  Future<Map<String, dynamic>> requestPasswordReset({
+    required String accountNumber,
+  }) async {
+    return handleApiCall(() async {
+      final normalizedAccount = accountNumber.replaceAll(RegExp(r'\D'), '');
+      if (normalizedAccount.isEmpty) {
+        throw ValidationException(message: 'Account number is required.');
+      }
+
+      final request = <String, dynamic>{
+        'account_number': int.tryParse(normalizedAccount) ?? normalizedAccount,
+        'imei_number': AppConstants.defaultMobileApiImeiNumber,
+        's_key': AppConstants.defaultMobileApiSKey,
+      };
+
+      AppLogger.logApiRequest(
+        'POST',
+        ApiEndpoints.requestPasswordReset,
+        request,
+      );
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.requestPasswordReset,
+        data: request,
+      );
+
+      final data = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse(
+        'POST',
+        ApiEndpoints.requestPasswordReset,
+        data,
+        statusCode: response.statusCode,
+      );
+
+      if (hasExplicitFailure(data)) {
+        throw AuthException(
+          message:
+              data['message']?.toString() ??
+              'We could not send the reset code. Please try again.',
+        );
+      }
+
+      return data;
+    });
+  }
+
+  /// Verify the one-time password sent during a reset request.
+  Future<Map<String, dynamic>> verifyPasswordResetOtp({
+    required String requestId,
+    required String otp,
+  }) async {
+    return handleApiCall(() async {
+      final request = <String, dynamic>{
+        'request_id': requestId,
+        'otp': int.tryParse(otp.trim()) ?? otp.trim(),
+      };
+
+      AppLogger.logApiRequest(
+        'POST',
+        ApiEndpoints.verifyPasswordResetOtp,
+        request,
+      );
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.verifyPasswordResetOtp,
+        data: request,
+      );
+
+      final data = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse(
+        'POST',
+        ApiEndpoints.verifyPasswordResetOtp,
+        data,
+        statusCode: response.statusCode,
+      );
+
+      if (hasExplicitFailure(data)) {
+        throw AuthException(
+          message:
+              data['message']?.toString() ??
+              'The reset code could not be verified.',
+        );
+      }
+
+      return data;
+    });
+  }
+
+  /// Complete the password reset using the verified request ID and the new password.
+  Future<Map<String, dynamic>> passwordReset({
+    required String requestId,
+    required String newPassword,
+    int? imeiNumber,
+  }) async {
+    return handleApiCall(() async {
+      final normalizedPassword = newPassword.trim();
+      if (normalizedPassword.isEmpty) {
+        throw ValidationException(message: 'New password is required.');
+      }
+
+      final request = <String, dynamic>{
+        'imei_number': imeiNumber ?? AppConstants.defaultMobileApiImeiNumber,
+        'password': int.tryParse(normalizedPassword) ?? normalizedPassword,
+        'request_id': requestId,
+        's_key': AppConstants.defaultMobileApiSKey,
+      };
+
+      AppLogger.logApiRequest('POST', ApiEndpoints.passwordReset, request);
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.passwordReset,
+        data: request,
+      );
+
+      final data = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse(
+        'POST',
+        ApiEndpoints.passwordReset,
+        data,
+        statusCode: response.statusCode,
+      );
+
+      if (hasExplicitFailure(data)) {
+        throw AuthException(
+          message:
+              data['message']?.toString() ??
+              'The password could not be reset. Please try again.',
+        );
+      }
+
+      return data;
+    });
+  }
+
+  /// Request an account deletion verification code.
+  Future<Map<String, dynamic>> requestAccountDeletion({
+    required int imeiNumber,
+  }) async {
+    return handleApiCall(() async {
+      final request = <String, dynamic>{
+        'imei_number': imeiNumber,
+        's_key': AppConstants.defaultMobileApiSKey,
+      };
+
+      AppLogger.logApiRequest('POST', ApiEndpoints.requestDeletion, request);
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.requestDeletion,
+        data: request,
+      );
+
+      final data = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse(
+        'POST',
+        ApiEndpoints.requestDeletion,
+        data,
+        statusCode: response.statusCode,
+      );
+
+      if (hasExplicitFailure(data)) {
+        throw AuthException(
+          message:
+              data['message']?.toString() ??
+              'We could not start account deletion. Please try again.',
+        );
+      }
+
+      return data;
+    });
+  }
+
+  /// Verify the OTP used to authorize account deletion.
+  Future<Map<String, dynamic>> verifyAccountDeletionOtp({
+    required String requestId,
+    required String otp,
+  }) async {
+    return handleApiCall(() async {
+      final request = <String, dynamic>{
+        'request_id': requestId,
+        'otp': int.tryParse(otp.trim()) ?? otp.trim(),
+      };
+
+      AppLogger.logApiRequest('POST', ApiEndpoints.verifyDeletionOtp, request);
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.verifyDeletionOtp,
+        data: request,
+      );
+
+      final data = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse(
+        'POST',
+        ApiEndpoints.verifyDeletionOtp,
+        data,
+        statusCode: response.statusCode,
+      );
+
+      if (hasExplicitFailure(data)) {
+        throw AuthException(
+          message:
+              data['message']?.toString() ??
+              'The deletion code could not be verified.',
+        );
+      }
+
+      return data;
+    });
+  }
+
+  /// Permanently delete the account after verification.
+  Future<Map<String, dynamic>> deleteAccount({
+    required String requestId,
+    required int imeiNumber,
+  }) async {
+    return handleApiCall(() async {
+      final request = <String, dynamic>{
+        'request_id': requestId,
+        'imei_number': imeiNumber,
+        's_key': AppConstants.defaultMobileApiSKey,
+      };
+
+      AppLogger.logApiRequest('POST', ApiEndpoints.deleteAccount, request);
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.deleteAccount,
+        data: request,
+      );
+
+      final data = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse(
+        'POST',
+        ApiEndpoints.deleteAccount,
+        data,
+        statusCode: response.statusCode,
+      );
+
+      if (hasExplicitFailure(data)) {
+        throw AuthException(
+          message:
+              data['message']?.toString() ??
+              'Account deletion could not be completed. Please try again.',
+        );
+      }
 
       return data;
     });

@@ -23,6 +23,10 @@ class DeviceIdentityService {
   Future<String> getInstallationId() => _getOrCreateInstallationId();
 
   Future<int> getBackendDeviceNumber() async {
+    if (AppConstants.defaultMobileApiImeiNumber > 0) {
+      return AppConstants.defaultMobileApiImeiNumber;
+    }
+
     final installationId = await _getOrCreateInstallationId();
     return backendDeviceNumber(installationId);
   }

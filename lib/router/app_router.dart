@@ -22,6 +22,7 @@ import '../screens/legal/terms_of_service_screen.dart';
 // Auth
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
+import '../screens/auth/forgot_password_screen.dart';
 import '../screens/auth/existing_member_enrollment_screen.dart';
 import '../screens/auth/otp_screen.dart';
 import '../screens/auth/registration_success_screen.dart';
@@ -110,6 +111,7 @@ class AppRouter {
   static const Set<String> _authRoutes = {
     '/login',
     '/signup',
+    '/forgot-password',
     '/existing-member-enrollment',
     '/otp',
     '/set-pin',
@@ -353,6 +355,10 @@ class AppRouter {
           path: '/signup',
           builder: (context, state) =>
               SignupScreen(reason: state.uri.queryParameters['reason']),
+        ),
+        GoRoute(
+          path: '/forgot-password',
+          builder: (context, state) => const ForgotPasswordScreen(),
         ),
         GoRoute(
           path: '/existing-member-enrollment',

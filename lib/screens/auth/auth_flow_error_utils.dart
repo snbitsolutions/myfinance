@@ -3,8 +3,8 @@ bool shouldRedirectToSignup(String message) {
 
   const signupSignals = <String>[
     'not registered',
-    'not found',
     'no account',
+    'account not found',
     'account does not exist',
     'account not exist',
     'phone number not found',

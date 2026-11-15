@@ -1,8 +1,16 @@
+import 'package:adepa_teachers/core/constants/app_constants.dart';
 import 'package:adepa_teachers/core/services/device_identity_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('DeviceIdentityService', () {
+    test('uses the configured stable backend device number', () async {
+      expect(
+        await DeviceIdentityService().getBackendDeviceNumber(),
+        AppConstants.defaultMobileApiImeiNumber,
+      );
+    });
+
     test(
       'maskIdentifier keeps only leading and trailing characters visible',
       () {
