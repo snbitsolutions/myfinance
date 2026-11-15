@@ -1,0 +1,26 @@
+user_intent:
+  raw_request: "Analyze the existing MyFinance Flutter application and identify what needs to be done next."
+  inferred_acceptance:
+    - "Document the current runtime structure and feature boundaries."
+    - "Identify concrete implementation and verification work without changing behavior during analysis."
+  cleanup_required: false
+strategy: minimal_runtime
+runtime_reachable:
+  - lib/main.dart
+  - lib/router/app_router.dart
+  - lib/core/providers/app_providers.dart
+  - lib/core/services/http_client.dart
+  - lib/core/services/api_service.dart
+must_rewrite: []
+copy_as_is:
+  - lib/core/models/auth_state.dart
+  - lib/core/models/auth_session.dart
+legacy_allowed_to_remain:
+  - lib/screens/**/*.dart
+defer_cleanup:
+  - "Resolve duplicated or obsolete screen implementations only after runtime behavior and backend contracts are verified."
+full_rewrite_reason: null
+implementation_rule: >
+  This is an analysis artifact, not an implementation mandate. Any future
+  implementation must define its own must_rewrite scope; source anchors in
+  unit_graph.yaml are evidence of runtime behavior, not automatic rewrite targets.

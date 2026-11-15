@@ -1,0 +1,8 @@
+unit: profile-and-settings
+commit: false
+candidate_splits:
+  - id: "lib/screens/profile/settings_screen.dart:1"
+    drivers: [concern_split, change_cadence_split]
+    rationale: "Account settings, security settings, notifications, appearance, and destructive account actions are independently changing concerns."
+    source_slice: {file: lib/screens/profile/settings_screen.dart, lines: [1, 1]}
+

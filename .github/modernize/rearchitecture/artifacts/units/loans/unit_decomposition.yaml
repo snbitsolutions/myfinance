@@ -1,0 +1,8 @@
+unit: loans
+commit: false
+candidate_splits:
+  - id: "lib/screens/loans/repayment_screen.dart:1"
+    drivers: [protocol_split, lifecycle_split]
+    rationale: "Loan repayment is a payment protocol boundary distinct from loan application and loan status presentation."
+    source_slice: {file: lib/screens/loans/repayment_screen.dart, lines: [1, 1]}
+

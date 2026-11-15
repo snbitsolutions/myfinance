@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:adepa_teachers/screens/investment/investment_screen.dart';
+import 'package:adepa_teachers/core/providers/app_providers.dart';
 
 void main() {
   setUp(() {
@@ -12,7 +13,7 @@ void main() {
   });
 
   testWidgets(
-    'selecting an investment plan navigates to payment source investment',
+    'investment screen does not offer unsupported investment start actions',
     (tester) async {
       final router = GoRouter(
         initialLocation: '/investment',
@@ -40,17 +41,18 @@ void main() {
       );
 
       await tester.pumpWidget(
-        ProviderScope(child: MaterialApp.router(routerConfig: router)),
+        ProviderScope(
+          overrides: [
+            investmentsApiProvider.overrideWith((ref) async => []),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
       );
       await tester.pumpAndSettle();
 
-      final starterPlan = find.text('Starter Plan');
-      expect(starterPlan, findsOneWidget);
-
-      await tester.tap(starterPlan);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Payment Source: investment'), findsOneWidget);
+      expect(find.text('Investments'), findsOneWidget);
+      expect(find.text('Investment actions will be available when the investment service is connected.'), findsOneWidget);
+      expect(find.text('Starter Plan'), findsNothing);
     },
   );
 }

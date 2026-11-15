@@ -1,0 +1,8 @@
+unit: payments
+commit: false
+candidate_splits:
+  - id: "lib/screens/payment/payment_screen.dart:1"
+    drivers: [protocol_split, concern_split]
+    rationale: "Generic payment method selection, provider-specific mobile/bills purchases, and terminal receipt handling have separate contracts."
+    source_slice: {file: lib/screens/payment/payment_screen.dart, lines: [1, 1]}
+

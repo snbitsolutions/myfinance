@@ -52,6 +52,8 @@ class Savings {
   final DateTime createdAt;
   final double? interestRate;
   final DateTime? maturityDate;
+  final bool isRemote;
+  final bool balanceAvailable;
 
   Savings({
     required this.id,
@@ -62,6 +64,8 @@ class Savings {
     DateTime? createdAt,
     this.interestRate,
     this.maturityDate,
+    this.isRemote = false,
+    this.balanceAvailable = true,
   }) : createdAt = createdAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() {
@@ -74,6 +78,8 @@ class Savings {
       'createdAt': createdAt.toIso8601String(),
       'interestRate': interestRate,
       'maturityDate': maturityDate?.toIso8601String(),
+      'isRemote': isRemote,
+      'balanceAvailable': balanceAvailable,
     };
   }
 
@@ -92,6 +98,8 @@ class Savings {
       maturityDate: json['maturityDate'] != null
           ? DateTime.tryParse(json['maturityDate'] as String)
           : null,
+      isRemote: json['isRemote'] as bool? ?? false,
+      balanceAvailable: json['balanceAvailable'] as bool? ?? true,
     );
   }
 }

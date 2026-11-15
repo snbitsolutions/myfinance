@@ -8,11 +8,11 @@ import 'package:adepa_teachers/core/constants/app_constants.dart';
 import 'package:adepa_teachers/core/services/device_identity_service.dart';
 import 'package:adepa_teachers/main.dart';
 import 'package:adepa_teachers/router/app_router.dart';
-import 'package:adepa_teachers/core/services/secure_auth_storage.dart';
-import 'package:adepa_teachers/screens/auth/account_number_screen.dart';
 import 'package:adepa_teachers/screens/auth/otp_screen.dart';
 import 'package:adepa_teachers/screens/auth/signup_screen.dart';
 import 'package:adepa_teachers/screens/dashboard/dashboard_screen.dart';
+import 'package:adepa_teachers/screens/legal/privacy_policy_screen.dart';
+import 'package:adepa_teachers/screens/legal/terms_of_service_screen.dart';
 import 'package:adepa_teachers/screens/onboarding/onboarding_screen.dart';
 import 'package:adepa_teachers/screens/auth/login_screen.dart';
 
@@ -63,6 +63,8 @@ void main() {
     AppRouter.resetSessionCache();
     SharedPreferences.setMockInitialValues({
       AppConstants.sharedPrefKeyOnboarding: false,
+      AppConstants.sharedPrefKeyAcceptedTermsVersion:
+          AppConstants.termsOfServiceVersion,
     });
     secureStore.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -74,19 +76,29 @@ void main() {
         .setMockMethodCallHandler(secureStorageChannel, null);
   });
 
-  Future<void> pumpAt(WidgetTester tester, String path) async {
+  Future<void> pumpAt(
+    WidgetTester tester,
+    String path, {
+    bool settle = true,
+  }) async {
     AppRouter.router.go(path);
     await tester.pumpWidget(
       ProviderScope(child: MaterialApp.router(routerConfig: AppRouter.router)),
     );
     await tester.pump();
-    await tester.pumpAndSettle(const Duration(milliseconds: 50));
+    if (settle) {
+      await tester.pumpAndSettle(const Duration(milliseconds: 50));
+    } else {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
   }
 
   testWidgets('starts unauthenticated users on onboarding from root', (
     tester,
   ) async {
-    await pumpAt(tester, '/');
+    await pumpAt(tester, '/', settle: false);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byType(OnboardingScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
@@ -94,14 +106,96 @@ void main() {
   });
 
   testWidgets(
-    'redirects protected routes to onboarding when onboarding not seen',
+    'shows Terms after splash until the current version is accepted',
     (tester) async {
-      await pumpAt(tester, '/home');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(AppConstants.sharedPrefKeyAcceptedTermsVersion);
 
+      await pumpAt(tester, '/', settle: false);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TermsOfServiceScreen), findsOneWidget);
+      expect(find.byType(OnboardingScreen), findsNothing);
+
+      await tester.tap(find.text('I Agree'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump();
+
+      expect(
+        prefs.getString(AppConstants.sharedPrefKeyAcceptedTermsVersion),
+        AppConstants.termsOfServiceVersion,
+      );
+      expect(
+        prefs.getString(AppConstants.sharedPrefKeyTermsAcceptedAt),
+        isNotNull,
+      );
       expect(find.byType(OnboardingScreen), findsOneWidget);
-      expect(find.byType(DashboardScreen), findsNothing);
     },
   );
+
+  testWidgets('lets users review Terms without accepting them again', (
+    tester,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final acceptedVersion = prefs.getString(
+      AppConstants.sharedPrefKeyAcceptedTermsVersion,
+    );
+
+    await pumpAt(tester, '/terms?viewOnly=true');
+
+    expect(find.byType(TermsOfServiceScreen), findsOneWidget);
+    expect(find.text('Close'), findsOneWidget);
+    expect(find.text('I Agree'), findsNothing);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+
+    expect(
+      prefs.getString(AppConstants.sharedPrefKeyAcceptedTermsVersion),
+      acceptedVersion,
+    );
+    expect(find.byType(LoginScreen), findsOneWidget);
+  });
+
+  testWidgets('makes the Privacy Policy available before authentication', (
+    tester,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(AppConstants.sharedPrefKeyAcceptedTermsVersion);
+
+    await pumpAt(tester, '/privacy-policy');
+
+    expect(find.byType(PrivacyPolicyScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+    await tester.scrollUntilVisible(find.text('Privacy contact'), 400);
+    expect(find.text('Privacy contact'), findsOneWidget);
+    expect(find.textContaining('swedruteachers@yahoo.com'), findsOneWidget);
+  });
+
+  testWidgets('requires Terms acceptance before opening auth routes', (
+    tester,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(AppConstants.sharedPrefKeyAcceptedTermsVersion);
+
+    await pumpAt(tester, '/login');
+
+    expect(find.byType(TermsOfServiceScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('redirects protected routes to login when onboarding not seen', (
+    tester,
+  ) async {
+    await pumpAt(tester, '/home');
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(OnboardingScreen), findsNothing);
+    expect(find.byType(DashboardScreen), findsNothing);
+  });
 
   testWidgets(
     'redirects protected routes to login when onboarding seen and session missing',
@@ -117,12 +211,11 @@ void main() {
   );
 
   testWidgets(
-    'redirects auth routes to home when onboarding seen and session exists',
+    'keeps the auth entry screen visible even when a valid session exists',
     (tester) async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(AppConstants.sharedPrefKeyOnboarding, true);
 
-      // Seed a deterministic install ID so the fingerprint is predictable.
       await prefs.setString(
         AppConstants.sharedPrefKeyDeviceInstallId,
         'test-install-id',
@@ -134,13 +227,10 @@ void main() {
       secureStore[AppConstants.secureStorageKeySessionDeviceFingerprint] =
           fingerprint;
 
-      final token = await SecureAuthStorage.instance.readAuthToken();
-      expect(token, 'test-token');
-
       await pumpAt(tester, '/login');
 
-      expect(find.byType(DashboardScreen), findsOneWidget);
-      expect(find.byType(LoginScreen), findsNothing);
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(DashboardScreen), findsNothing);
     },
   );
 
@@ -155,11 +245,26 @@ void main() {
     );
   });
 
+  testWidgets('keeps startup on login even when debug auth bypass is enabled', (
+    tester,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(AppConstants.sharedPrefKeyOnboarding, true);
+    await prefs.setString(AppConstants.sharedPrefKeyUserId, '001060000004075');
+    await prefs.setString(AppConstants.sharedPrefKeyUserEmail, '233501234567');
+
+    await pumpAt(tester, '/?debugAuth=true');
+
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(DashboardScreen), findsNothing);
+  });
+
   testWidgets(
-    'redirects the root route to home when debug auth bypass is enabled',
+    'keeps protected routes on login even when debug auth bypass is enabled',
     (tester) async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(AppConstants.sharedPrefKeyOnboarding, true);
+      await prefs.setBool(AppConstants.sharedPrefKeyDebugBypassAuth, true);
       await prefs.setString(
         AppConstants.sharedPrefKeyUserId,
         '001060000004075',
@@ -169,27 +274,12 @@ void main() {
         '233501234567',
       );
 
-      await pumpAt(tester, '/?debugAuth=true');
+      await pumpAt(tester, '/home?debugAuth=true');
 
-      expect(find.byType(DashboardScreen), findsOneWidget);
-      expect(find.byType(LoginScreen), findsNothing);
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(DashboardScreen), findsNothing);
     },
   );
-
-  testWidgets('allows protected routes when debug auth bypass is enabled', (
-    tester,
-  ) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(AppConstants.sharedPrefKeyOnboarding, true);
-    await prefs.setBool(AppConstants.sharedPrefKeyDebugBypassAuth, true);
-    await prefs.setString(AppConstants.sharedPrefKeyUserId, '001060000004075');
-    await prefs.setString(AppConstants.sharedPrefKeyUserEmail, '233501234567');
-
-    await pumpAt(tester, '/home?debugAuth=true');
-
-    expect(find.byType(DashboardScreen), findsOneWidget);
-    expect(find.byType(LoginScreen), findsNothing);
-  });
 
   testWidgets(
     'shows SignupScreen at /signup when onboarding seen and no session',
@@ -200,28 +290,6 @@ void main() {
       await pumpAt(tester, '/signup');
 
       expect(find.byType(SignupScreen), findsOneWidget);
-      expect(find.byType(LoginScreen), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'shows AccountNumberScreen at /account-number when onboarding seen and no session',
-    (tester) async {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(AppConstants.sharedPrefKeyOnboarding, true);
-
-      AppRouter.router.go(
-        '/account-number',
-        extra: {'phoneNumber': '233501234567'},
-      );
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp.router(routerConfig: AppRouter.router),
-        ),
-      );
-      await tester.pumpAndSettle(const Duration(milliseconds: 50));
-
-      expect(find.byType(AccountNumberScreen), findsOneWidget);
       expect(find.byType(LoginScreen), findsNothing);
     },
   );

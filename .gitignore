@@ -32,6 +32,10 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+/macos/DerivedData/
+
+# iOS signing certificates
+/ios/*.p12
 
 # Symbolication related
 app.*.symbols

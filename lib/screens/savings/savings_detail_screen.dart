@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/action_triple_row.dart';
-import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
-import '../../core/balance_card_shell.dart';
-import '../../core/color_ext.dart';
+import '../../core/providers/app_providers.dart';
 import 'savings_model.dart';
 
 class _SavingsDetailData {
@@ -13,185 +11,246 @@ class _SavingsDetailData {
   final String title;
   final IconData icon;
   final Color accent;
-  final double target;
-  final double balance;
-  final double interest;
-  final double monthlyDeposit;
+  final double? balance;
+  final double? interest;
+  final double? monthlyDeposit;
   final String createdLabel;
   final List<Map<String, dynamic>> transactions;
+  final bool isRemote;
 
   const _SavingsDetailData({
     required this.id,
     required this.title,
     required this.icon,
     required this.accent,
-    required this.target,
     required this.balance,
     required this.interest,
     required this.monthlyDeposit,
     required this.createdLabel,
     required this.transactions,
+    required this.isRemote,
   });
 }
 
-final Map<String, _SavingsDetailData> _savingsCatalog = {
-  'member-savings': _SavingsDetailData(
-    id: 'member-savings',
-    title: 'Member Savings',
-    icon: Icons.groups_rounded,
-    accent: const Color(0xFF43A047),
-    target: 12000,
-    balance: 7850,
-    interest: 152.30,
-    monthlyDeposit: 500,
-    createdLabel: 'Created Feb 01, 2026',
-    transactions: [
-      {'type': 'Deposit', 'amount': 500.0, 'date': 'Mar 01, 2026'},
-      {'type': 'Interest', 'amount': 12.3, 'date': 'Feb 28, 2026'},
-      {'type': 'Deposit', 'amount': 450.0, 'date': 'Feb 20, 2026'},
-    ],
-  ),
-  'current-savings': _SavingsDetailData(
-    id: 'current-savings',
-    title: 'Current Savings',
-    icon: Icons.account_balance_wallet_rounded,
-    accent: const Color(0xFF3498DB),
-    target: 6000,
-    balance: 2140,
-    interest: 24.80,
-    monthlyDeposit: 220,
-    createdLabel: 'Created Jan 12, 2026',
-    transactions: [
-      {'type': 'Deposit', 'amount': 220.0, 'date': 'Mar 03, 2026'},
-      {'type': 'Deposit', 'amount': 180.0, 'date': 'Feb 18, 2026'},
-      {'type': 'Interest', 'amount': 4.8, 'date': 'Feb 15, 2026'},
-    ],
-  ),
-  'kiddy-savings': _SavingsDetailData(
-    id: 'kiddy-savings',
-    title: 'Kiddy Savings',
-    icon: Icons.child_care_rounded,
-    accent: const Color(0xFFFF6B9D),
-    target: 10000,
-    balance: 3650,
-    interest: 61.20,
-    monthlyDeposit: 300,
-    createdLabel: 'Created Dec 20, 2025',
-    transactions: [
-      {'type': 'Deposit', 'amount': 300.0, 'date': 'Mar 01, 2026'},
-      {'type': 'Deposit', 'amount': 250.0, 'date': 'Feb 10, 2026'},
-      {'type': 'Interest', 'amount': 11.2, 'date': 'Feb 01, 2026'},
-    ],
-  ),
-  'fixed-savings': _SavingsDetailData(
-    id: 'fixed-savings',
-    title: 'Fixed Savings',
-    icon: Icons.lock_clock_rounded,
-    accent: const Color(0xFF9B59B6),
-    target: 25000,
-    balance: 15400,
-    interest: 480.00,
-    monthlyDeposit: 1200,
-    createdLabel: 'Created Nov 15, 2025',
-    transactions: [
-      {'type': 'Deposit', 'amount': 1200.0, 'date': 'Mar 01, 2026'},
-      {'type': 'Interest', 'amount': 80.0, 'date': 'Feb 28, 2026'},
-      {'type': 'Deposit', 'amount': 1000.0, 'date': 'Feb 01, 2026'},
-    ],
-  ),
-  'emergency-fund': _SavingsDetailData(
-    id: 'emergency-fund',
-    title: 'Emergency Fund',
-    icon: Icons.medical_information_rounded,
-    accent: const Color(0xFFE74C3C),
-    target: 2000,
-    balance: 1200,
-    interest: 45.50,
-    monthlyDeposit: 150,
-    createdLabel: 'Created Jan 15, 2026',
-    transactions: [
-      {'type': 'Deposit', 'amount': 200.0, 'date': 'Jan 20, 2026'},
-      {'type': 'Interest', 'amount': 5.50, 'date': 'Jan 15, 2026'},
-      {'type': 'Deposit', 'amount': 150.0, 'date': 'Jan 10, 2026'},
-    ],
-  ),
-  'goal-savings': _SavingsDetailData(
-    id: 'goal-savings',
-    title: 'Goal Savings',
-    icon: Icons.flag_rounded,
-    accent: const Color(0xFF16A085),
-    target: 8000,
-    balance: 2950,
-    interest: 73.10,
-    monthlyDeposit: 400,
-    createdLabel: 'Created Jan 05, 2026',
-    transactions: [
-      {'type': 'Deposit', 'amount': 400.0, 'date': 'Mar 05, 2026'},
-      {'type': 'Deposit', 'amount': 350.0, 'date': 'Feb 05, 2026'},
-      {'type': 'Interest', 'amount': 8.1, 'date': 'Feb 01, 2026'},
-    ],
-  ),
-  'vacation-savings': _SavingsDetailData(
-    id: 'vacation-savings',
-    title: 'Vacation',
-    icon: Icons.flight_takeoff_rounded,
-    accent: const Color(0xFFF39C12),
-    target: 7000,
-    balance: 3200,
-    interest: 55.00,
-    monthlyDeposit: 350,
-    createdLabel: 'Created Dec 01, 2025',
-    transactions: [
-      {'type': 'Deposit', 'amount': 350.0, 'date': 'Mar 01, 2026'},
-      {'type': 'Deposit', 'amount': 300.0, 'date': 'Feb 01, 2026'},
-      {'type': 'Interest', 'amount': 7.0, 'date': 'Jan 31, 2026'},
-    ],
-  ),
-  'education-savings': _SavingsDetailData(
-    id: 'education-savings',
-    title: 'Education',
-    icon: Icons.school_rounded,
-    accent: const Color(0xFF8E44AD),
-    target: 15000,
-    balance: 6400,
-    interest: 121.40,
-    monthlyDeposit: 650,
-    createdLabel: 'Created Oct 10, 2025',
-    transactions: [
-      {'type': 'Deposit', 'amount': 650.0, 'date': 'Mar 01, 2026'},
-      {'type': 'Deposit', 'amount': 600.0, 'date': 'Feb 01, 2026'},
-      {'type': 'Interest', 'amount': 16.4, 'date': 'Jan 31, 2026'},
-    ],
-  ),
-  'custom-savings': _SavingsDetailData(
-    id: 'custom-savings',
-    title: 'Custom Savings',
-    icon: Icons.add_circle_outline_rounded,
-    accent: const Color(0xFF34495E),
-    target: 5000,
-    balance: 900,
-    interest: 14.90,
-    monthlyDeposit: 120,
-    createdLabel: 'Created Mar 01, 2026',
-    transactions: [
-      {'type': 'Deposit', 'amount': 200.0, 'date': 'Mar 08, 2026'},
-      {'type': 'Deposit', 'amount': 150.0, 'date': 'Mar 05, 2026'},
-      {'type': 'Interest', 'amount': 1.9, 'date': 'Mar 04, 2026'},
-    ],
-  ),
-};
-
-class SavingsDetailScreen extends StatefulWidget {
+class SavingsDetailScreen extends ConsumerStatefulWidget {
   final String savingsId;
   final Savings? savings;
 
   const SavingsDetailScreen({super.key, required this.savingsId, this.savings});
 
   @override
-  State<SavingsDetailScreen> createState() => _SavingsDetailScreenState();
+  ConsumerState<SavingsDetailScreen> createState() =>
+      _SavingsDetailScreenState();
 }
 
-class _SavingsDetailScreenState extends State<SavingsDetailScreen> {
+class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
+  double? _resolvedBalance;
+  bool _isLoadingBalance = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshMissingBalance();
+  }
+
+  Future<void> _refreshMissingBalance() async {
+    final records = ref.read(savingsProvider).valueOrNull ?? const [];
+    final record = records.firstWhere(
+      (item) =>
+          (item['savings_id'] ?? item['id'] ?? item['product_id'])
+              ?.toString()
+              .trim() ==
+          widget.savingsId,
+      orElse: () => const <String, dynamic>{},
+    );
+    if (widget.savingsId.trim().isEmpty) return;
+
+    final rawBalance =
+        record['balance'] ?? record['current_balance'] ?? record['amount'];
+    if (rawBalance != null) {
+      final amount = _toAmount(rawBalance);
+      if (mounted) {
+        setState(() => _resolvedBalance = amount);
+      }
+      return;
+    }
+
+    final productId =
+        (record['savings_id'] ?? record['id'] ?? record['product_id'])
+            ?.toString()
+            .trim();
+    if (productId == null || productId.isEmpty) return;
+
+    if (mounted) {
+      setState(() => _isLoadingBalance = true);
+    }
+
+    try {
+      final response = await ref
+          .read(savingsServiceProvider)
+          .getSavingsBalance(productId: productId);
+      final balance = response['balance'];
+      if (balance is num && mounted) {
+        setState(() => _resolvedBalance = balance.toDouble());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingBalance = false);
+      }
+    }
+  }
+
+  void _showLocalGoalMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'This local goal is not a backend account. Deposit and withdrawal require a customer savings account.',
+        ),
+      ),
+    );
+  }
+
+  void _showSavingsStatement(BuildContext context, _SavingsDetailData savings) {
+    final theme = Theme.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${savings.title} statement',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Current account activity and balance summary',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                ),
+              ),
+              const SizedBox(height: 18),
+              _SavingsSummaryRow(
+                label: 'Current balance',
+                value: savings.balance == null
+                    ? 'Unavailable'
+                    : 'GH₵${savings.balance!.toStringAsFixed(2)}',
+                icon: Icons.account_balance_wallet_outlined,
+              ),
+              _SavingsSummaryRow(
+                label: 'Interest earned',
+                value: savings.interest == null
+                    ? 'Unavailable'
+                    : 'GH₵${savings.interest!.toStringAsFixed(2)}',
+                icon: Icons.trending_up_rounded,
+              ),
+              _SavingsSummaryRow(
+                label: 'Monthly contribution',
+                value: savings.monthlyDeposit == null
+                    ? 'Unavailable'
+                    : 'GH₵${savings.monthlyDeposit!.toStringAsFixed(2)}',
+                icon: Icons.calendar_month_outlined,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Statement download is not available yet.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showTransactionHistory(
+    BuildContext context,
+    List<Map<String, dynamic>> transactions,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * 0.72,
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            itemCount: transactions.length,
+            separatorBuilder: (_, index) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final transaction = transactions[index];
+              final isCredit = transaction['positive'] == true;
+              final colorScheme = Theme.of(context).colorScheme;
+              final transactionColor = isCredit
+                  ? colorScheme.primary
+                  : colorScheme.error;
+              final amount = (transaction['amount'] as num?)?.toDouble() ?? 0;
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: transactionColor.withValues(alpha: 0.12),
+                  child: Icon(
+                    isCredit
+                        ? Icons.call_received_rounded
+                        : Icons.call_made_rounded,
+                    color: transactionColor,
+                  ),
+                ),
+                title: Text(
+                  transaction['type']?.toString() ?? 'Transaction',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  '${transaction['subtitle'] ?? 'Savings activity'} • ${transaction['date'] ?? ''}',
+                ),
+                trailing: Text(
+                  '${isCredit ? '+' : '-'}GH₵${amount.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    color: transactionColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showMoreActions(BuildContext context, _SavingsDetailData savings) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.receipt_long_rounded),
+              title: const Text('Statement'),
+              subtitle: const Text('View your balance summary'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showSavingsStatement(context, savings);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   _SavingsDetailData _fromSavedGoal(Savings goal) {
     final accent = switch (goal.type) {
       SavingsType.memberSaving => const Color(0xFF43A047),
@@ -200,608 +259,724 @@ class _SavingsDetailScreenState extends State<SavingsDetailScreen> {
       SavingsType.fixedDeposit => const Color(0xFF9B59B6),
     };
 
-    final today = DateTime.now();
-    final createdLabel = 'Created ${today.day}/${today.month}/${today.year}';
-
     return _SavingsDetailData(
       id: goal.id,
       title: goal.title,
       icon: goal.type.icon,
       accent: accent,
-      target: goal.target,
-      balance: goal.balance,
-      interest: goal.interestRate ?? 0,
-      monthlyDeposit: (goal.target / 12).clamp(0, goal.target),
-      createdLabel: createdLabel,
+      balance: goal.balanceAvailable ? goal.balance : null,
+      interest: goal.interestRate,
+      monthlyDeposit: null,
+      createdLabel: 'Creation date unavailable',
       transactions: const [],
+      isRemote: goal.isRemote,
     );
+  }
+
+  Savings? _findLiveSavings() {
+    final records = ref.read(savingsProvider).valueOrNull ?? const [];
+    for (final record in records) {
+      final recordId =
+          (record['savings_id'] ?? record['id'] ?? record['product_id'])
+              ?.toString()
+              .trim();
+      if (recordId == widget.savingsId) {
+        final name =
+            (record['name'] ??
+                    record['product_name'] ??
+                    record['account_name'] ??
+                    'Savings Account')
+                .toString();
+        final balance = _toAmount(
+          record['balance'] ?? record['current_balance'] ?? record['amount'],
+        );
+        return Savings(
+          id: recordId!,
+          title: name,
+          balance: balance,
+          target: _toAmount(
+            record['target'] ??
+                record['target_amount'] ??
+                record['goal_amount'] ??
+                0,
+          ),
+          type: SavingsType.memberSaving,
+          interestRate: _toOptionalAmount(
+            record['interest_rate'] ?? record['rate'],
+          ),
+          isRemote: true,
+          balanceAvailable:
+              record['balance'] != null ||
+              record['current_balance'] != null ||
+              record['amount'] != null,
+        );
+      }
+    }
+    return null;
+  }
+
+  double _toAmount(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString().replaceAll(',', '') ?? '') ?? 0;
+  }
+
+  double? _toOptionalAmount(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value == null) return null;
+    return double.tryParse(value.toString().replaceAll(',', ''));
+  }
+
+  String _maskedAccountNumber(String accountNumber) {
+    final digits = accountNumber.trim();
+    if (digits.isEmpty) return 'Unavailable';
+    final suffix = digits.length <= 4
+        ? digits
+        : digits.substring(digits.length - 4);
+    return '•••• $suffix';
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final savings = widget.savings != null
-        ? _fromSavedGoal(widget.savings!)
-        : _savingsCatalog[widget.savingsId] ??
-              _savingsCatalog['custom-savings'] ??
-              _fromSavedGoal(
-                Savings(
-                  id: widget.savingsId,
-                  title: 'Savings Goal',
-                  balance: 0,
-                  target: 1,
-                  type: SavingsType.memberSaving,
-                ),
-              );
-    final String title = savings.title;
-    final double target = savings.target;
-    final double balance = savings.balance;
-    final progress = (balance / target).clamp(0.0, 1.0);
-    final remaining = (target - balance).clamp(0.0, target);
-    final transactions = savings.transactions;
-    final heroCard = BalanceCardShell(
-      gradientColors: [
-        savings.accent,
-        Color.lerp(savings.accent, theme.colorScheme.primary, 0.35) ??
-            theme.colorScheme.primary,
-      ],
-      shadowColor: savings.accent.withOpacitySafe(0.30),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final liveSavings = widget.savings ?? _findLiveSavings();
+    final baseSavings = liveSavings != null
+        ? _fromSavedGoal(liveSavings)
+        : _SavingsDetailData(
+            id: widget.savingsId,
+            title: 'Savings Account',
+            icon: Icons.savings_rounded,
+            accent: const Color(0xFF2F7C52),
+            balance: null,
+            interest: null,
+            monthlyDeposit: null,
+            createdLabel: 'Account details unavailable',
+            transactions: const [],
+            isRemote: false,
+          );
+    final savings = _SavingsDetailData(
+      id: baseSavings.id,
+      title: baseSavings.title,
+      icon: baseSavings.icon,
+      accent: baseSavings.accent,
+      balance: _resolvedBalance ?? baseSavings.balance,
+      interest: baseSavings.interest,
+      monthlyDeposit: baseSavings.monthlyDeposit,
+      createdLabel: baseSavings.createdLabel,
+      transactions: baseSavings.transactions,
+      isRemote: baseSavings.isRemote,
+    );
+    final profile = ref.watch(userProfileProvider).valueOrNull;
+    final accountNumber =
+        (profile?['account_number'] ??
+                profile?['accountNumber'] ??
+                ref.read(authProvider).userId ??
+                '')
+            .toString();
+
+    final title = savings.title;
+    final transactionRows = savings.transactions;
+
+    return AppScaffold(
+      title: title,
+      backRoute: '/savings',
+      child: Container(
+        color: const Color(0xFFF5F6F3),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      textScaler: const TextScaler.linear(1.0),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.78),
-                        fontSize: 12,
+              if (_isLoadingBalance)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Center(
+                    child: Text(
+                      'Refreshing balance…',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: const Color(0xFF2E8B57),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Current balance',
-                      textScaler: const TextScaler.linear(1.0),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.68),
-                        fontSize: 10,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'GH₵${balance.toStringAsFixed(2)}',
-                        style: theme.textTheme.headlineMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.45,
-                          shadows: const [
-                            Shadow(
-                              color: Color(0x33000000),
-                              blurRadius: 10,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(savings.icon, color: Colors.white, size: 20),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline, color: Colors.white, size: 12),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    'Target: GH₵${target.toStringAsFixed(0)} • Progress: ${(progress * 100).toStringAsFixed(1)}%',
-                    textScaler: const TextScaler.linear(1.0),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.white,
-                      fontSize: 11,
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _SavingsCardMeta(
-                        label: 'Target',
-                        value: 'GH₵${target.toStringAsFixed(0)}',
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _SavingsCardMeta(
-                        label: 'Progress',
-                        value: '${(progress * 100).toStringAsFixed(1)}%',
-                      ),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1B6845), Color(0xFF2E8B57)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2E8B57).withValues(alpha: 0.25),
+                      blurRadius: 24,
+                      offset: const Offset(0, 14),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Row(
+                child: Stack(
                   children: [
-                    Expanded(
-                      child: _SavingsCardMeta(
-                        label: 'Remaining',
-                        value: 'GH₵${remaining.toStringAsFixed(0)}',
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _SavingsCardMeta(
-                        label: 'Created',
-                        value: savings.createdLabel.replaceAll('Created ', ''),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-
-    final actions = ActionTripleRow(
-      deposit: ActionItem(
-        label: 'Deposit',
-        icon: Icons.add_circle_outline,
-        color: theme.colorScheme.primary,
-        onTap: () => context.go('/payment'),
-      ),
-      withdraw: ActionItem(
-        label: 'Withdraw',
-        icon: Icons.remove_circle_outline,
-        color: Theme.of(context).colorScheme.error,
-        onTap: () => context.go('/savings/${savings.id}/withdraw'),
-      ),
-      transfer: ActionItem(
-        label: 'Transfer',
-        icon: Icons.swap_horiz_rounded,
-        color: const Color(0xFF1B8A9B),
-        onTap: () => context.go('/savings/transfer'),
-      ),
-    );
-
-    final activitySection = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                'Recent Activity',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                final encodedId = Uri.encodeComponent(savings.id);
-                final encodedTitle = Uri.encodeComponent(savings.title);
-                context.go(
-                  '/transactions?savingsId=$encodedId&savingsTitle=$encodedTitle',
-                  extra: {'savingsTransactions': transactions},
-                );
-              },
-              child: const Text('View All'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        AppCard(
-          margin: EdgeInsets.zero,
-          child: Column(
-            children: transactions.asMap().entries.map((entry) {
-              final index = entry.key;
-              final tx = entry.value;
-              final isDeposit = tx['type'] == 'Deposit';
-              final isInterest = tx['type'] == 'Interest';
-              final isLast = index == transactions.length - 1;
-
-              final refNumber =
-                  'TXN${savings.id.hashCode.abs() % 90000 + 10000}${index + 1}';
-              final method = isInterest ? 'Auto-credited' : 'Mobile Money';
-              final status = 'Completed';
-              final amountLabel =
-                  '${isDeposit || isInterest ? '+' : '-'}GH₵${(tx['amount'] as double).toStringAsFixed(2)}';
-              final amountColor = isDeposit || isInterest
-                  ? Colors.green
-                  : theme.colorScheme.error;
-
-              return Column(
-                children: [
-                  InkWell(
-                    onTap: () => showModalBottomSheet(
-                      context: context,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(20),
+                    Positioned(
+                      right: -28,
+                      bottom: -38,
+                      child: Opacity(
+                        opacity: 0.15,
+                        child: Container(
+                          width: 170,
+                          height: 170,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
                         ),
                       ),
-                      builder: (_) => _TxDetailSheet(
-                        type: tx['type'] as String,
-                        date: tx['date'] as String,
-                        refNumber: refNumber,
-                        method: method,
-                        status: status,
-                        amountLabel: amountLabel,
-                        amountColor: amountColor,
-                        isDeposit: isDeposit,
-                        isInterest: isInterest,
-                      ),
                     ),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: isInterest
-                                  ? theme.colorScheme.secondaryContainer
-                                        .withOpacitySafe(0.5)
-                                  : isDeposit
-                                  ? theme.colorScheme.primaryContainer
-                                        .withOpacitySafe(0.5)
-                                  : theme.colorScheme.errorContainer
-                                        .withOpacitySafe(0.5),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              isInterest
-                                  ? Icons.percent
-                                  : isDeposit
-                                  ? Icons.arrow_downward
-                                  : Icons.arrow_upward,
-                              color: isInterest
-                                  ? theme.colorScheme.secondary
-                                  : isDeposit
-                                  ? theme.colorScheme.primary
-                                  : theme.colorScheme.error,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
                               children: [
-                                Text(
-                                  tx['type'] as String,
-                                  style: theme.textTheme.titleSmall?.copyWith(
+                                const Text(
+                                  'Available Balance',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                Text(
-                                  tx['date'] as String,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurface
-                                        .withOpacitySafe(0.6),
+                                const SizedBox(width: 8),
+                                Container(
+                                  width: 9,
+                                  height: 9,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
                                   ),
                                 ),
                               ],
                             ),
+                            Row(
+                              children: const [
+                                Icon(
+                                  Icons.star_rounded,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Primary Account',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          savings.balance == null
+                              ? 'GH₵ —'
+                              : 'GH₵ ${savings.balance!.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 42,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -1.2,
                           ),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 110),
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerRight,
+                        ),
+                        const SizedBox(height: 8),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            const Text(
+                              'Account Number',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               child: Text(
-                                '${isDeposit || isInterest ? '+' : '-'}GH₵${(tx['amount'] as double).toStringAsFixed(2)}',
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: isDeposit || isInterest
-                                      ? Colors.green
-                                      : theme.colorScheme.error,
+                                _maskedAccountNumber(accountNumber),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.6,
                                 ),
                               ),
                             ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _ActionButton(
+                      icon: Icons.call_received_rounded,
+                      label: 'Deposit',
+                      active: true,
+                      onTap: () => savings.isRemote
+                          ? context.go(
+                              '/savings/${widget.savingsId}/deposit',
+                              extra: widget.savings,
+                            )
+                          : _showLocalGoalMessage(),
+                    ),
+                    _ActionButton(
+                      icon: Icons.call_made_rounded,
+                      label: 'Withdraw',
+                      color: Theme.of(context).colorScheme.error,
+                      onTap: () => savings.isRemote
+                          ? context.go('/savings/${widget.savingsId}/withdraw')
+                          : _showLocalGoalMessage(),
+                    ),
+                    _ActionButton(
+                      icon: Icons.swap_horiz,
+                      label: 'Transfer',
+                      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Savings transfers are unavailable until recipient verification and transfer processing are connected to the backend.',
                           ),
-                          const SizedBox(width: 4),
+                        ),
+                      ),
+                    ),
+                    _ActionButton(
+                      icon: Icons.more_horiz_rounded,
+                      label: 'More',
+                      onTap: () => _showMoreActions(context, savings),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Account Overview',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _OverviewTile(
+                      icon: Icons.account_balance_wallet_outlined,
+                      iconColor: const Color(0xFF6E8A7A),
+                      label: 'Total Deposits',
+                      value: '—',
+                      background: const Color(0xFFF0F7F3),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _OverviewTile(
+                      icon: Icons.call_made_rounded,
+                      iconColor: const Color(0xFFDD7F7F),
+                      label: 'Total Withdrawals',
+                      value: '—',
+                      background: const Color(0xFFF9F2F2),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _OverviewTile(
+                      icon: Icons.trending_up_rounded,
+                      iconColor: const Color(0xFF7DAE78),
+                      label: 'Interest Earned',
+                      value: savings.interest != null
+                          ? 'GH₵ ${savings.interest!.toStringAsFixed(2)}'
+                          : '—',
+                      background: const Color(0xFFF0F7EE),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Account Details',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Column(
+                  children: [
+                    _DetailRow(
+                      label: 'Account Type',
+                      value: savings.title,
+                      icon: Icons.account_balance_rounded,
+                    ),
+                    _DetailRow(
+                      label: 'Opened On',
+                      value: savings.isRemote
+                          ? 'Unavailable'
+                          : savings.createdLabel,
+                      icon: Icons.calendar_today_rounded,
+                    ),
+                    _DetailRow(
+                      label: 'Currency',
+                      value: 'Ghana Cedi (GH₵)',
+                      icon: Icons.currency_exchange_rounded,
+                    ),
+                    _DetailRow(
+                      label: 'Status',
+                      value: savings.isRemote ? 'Unavailable' : 'Local goal',
+                      icon: Icons.check_circle_rounded,
+                      valueColor: savings.isRemote
+                          ? null
+                          : const Color(0xFF2E8B57),
+                    ),
+                    _DetailRow(
+                      label: 'Next Interest Payout',
+                      value: 'Unavailable',
+                      icon: Icons.schedule_rounded,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Recent Transactions',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () =>
+                        _showTransactionHistory(context, transactionRows),
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                    child: const Text(
+                      'View All',
+                      style: TextStyle(
+                        color: Color(0xFF2E8B57),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 52,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE5E7E5)),
+                      ),
+                      child: Row(
+                        children: const [
                           Icon(
-                            Icons.chevron_right_rounded,
-                            size: 18,
-                            color: theme.colorScheme.onSurface.withOpacitySafe(
-                              0.35,
+                            Icons.search_rounded,
+                            color: Colors.grey,
+                            size: 20,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'Search transactions',
+                            style: TextStyle(
+                              color: Color(0xFF8A8F89),
+                              fontSize: 15,
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  if (!isLast) ...[
-                    const SizedBox(height: 16),
-                    Divider(
-                      height: 1,
-                      color: theme.colorScheme.outline.withOpacitySafe(0.2),
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 54,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE5E7E5)),
                     ),
-                    const SizedBox(height: 16),
-                  ],
+                    child: const Icon(
+                      Icons.filter_list_rounded,
+                      color: Colors.black87,
+                    ),
+                  ),
                 ],
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-
-    final insightsSection = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Insights',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        AppCard(
-          margin: EdgeInsets.zero,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: savings.accent.withOpacitySafe(0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.lightbulb_outline,
-                  color: savings.accent,
-                  size: 24,
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Today',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'On track!',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
+              const SizedBox(height: 8),
+              ...transactionRows.map((tx) {
+                final isPositive = tx['positive'] as bool;
+                final amount = (tx['amount'] as num).toDouble();
+                final transactionColor = isPositive
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.error;
+                final amountText =
+                    '${isPositive ? '+' : '-'}GH₵ ${amount.toStringAsFixed(2)}';
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: transactionColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          isPositive
+                              ? Icons.call_received_rounded
+                              : Icons.call_made_rounded,
+                          color: transactionColor,
+                          size: 20,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'You need to save GH₵${(remaining / 5).toStringAsFixed(0)} per month for 5 months to reach your goal.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacitySafe(0.7),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              tx['type'] as String,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            Text(
+                              tx['subtitle'] as String,
+                              style: const TextStyle(
+                                color: Color(0xFF7B827D),
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              tx['date'] as String,
+                              style: const TextStyle(
+                                color: Color(0xFF8E9390),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
+                      Row(
+                        children: [
+                          Text(
+                            amountText,
+                            style: TextStyle(
+                              color: transactionColor,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: Color(0xFF8A8F89),
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              const SizedBox(height: 12),
             ],
           ),
         ),
-      ],
-    );
-
-    return AppScaffold(
-      title: '$title Details',
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isTablet = constraints.maxWidth >= 900;
-          final content = SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                heroCard,
-                const SizedBox(height: 16),
-                actions,
-                const SizedBox(height: 24),
-                if (isTablet)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(flex: 6, child: activitySection),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        flex: 4,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [insightsSection],
-                        ),
-                      ),
-                    ],
-                  )
-                else ...[
-                  activitySection,
-                  const SizedBox(height: 24),
-                  insightsSection,
-                ],
-                const SizedBox(height: 80),
-              ],
-            ),
-          );
-
-          if (!isTablet) return content;
-          return Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 980),
-              child: content,
-            ),
-          );
-        },
       ),
     );
   }
 }
 
-class _TxDetailSheet extends StatelessWidget {
-  final String type;
-  final String date;
-  final String refNumber;
-  final String method;
-  final String status;
-  final String amountLabel;
-  final Color amountColor;
-  final bool isDeposit;
-  final bool isInterest;
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final Color? color;
+  final VoidCallback? onTap;
 
-  const _TxDetailSheet({
-    required this.type,
-    required this.date,
-    required this.refNumber,
-    required this.method,
-    required this.status,
-    required this.amountLabel,
-    required this.amountColor,
-    required this.isDeposit,
-    required this.isInterest,
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    this.active = false,
+    this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final iconData = isInterest
-        ? Icons.percent
-        : isDeposit
-        ? Icons.arrow_downward
-        : Icons.arrow_upward;
-    final iconColor = isInterest
-        ? theme.colorScheme.secondary
-        : isDeposit
-        ? theme.colorScheme.primary
-        : theme.colorScheme.error;
-    final iconBg = isInterest
-        ? theme.colorScheme.secondaryContainer.withOpacitySafe(0.5)
-        : isDeposit
-        ? theme.colorScheme.primaryContainer.withOpacitySafe(0.5)
-        : theme.colorScheme.errorContainer.withOpacitySafe(0.5);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: SizedBox(
+        width: 72,
+        child: Column(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: active
+                    ? const Color(0xFFE9F5ED)
+                    : const Color(0xFFF4F5F4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFD9E6DE)),
+              ),
+              child: Icon(
+                icon,
+                color:
+                    color ??
+                    (active ? const Color(0xFF2E8B57) : Colors.black87),
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                color:
+                    color ??
+                    (active ? const Color(0xFF2E8B57) : Colors.black87),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+class _OverviewTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String value;
+  final Color background;
+
+  const _OverviewTile({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.value,
+    required this.background,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Drag handle
           Container(
             width: 36,
-            height: 4,
+            height: 36,
             decoration: BoxDecoration(
-              color: theme.colorScheme.outline.withOpacitySafe(0.3),
-              borderRadius: BorderRadius.circular(2),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: iconColor),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Colors.black87,
+              fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 20),
-          // Icon + title
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: iconBg,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(iconData, color: iconColor, size: 24),
-              ),
-              const SizedBox(width: 14),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    type,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    date,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacitySafe(0.55),
-                    ),
-                  ),
-                ],
-              ),
-              const Spacer(),
-              Text(
-                amountLabel,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: amountColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Divider(
-            height: 1,
-            color: theme.colorScheme.outline.withOpacitySafe(0.15),
-          ),
-          const SizedBox(height: 16),
-          _SheetRow(label: 'Reference No.', value: refNumber, theme: theme),
-          const SizedBox(height: 12),
-          _SheetRow(label: 'Payment Method', value: method, theme: theme),
-          const SizedBox(height: 12),
-          _SheetRow(
-            label: 'Status',
-            value: status,
-            theme: theme,
-            valueColor: Colors.green,
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
             ),
           ),
         ],
@@ -810,74 +985,75 @@ class _TxDetailSheet extends StatelessWidget {
   }
 }
 
-class _SheetRow extends StatelessWidget {
+class _DetailRow extends StatelessWidget {
   final String label;
   final String value;
-  final ThemeData theme;
+  final IconData icon;
   final Color? valueColor;
 
-  const _SheetRow({
+  const _DetailRow({
     required this.label,
     required this.value,
-    required this.theme,
+    required this.icon,
     this.valueColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacitySafe(0.55),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: const Color(0xFF5A625F)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF4E5552),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
-        ),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: valueColor ?? theme.colorScheme.onSurface,
+          Text(
+            value,
+            style: TextStyle(
+              color: valueColor ?? const Color(0xFF1C2320),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-class _SavingsCardMeta extends StatelessWidget {
+class _SavingsSummaryRow extends StatelessWidget {
   final String label;
   final String value;
-  const _SavingsCardMeta({required this.label, required this.value});
+  final IconData icon;
+
+  const _SavingsSummaryRow({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textScaler: const TextScaler.linear(1.0),
-          style: const TextStyle(color: Color(0xFFB0BEC5), fontSize: 11),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          softWrap: false,
-          textScaler: const TextScaler.linear(1.0),
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
-          ),
-        ),
-      ],
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: theme.colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(child: Text(label)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
+        ],
+      ),
     );
   }
 }

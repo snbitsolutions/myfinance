@@ -1,0 +1,10 @@
+HTTP/2 200 
+expires: Thu, 19 Nov 1981 08:52:00 GMT
+cache-control: no-store, no-cache, must-revalidate
+pragma: no-cache
+set-cookie: PHPSESSID=g1kon2s1vj6mic20pqvkmgspi6; path=/
+vary: Accept-Encoding,User-Agent
+content-type: application/json
+date: Thu, 13 Aug 2026 13:05:09 GMT
+server: Apache
+

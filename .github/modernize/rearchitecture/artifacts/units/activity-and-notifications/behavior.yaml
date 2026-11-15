@@ -1,0 +1,26 @@
+unit: activity-and-notifications
+side_effects:
+  - source_loc: "lib/core/services/notification_service.dart:17"
+    effect: "Persists custom notifications, read IDs, and notification preferences."
+    must_preserve: true
+  - source_loc: "lib/screens/auth/otp_screen.dart:113"
+    effect: "Adds security notifications for OTP success/failure."
+    must_preserve: true
+branches:
+  - source_loc: "lib/router/app_router.dart:509"
+    condition: "User opens transactions or notifications route."
+    behavior: "Loads the corresponding authenticated list screen."
+    must_preserve: true
+error_paths:
+  - source_loc: "lib/core/providers/app_providers.dart:1221"
+    trigger: "Transaction endpoint failure."
+    outcome: "Provider exposes the service error to the activity screen."
+    contract: "No fabricated successful transaction result on API failure."
+    must_preserve: true
+concurrency:
+  model: async
+  tx_boundary:
+    source_loc: "lib/core/services/notification_service.dart:17"
+    scope: "Preference-backed notification reads/writes."
+    isolation: "not specified"
+    must_preserve: true

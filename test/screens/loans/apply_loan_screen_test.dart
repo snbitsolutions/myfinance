@@ -4,16 +4,64 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:adepa_teachers/core/models/auth_state.dart';
+import 'package:adepa_teachers/core/providers/app_providers.dart';
+import 'package:adepa_teachers/core/services/api_service.dart';
+import 'package:adepa_teachers/core/services/device_identity_service.dart';
 import 'package:adepa_teachers/screens/loans/apply_loan_screen.dart';
+
+class _TestAuthNotifier extends AuthNotifier {
+  _TestAuthNotifier()
+    : super(
+        authService: AuthService(),
+        userService: UserService(),
+        deviceIdentityService: DeviceIdentityService(),
+      ) {
+    state = AuthState.authenticated(
+      userId: '0010600000040752',
+      userEmail: 'member@example.com',
+    );
+  }
+}
+
+class _TestDeviceIdentityService extends DeviceIdentityService {
+  @override
+  Future<int> getBackendDeviceNumber() async => 100000000000001;
+}
+
+class _LoanServiceStub extends LoanService {
+  String? accountNumber;
+  double? amount;
+  String? purpose;
+
+  @override
+  Future<Map<String, dynamic>> applyLoan({
+    required String accountNumber,
+    required double amount,
+    required String purpose,
+    required int imeiNumber,
+    int productId = 1,
+  }) async {
+    this.accountNumber = accountNumber;
+    this.amount = amount;
+    this.purpose = purpose;
+    return {
+      'status': 'success',
+      'message': 'Application received',
+      'data': const <String, dynamic>{},
+    };
+  }
+}
 
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('submit valid loan application navigates to status', (
+  testWidgets('submits valid loan application and navigates to status', (
     tester,
   ) async {
+    final loanService = _LoanServiceStub();
     final router = GoRouter(
       initialLocation: '/apply-loan',
       routes: [
@@ -31,7 +79,16 @@ void main() {
     );
 
     await tester.pumpWidget(
-      ProviderScope(child: MaterialApp.router(routerConfig: router)),
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => _TestAuthNotifier()),
+          deviceIdentityServiceProvider.overrideWithValue(
+            _TestDeviceIdentityService(),
+          ),
+          loanServiceProvider.overrideWithValue(loanService),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -41,7 +98,7 @@ void main() {
     );
     final purposeField = find.widgetWithText(
       TextField,
-      'What is the loan for?',
+      'e.g., school fees, rent, business stock',
     );
 
     expect(amountField, findsOneWidget);
@@ -59,9 +116,12 @@ void main() {
     final onPressed = tester.widget<ElevatedButton>(submitButton).onPressed;
     expect(onPressed, isNotNull);
 
-    onPressed!.call();
+    onPressed!();
     await tester.pumpAndSettle();
 
     expect(find.text('Loan Status Placeholder'), findsOneWidget);
+    expect(loanService.accountNumber, '0010600000040752');
+    expect(loanService.amount, 2500);
+    expect(loanService.purpose, 'Business expansion');
   });
 }

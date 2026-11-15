@@ -1,0 +1,8 @@
+unit: authentication
+commit: false
+candidate_splits:
+  - id: "lib/screens/auth/existing_member_enrollment_screen.dart:45-1978"
+    drivers: [lifecycle_split, concern_split, change_cadence_split]
+    rationale: "Enrollment combines multi-step member verification, profile collection, product selection, PIN setup, and registration completion."
+    source_slice: {file: lib/screens/auth/existing_member_enrollment_screen.dart, lines: [45, 1978]}
+

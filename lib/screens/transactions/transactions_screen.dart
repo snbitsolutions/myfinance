@@ -7,6 +7,7 @@ import '../../core/app_scaffold.dart';
 import '../../core/app_card.dart';
 import '../../core/balance_card_shell.dart';
 import '../../core/providers/app_providers.dart';
+import '../../core/utils/receipt_clipboard.dart';
 import 'transaction_model.dart';
 
 class TransactionsScreen extends ConsumerStatefulWidget {
@@ -28,25 +29,6 @@ class TransactionsScreen extends ConsumerStatefulWidget {
 class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   String _selectedFilter = 'All';
   String _selectedPeriod = 'This Month';
-  late TextEditingController _searchController;
-  String _searchQuery = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _searchController = TextEditingController();
-    _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text.toLowerCase();
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,9 +58,12 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         : _normalizeApiTransactions(
             liveTransactionsAsync.valueOrNull ?? const [],
           );
+    final periodTransactions = allTransactions
+        .where((tx) => _isWithinSelectedPeriod(tx.date, DateTime.now()))
+        .toList();
 
     // Filter transactions
-    final transactions = allTransactions.where((tx) {
+    final transactions = periodTransactions.where((tx) {
       // Filter by type
       if (_selectedFilter == 'All') {
         // include all
@@ -90,28 +75,23 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         if (tx.type != TransactionType.repayment) return false;
       }
 
-      // Filter by search query
-      if (_searchQuery.isNotEmpty) {
-        final matchesTitle = tx.title.toLowerCase().contains(_searchQuery);
-        final matchesDesc = (tx.description?.toLowerCase() ?? '').contains(
-          _searchQuery,
-        );
-        if (!matchesTitle && !matchesDesc) return false;
-      }
-
       return true;
     }).toList();
 
     // Calculate totals
-    final totalIncome = allTransactions
-        .where((tx) => tx.type == TransactionType.deposit)
-        .fold<double>(0, (sum, tx) => sum + tx.amount);
-    final totalExpense = allTransactions
-        .where((tx) => tx.type == TransactionType.withdrawal)
-        .fold<double>(0, (sum, tx) => sum + tx.amount);
-    final totalRepayment = allTransactions
-        .where((tx) => tx.type == TransactionType.repayment)
-        .fold<double>(0, (sum, tx) => sum + tx.amount);
+    final totalIncome = periodTransactions
+        .where((tx) => tx.amount != null && tx.type == TransactionType.deposit)
+        .fold<double>(0, (sum, tx) => sum + (tx.amount ?? 0));
+    final totalExpense = periodTransactions
+        .where(
+          (tx) => tx.amount != null && tx.type == TransactionType.withdrawal,
+        )
+        .fold<double>(0, (sum, tx) => sum + (tx.amount ?? 0));
+    final totalRepayment = periodTransactions
+        .where(
+          (tx) => tx.amount != null && tx.type == TransactionType.repayment,
+        )
+        .fold<double>(0, (sum, tx) => sum + (tx.amount ?? 0));
     final netBalance = totalIncome - totalExpense - totalRepayment;
 
     // Group transactions by date
@@ -156,20 +136,28 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Row(
                     children: [
-                      Expanded(
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withOpacitySafe(
+                            0.08,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                         child: Text(
                           dateKey,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.labelLarge?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.onSurface.withOpacitySafe(
-                              0.75,
-                            ),
+                            color: theme.colorScheme.primary,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const Spacer(),
                       Text(
                         '${dayTransactions.length} item${dayTransactions.length > 1 ? 's' : ''}',
                         style: theme.textTheme.labelSmall?.copyWith(
@@ -212,7 +200,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     );
 
     return AppScaffold(
-      title: isSavingsFiltered ? 'Savings Activity' : 'Transactions',
+      title: isSavingsFiltered ? 'Savings Activity' : 'Activity',
       actions: !isSavingsFiltered
           ? [
               IconButton(
@@ -225,100 +213,16 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
       child: isLoadingLive
           ? _buildLoadingState(theme)
           : liveTransactionsAsync.hasError && !isSavingsFiltered
-              ? _buildApiErrorState(
-                  theme,
-                  liveTransactionsAsync.error!,
-                  () => ref.invalidate(transactionsProvider),
-                )
-              : transactions.isEmpty
-                  ? _buildEmptyState(theme)
-                  : LayoutBuilder(
+          ? _buildApiErrorState(
+              theme,
+              liveTransactionsAsync.error!,
+              () => ref.invalidate(transactionsProvider),
+            )
+          : transactions.isEmpty
+          ? _buildEmptyState(theme)
+          : LayoutBuilder(
               builder: (context, constraints) {
                 final isTablet = constraints.maxWidth >= 900;
-
-                final summaryCards = isTablet
-                    ? Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        child: Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: [
-                            _buildSummaryCard(
-                              theme,
-                              'Income',
-                              totalIncome,
-                              Icons.arrow_downward,
-                              Colors.green,
-                            ),
-                            _buildSummaryCard(
-                              theme,
-                              'Expense',
-                              totalExpense,
-                              Icons.arrow_upward,
-                              Colors.red,
-                            ),
-                            _buildSummaryCard(
-                              theme,
-                              'Repayment',
-                              totalRepayment,
-                              Icons.credit_card,
-                              Colors.orange,
-                            ),
-                            _buildSummaryCard(
-                              theme,
-                              'Balance',
-                              netBalance,
-                              Icons.account_balance_wallet,
-                              theme.colorScheme.primary,
-                            ),
-                          ],
-                        ),
-                      )
-                    : SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        child: Row(
-                          children: [
-                            _buildSummaryCard(
-                              theme,
-                              'Income',
-                              totalIncome,
-                              Icons.arrow_downward,
-                              Colors.green,
-                            ),
-                            const SizedBox(width: 12),
-                            _buildSummaryCard(
-                              theme,
-                              'Expense',
-                              totalExpense,
-                              Icons.arrow_upward,
-                              Colors.red,
-                            ),
-                            const SizedBox(width: 12),
-                            _buildSummaryCard(
-                              theme,
-                              'Repayment',
-                              totalRepayment,
-                              Icons.credit_card,
-                              Colors.orange,
-                            ),
-                            const SizedBox(width: 12),
-                            _buildSummaryCard(
-                              theme,
-                              'Balance',
-                              netBalance,
-                              Icons.account_balance_wallet,
-                              theme.colorScheme.primary,
-                            ),
-                          ],
-                        ),
-                      );
 
                 final controlsPane = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -385,7 +289,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Net Balance',
+                                        'Activity Overview',
                                         style: theme.textTheme.bodySmall
                                             ?.copyWith(
                                               color: Colors.white.withValues(
@@ -405,7 +309,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                                               fontSize: 10,
                                             ),
                                       ),
-                                      const SizedBox(height: 6),
+                                      const SizedBox(height: 8),
                                       FittedBox(
                                         fit: BoxFit.scaleDown,
                                         alignment: Alignment.centerLeft,
@@ -429,115 +333,51 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(
-                                    Icons.account_balance_wallet,
+                                    Icons.receipt_long,
                                     color: Colors.white,
                                     size: 20,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.14),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.receipt_long,
-                                    color: Colors.white,
-                                    size: 12,
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _miniStatPill(
+                                    label: 'Income',
+                                    value:
+                                        'GH₵${totalIncome.toStringAsFixed(2)}',
+                                    background: Colors.white,
+                                    textColor: theme.colorScheme.primary,
                                   ),
-                                  const SizedBox(width: 4),
-                                  Flexible(
-                                    child: Text(
-                                      '${transactions.length} transactions in view',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                          ),
-                                    ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _miniStatPill(
+                                    label: 'Expense',
+                                    value:
+                                        'GH₵${totalExpense.toStringAsFixed(2)}',
+                                    background: Colors.white,
+                                    textColor: theme.colorScheme.error,
                                   ),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _miniStatPill(
+                                    label: 'Repayment',
+                                    value:
+                                        'GH₵${totalRepayment.toStringAsFixed(2)}',
+                                    background: Colors.white,
+                                    textColor: Colors.deepOrange,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Search transactions...',
-                          hintStyle: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.45,
-                            ),
-                          ),
-                          prefixIcon: Icon(
-                            Icons.search,
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.55,
-                            ),
-                            size: 20,
-                          ),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? GestureDetector(
-                                  onTap: () => _searchController.clear(),
-                                  child: Icon(
-                                    Icons.close_rounded,
-                                    color: theme.colorScheme.onSurface
-                                        .withValues(alpha: 0.55),
-                                    size: 18,
-                                  ),
-                                )
-                              : null,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: theme.colorScheme.outline.withValues(
-                                alpha: 0.25,
-                              ),
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: theme.colorScheme.outline.withValues(
-                                alpha: 0.25,
-                              ),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: theme.colorScheme.primary.withValues(
-                                alpha: 0.4,
-                              ),
-                              width: 1.5,
-                            ),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          filled: true,
-                          fillColor: theme.colorScheme.surface,
-                        ),
-                      ),
-                    ),
-                    summaryCards,
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: AppCard(
@@ -685,35 +525,67 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   List<AppTransaction> _normalizeApiTransactions(
     List<Map<String, dynamic>> raw,
   ) {
-    return raw.asMap().entries.map((entry) {
-      final i = entry.key;
-      final txn = entry.value;
-      final typeStr = (txn['type'] as String? ?? 'debit').toLowerCase();
-      final type = switch (typeStr) {
-        'credit' => TransactionType.deposit,
-        'repayment' => TransactionType.repayment,
-        _ => TransactionType.withdrawal,
-      };
-      final amount = (txn['amount'] as num?)?.toDouble() ??
-          double.tryParse(txn['amount']?.toString() ?? '') ??
-          0.0;
-      final description =
-          txn['description'] as String? ?? txn['narration'] as String? ?? '';
-      final dateStr = txn['date'] as String? ?? '';
-      DateTime date = DateTime.now();
-      try {
-        date = DateTime.parse(dateStr);
-      } catch (_) {}
-      return AppTransaction(
-        id: txn['transaction_id'] as String? ?? '$i',
-        title: description.isEmpty ? 'Transaction' : description,
-        description: description,
-        amount: amount,
-        type: type,
-        date: date,
-        category: typeStr == 'credit' ? 'Income' : 'Expense',
-      );
-    }).toList();
+    return raw
+        .map((txn) {
+          final typeStr = txn['type']?.toString().toLowerCase() ?? 'unknown';
+          final type = switch (typeStr) {
+            'credit' || 'deposit' => TransactionType.deposit,
+            'repayment' => TransactionType.repayment,
+            'debit' || 'withdraw' || 'withdrawal' => TransactionType.withdrawal,
+            _ => TransactionType.unknown,
+          };
+          final amount =
+              (txn['amount'] as num?)?.toDouble() ??
+              double.tryParse(txn['amount']?.toString() ?? '');
+          final description =
+              txn['description'] as String? ??
+              txn['narration'] as String? ??
+              '';
+          final dateStr = txn['date']?.toString() ?? '';
+          final date = DateTime.tryParse(dateStr);
+          final id = txn['transaction_id']?.toString().trim() ?? '';
+          if (date == null || id.isEmpty) return null;
+          return AppTransaction(
+            id: id,
+            title: description.isEmpty ? 'Transaction' : description,
+            description: description,
+            amount: amount,
+            type: type,
+            date: date,
+            category: type == TransactionType.deposit ? 'Income' : 'Expense',
+          );
+        })
+        .whereType<AppTransaction>()
+        .toList();
+  }
+
+  bool _isWithinSelectedPeriod(DateTime date, DateTime now) {
+    final localDate = date.toLocal();
+    final transactionDay = DateTime(
+      localDate.year,
+      localDate.month,
+      localDate.day,
+    );
+    final today = DateTime(now.year, now.month, now.day);
+
+    return switch (_selectedPeriod) {
+      'Today' => transactionDay == today,
+      'This Week' =>
+        !transactionDay.isBefore(
+              today.subtract(Duration(days: today.weekday - 1)),
+            ) &&
+            transactionDay.isBefore(
+              today
+                  .subtract(Duration(days: today.weekday - 1))
+                  .add(const Duration(days: 7)),
+            ),
+      'This Month' =>
+        localDate.year == now.year && localDate.month == now.month,
+      'Last Month' =>
+        localDate.year == DateTime(now.year, now.month - 1).year &&
+            localDate.month == DateTime(now.year, now.month - 1).month,
+      _ => true,
+    };
   }
 
   List<AppTransaction> _buildSavingsTransactions(
@@ -734,13 +606,14 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
       final type = switch (rawType) {
         'withdraw' || 'withdrawal' => TransactionType.withdrawal,
         'repayment' => TransactionType.repayment,
-        _ => TransactionType.deposit,
+        'deposit' || 'credit' => TransactionType.deposit,
+        _ => TransactionType.unknown,
       };
 
       final rawAmount = tx['amount'];
       final amount = rawAmount is num
           ? rawAmount.toDouble()
-          : double.tryParse(rawAmount?.toString() ?? '') ?? 0;
+          : double.tryParse(rawAmount?.toString() ?? '');
 
       DateTime parsedDate = DateTime.now();
       final rawDate = tx['date'];
@@ -860,78 +733,36 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     );
   }
 
-  Widget _buildSummaryCard(
-    ThemeData theme,
-    String label,
-    double amount,
-    IconData icon,
-    Color color,
-  ) {
-    final gradientStart = color.withValues(alpha: 0.88);
-    final gradientEnd = color.withValues(alpha: 0.65);
+  Widget _miniStatPill({
+    required String label,
+    required String value,
+    required Color background,
+    required Color textColor,
+  }) {
     return Container(
-      width: 150,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [gradientStart, gradientEnd],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.25),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.28),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: background,
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.22),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: Colors.white, size: 22),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ).copyWith(color: textColor.withValues(alpha: 0.78)),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'GH₵${amount.toStringAsFixed(2)}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  fontSize: 16,
-                  letterSpacing: 0.2,
-                ),
-              ),
-            ],
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -964,33 +795,47 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   Widget _buildTransactionTile(ThemeData theme, AppTransaction transaction) {
     final isCredit = transaction.type == TransactionType.deposit;
     final isRepayment = transaction.type == TransactionType.repayment;
-
+    final isDebit = transaction.type == TransactionType.withdrawal;
+    final amountLabel = transaction.amount == null
+        ? 'GH₵ —'
+        : '${isCredit
+              ? '+'
+              : isDebit || isRepayment
+              ? '-'
+              : ''}GH₵${transaction.amount!.toStringAsFixed(2)}';
     Color getColor() {
-      if (isCredit) return Colors.green;
+      if (isCredit) return theme.colorScheme.primary;
       if (isRepayment) return Colors.orange;
-      return Colors.red;
+      if (isDebit) return theme.colorScheme.error;
+      return theme.colorScheme.outline;
     }
 
     IconData getIcon() {
-      if (isCredit) return Icons.arrow_downward;
+      if (isCredit) return Icons.call_received_rounded;
       if (isRepayment) return Icons.credit_card;
-      return Icons.arrow_upward;
+      if (!isDebit) return Icons.receipt_long_outlined;
+      return Icons.call_made_rounded;
     }
 
     return InkWell(
       onTap: () => _showTransactionDetails(context, transaction),
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: theme.colorScheme.surface,
+        ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: getColor().withOpacitySafe(0.1),
+                color: getColor().withOpacitySafe(0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(getIcon(), color: getColor(), size: 24),
+              child: Icon(getIcon(), color: getColor(), size: 22),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1000,7 +845,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                   Text(
                     transaction.title,
                     style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   if (transaction.description != null) ...[
@@ -1015,21 +860,21 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                     ),
                   ],
                   if (transaction.category != null) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.secondaryContainer
-                            .withOpacitySafe(0.5),
+                        color: theme.colorScheme.primary.withOpacitySafe(0.09),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         transaction.category!,
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSecondaryContainer,
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w600,
                           fontSize: 10,
                         ),
                       ),
@@ -1038,6 +883,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                 ],
               ),
             ),
+            const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -1051,14 +897,14 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '${isCredit ? '+' : '-'}GH₵${transaction.amount.toStringAsFixed(2)}',
+                    amountLabel,
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: getColor(),
                     ),
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
                   DateFormat('HH:mm').format(transaction.date),
                   style: theme.textTheme.labelSmall?.copyWith(
@@ -1095,6 +941,33 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     final theme = Theme.of(context);
     final isCredit = transaction.type == TransactionType.deposit;
     final isRepayment = transaction.type == TransactionType.repayment;
+    final isDebit = transaction.type == TransactionType.withdrawal;
+    final transactionColor = isCredit
+        ? theme.colorScheme.primary
+        : isRepayment
+        ? Colors.orange
+        : isDebit
+        ? theme.colorScheme.error
+        : theme.colorScheme.outline;
+    final amountLabel = transaction.amount == null
+        ? 'GH₵ —'
+        : '${isCredit
+              ? '+'
+              : isDebit || isRepayment
+              ? '-'
+              : ''}GH₵${transaction.amount!.toStringAsFixed(2)}';
+    final receiptText = [
+      'ADEPA - Transaction Receipt',
+      'Transaction: ${transaction.title}',
+      'Amount: $amountLabel',
+      'Date: ${DateFormat('MMM dd, yyyy • HH:mm').format(transaction.date)}',
+      'Transaction ID: ${transaction.id}',
+      if (transaction.description?.isNotEmpty == true)
+        'Description: ${transaction.description}',
+      if (transaction.category?.isNotEmpty == true)
+        'Category: ${transaction.category}',
+      'Status: Completed',
+    ].join('\n');
 
     showModalBottomSheet(
       context: context,
@@ -1133,26 +1006,16 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color:
-                            (isCredit
-                                    ? Colors.green
-                                    : isRepayment
-                                    ? Colors.orange
-                                    : Colors.red)
-                                .withOpacitySafe(0.12),
+                        color: transactionColor.withOpacitySafe(0.12),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         isCredit
-                            ? Icons.arrow_downward
+                            ? Icons.call_received_rounded
                             : isRepayment
                             ? Icons.credit_card
-                            : Icons.arrow_upward,
-                        color: isCredit
-                            ? Colors.green
-                            : isRepayment
-                            ? Colors.orange
-                            : Colors.red,
+                            : Icons.call_made_rounded,
+                        color: transactionColor,
                         size: 26,
                       ),
                     ),
@@ -1186,10 +1049,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               const SizedBox(height: 14),
               BalanceCardShell(
                 gradientColors: [
-                  theme.colorScheme.primary,
-                  theme.colorScheme.primary.withOpacitySafe(0.82),
+                  theme.colorScheme.surface,
+                  theme.colorScheme.surface,
                 ],
-                shadowColor: theme.colorScheme.primary.withOpacitySafe(0.28),
+                shadowColor: transactionColor.withOpacitySafe(0.18),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 14,
                   vertical: 12,
@@ -1203,18 +1066,20 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodyLarge?.copyWith(
-                          color: Colors.white.withOpacitySafe(0.92),
+                          color: theme.colorScheme.onSurface.withOpacitySafe(
+                            0.72,
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      '${isCredit ? '+' : '-'}GH₵${transaction.amount.toStringAsFixed(2)}',
+                      amountLabel,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: transactionColor,
                       ),
                     ),
                   ],
@@ -1250,34 +1115,14 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Receipt downloaded')),
-                        );
-                      },
-                      icon: const Icon(Icons.download),
-                      label: const Text('Download'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Receipt shared')),
-                        );
-                      },
-                      icon: const Icon(Icons.share),
-                      label: const Text('Share'),
-                    ),
-                  ),
-                ],
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      copyReceiptToClipboard(context, text: receiptText),
+                  icon: const Icon(Icons.copy_rounded),
+                  label: const Text('Copy receipt'),
+                ),
               ),
             ],
           ),

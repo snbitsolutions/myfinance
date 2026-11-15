@@ -78,8 +78,80 @@ class BalanceCardShell extends StatelessWidget {
                 ),
               ),
             ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: const AdepaLogoBadge(size: 104),
+            ),
             Padding(padding: contentPadding, child: child),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class AdepaLogoBadge extends StatelessWidget {
+  final double size;
+  final Color color;
+  final double opacity;
+
+  const AdepaLogoBadge({
+    super.key,
+    this.size = 104,
+    this.color = Colors.white,
+    this.opacity = 0.28,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Opacity(
+        opacity: opacity,
+        child: ColorFiltered(
+          colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+          child: Image.asset(
+            'images/adepa_teachers_logo.png',
+            fit: BoxFit.contain,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class TreeLogoBadge extends StatelessWidget {
+  final double size;
+  final Color color;
+  final double opacity;
+
+  const TreeLogoBadge({
+    super.key,
+    this.size = 132,
+    this.color = Colors.white,
+    this.opacity = 0.3,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Opacity(
+        opacity: opacity,
+        child: ColorFiltered(
+          colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+          child: Transform.scale(
+            scale: 1.45,
+            alignment: Alignment.topCenter,
+            child: Image.asset(
+              'images/adepa_teachers_logo.png',
+              fit: BoxFit.contain,
+              alignment: Alignment.topCenter,
+            ),
+          ),
         ),
       ),
     );

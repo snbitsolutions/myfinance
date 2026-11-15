@@ -1,4 +1,4 @@
-enum KycStatus { notStarted, pending, verified }
+enum KycStatus { unavailable, notStarted, pending, verified }
 
 class AppUser {
   final String name;

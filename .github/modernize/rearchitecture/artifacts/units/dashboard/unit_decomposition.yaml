@@ -1,0 +1,8 @@
+unit: dashboard
+commit: false
+candidate_splits:
+  - id: "lib/screens/dashboard/dashboard_screen.dart:1"
+    drivers: [concern_split, reuse_split]
+    rationale: "Dashboard presentation, balance aggregation, quick actions, and recent activity are distinct responsibilities."
+    source_slice: {file: lib/screens/dashboard/dashboard_screen.dart, lines: [1, 1]}
+

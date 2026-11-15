@@ -1,0 +1,9 @@
+unit: onboarding
+bindings:
+  - type: route-declaration
+    name: "GoRoute /onboarding"
+    source_loc: "lib/router/app_router.dart:317"
+    target: "OnboardingScreen"
+    must_appear_in_target: true
+    notes: "Route is pre-auth and guarded by seenOnboarding."
+runtime_config: []

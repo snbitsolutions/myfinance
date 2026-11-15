@@ -97,7 +97,8 @@ class InvestmentState {
 class InvestmentNotifier extends StateNotifier<InvestmentState> {
   static const _storageKey = 'investment_state_v1';
 
-  InvestmentNotifier() : super(const InvestmentState()) {
+  InvestmentNotifier()
+      : super(const InvestmentState()) {
     _restore();
   }
 

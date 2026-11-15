@@ -171,7 +171,9 @@ class _SavingsSuccessScreenState extends State<SavingsSuccessScreen>
                     _GoalDetail(
                       label: 'Interest Rate',
                       value:
-                          '${widget.savings.interestRate?.toStringAsFixed(1) ?? '0'}% p.a.',
+                          widget.savings.interestRate == null
+                              ? 'Unavailable'
+                              : '${widget.savings.interestRate!.toStringAsFixed(1)}% p.a.',
                       theme: theme,
                     ),
                     const SizedBox(height: 12),

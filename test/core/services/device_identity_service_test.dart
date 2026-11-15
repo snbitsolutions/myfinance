@@ -29,6 +29,18 @@ void main() {
       expect(first, isNot('device-id'));
     });
 
+    test('backendDeviceNumber is stable and numeric', () {
+      final first = DeviceIdentityService.backendDeviceNumber('installation');
+      final second = DeviceIdentityService.backendDeviceNumber('installation');
+      final otherInstallation = DeviceIdentityService.backendDeviceNumber(
+        'another-installation',
+      );
+
+      expect(first, second);
+      expect(first, inInclusiveRange(100000000000000, 999999999999999));
+      expect(otherInstallation, isNot(first));
+    });
+
     test('shortenFingerprint keeps only the start and end of long values', () {
       final shortened = DeviceIdentityService.shortenFingerprint(
         '0123456789abcdef0123456789abcdef',
@@ -37,20 +49,18 @@ void main() {
       expect(shortened, '01234567...abcdef');
     });
 
-    test('resolveDeviceIdentifier prefers IMEI-like values first', () {
+    test('resolveDeviceIdentifier prefers app installation ID', () {
       expect(
         DeviceIdentityService.resolveDeviceIdentifier({
-          'imei_number': '355123456789012',
           'android_id': 'android-123',
           'installation_id': 'dev_abc',
         }),
-        '355123456789012',
+        'dev_abc',
       );
 
       expect(
         DeviceIdentityService.resolveDeviceIdentifier({
           'android_id': 'android-123',
-          'installation_id': 'dev_abc',
         }),
         'android-123',
       );

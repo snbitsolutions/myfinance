@@ -1,0 +1,23 @@
+unit: loans
+side_effects:
+  - source_loc: "lib/screens/loans/apply_loan_screen.dart:1"
+    effect: "Submits a loan application and routes through status/detail/repayment flows."
+    must_preserve: true
+branches:
+  - source_loc: "lib/screens/loans/apply_loan_screen.dart:1"
+    condition: "Amount and purpose validation."
+    behavior: "Submit stays disabled or displays validation until the form is valid."
+    must_preserve: true
+error_paths:
+  - source_loc: "lib/screens/loans/repayment_screen.dart:1"
+    trigger: "Repayment API or payment flow failure."
+    outcome: "Keeps the user in the repayment flow and exposes an error state."
+    contract: "No success route on failed payment."
+    must_preserve: true
+concurrency:
+  model: async
+  tx_boundary:
+    source_loc: "lib/core/providers/app_providers.dart:1103"
+    scope: "Loan list retrieval and mutation calls use authenticated member credentials."
+    isolation: "not specified"
+    must_preserve: true

@@ -3,152 +3,345 @@ import '../../core/color_ext.dart';
 import '../../core/app_card.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/app_scaffold.dart';
-
 class PaymentFailedScreen extends StatelessWidget {
-  const PaymentFailedScreen({super.key});
+  final String returnRoute;
+  final bool isDeposit;
+  final double? amount;
+  final String? reason;
+
+  const PaymentFailedScreen({
+    super.key,
+    this.returnRoute = '/home',
+    this.isDeposit = false,
+    this.amount,
+    this.reason,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final retryRoute = isDeposit
+        ? returnRoute.startsWith('/savings')
+              ? returnRoute
+              : '/savings'
+        : returnRoute.startsWith('/savings')
+        ? returnRoute
+        : '/home';
 
-    return AppScaffold(
-      title: 'Payment Failed',
-      showBack: false,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    theme.colorScheme.error,
-                    theme.colorScheme.error.withOpacitySafe(0.82),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: theme.colorScheme.error.withOpacitySafe(0.22),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Column(
+        children: [
+          // Dark green header at the very top
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(
+              20,
+              MediaQuery.of(context).padding.top + 16,
+              20,
+              24,
+            ),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF075D21), Color(0xFF08752B)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
+            ),
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  isDeposit ? 'Deposit Failed' : 'Payment Failed',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Scrollable content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacitySafe(0.18),
-                      shape: BoxShape.circle,
+                  // Error Icon with broken piggy bank
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.error,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: theme.colorScheme.error.withOpacitySafe(
+                                0.3,
+                              ),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 56,
+                          color: Colors.white,
+                        ),
+                      ),
+                      // Broken piggy bank below the X
+                      Positioned(top: 70, child: _BrokenPiggyBank()),
+                    ],
+                  ),
+                  const SizedBox(height: 100),
+                  // Title
+                  Text(
+                    isDeposit
+                        ? 'We couldn\'t complete your deposit'
+                        : 'Payment Failed',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: theme.colorScheme.onSurface,
                     ),
-                    child: const Icon(
-                      Icons.error_outline_rounded,
-                      size: 64,
-                      color: Colors.white,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  // Message
+                  Text(
+                    isDeposit
+                        ? 'Unfortunately, we were unable to process your deposit. Please try again.'
+                        : 'We were unable to process this payment. Please try again.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  // Error Reason Card
+                  AppCard(
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.error_outline_rounded,
+                          color: theme.colorScheme.error,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Reason',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacitySafe(0.6),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                reason ??
+                                    'Network error. Please check your connection.',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Text(
-                    'Payment Failed',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'We could not complete this transaction at the moment.',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withOpacitySafe(0.92),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            AppCard(
-              backgroundColor: theme.colorScheme.errorContainer.withOpacitySafe(
-                0.1,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline_rounded,
-                        color: theme.colorScheme.error,
-                        size: 20,
+                  // Transaction Details
+                  if (amount != null)
+                    AppCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _TransactionDetailRow(
+                            'Amount',
+                            'GH₵${amount!.toStringAsFixed(2)}',
+                            theme,
+                          ),
+                          _TransactionDetailRow(
+                            'Date',
+                            _formatDateTime(DateTime.now()),
+                            theme,
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Transaction Summary',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
+                    ),
+                  const SizedBox(height: 24),
+                  // Action Buttons
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: FilledButton(
+                      onPressed: () => context.go(retryRoute),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Reason',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacitySafe(0.62),
+                      child: const Text('Try Again'),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Possible causes: insufficient funds or network timeout.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.error,
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: OutlinedButton(
+                      onPressed: () => context.go('/home'),
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Back Home'),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: FilledButton.icon(
-                onPressed: () => context.go('/payment'),
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Retry Payment'),
-                style: FilledButton.styleFrom(
-                  elevation: 0,
-                  backgroundColor: theme.colorScheme.error,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDateTime(DateTime date) {
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
+    final meridiem = date.hour >= 12 ? 'PM' : 'AM';
+    return '${date.day} ${months[date.month - 1]} ${date.year} • $hour:${date.minute.toString().padLeft(2, '0')} $meridiem';
+  }
+}
+
+class _BrokenPiggyBank extends StatelessWidget {
+  const _BrokenPiggyBank();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 80,
+      height: 80,
+      decoration: BoxDecoration(
+        color: Colors.pink[100],
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Piggy bank emoji
+          const Text('🐷', style: TextStyle(fontSize: 48)),
+          // Crack line (diagonal)
+          Positioned(
+            child: Transform.rotate(
+              angle: -0.5,
+              child: Container(width: 60, height: 2, color: Colors.red[400]),
+            ),
+          ),
+          // Error badge
+          Positioned(
+            top: -8,
+            right: -8,
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: Text(
+                  '!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: OutlinedButton.icon(
-                onPressed: () => context.go('/home'),
-                icon: const Icon(Icons.home_rounded),
-                label: const Text('Go Home'),
-                style: OutlinedButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TransactionDetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final ThemeData theme;
+
+  const _TransactionDetailRow(this.label, this.value, this.theme);
+
+  @override
+  Widget build(BuildContext context) {
+    final iconMap = {
+      'Amount': Icons.money_rounded,
+      'Date': Icons.calendar_today_rounded,
+      'Method': Icons.payment_rounded,
+      'Reference': Icons.receipt_rounded,
+    };
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          Icon(
+            iconMap[label] ?? Icons.check_rounded,
+            size: 20,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
                   ),
                 ),
-              ),
+                Text(
+                  value,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

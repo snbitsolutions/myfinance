@@ -1,10 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/constants/app_constants.dart';
+import '../../core/balance_card_shell.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/services/notification_service.dart';
 
@@ -74,13 +73,12 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final viewData = _DashboardProfileViewData.fromProfile(widget.profile);
-    final firstName = viewData.accountName.trim().split(RegExp(r'\s+')).first;
 
     final quickActionsPanel = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(top: 6, bottom: 10),
+          padding: const EdgeInsets.only(top: 4, bottom: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -104,7 +102,7 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 'Tap a card to continue to a service',
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -128,7 +126,7 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
             );
           },
           child: Container(
-            padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
               borderRadius: BorderRadius.circular(16),
@@ -185,8 +183,11 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _TopHeader(firstName: firstName),
-                      const SizedBox(height: 16),
+                      _TopHeader(
+                        accountName: viewData.accountName,
+                        imageUrl: viewData.profileImageUrl,
+                      ),
+                      const SizedBox(height: 10),
                       if (isTablet)
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -232,10 +233,8 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
                         const SizedBox(height: 16),
                         quickActionsPanel,
                       ],
-                      if (kDebugMode && AppConstants.disableApiAuthInDebug) ...[
-                        const SizedBox(height: 16),
-                        const _BackendDiagnosticsCard(),
-                      ],
+                      const SizedBox(height: 16),
+                      const _BackendDiagnosticsCard(),
                       const SizedBox(height: 20),
                       const _RecentTransactions(),
                     ],
@@ -387,7 +386,14 @@ class _BackendDiagnosticsCard extends ConsumerWidget {
               ),
             ),
             data: (result) {
-              const order = ['profile', 'loans', 'savings', 'transactions'];
+              const order = [
+                'identity',
+                'profile',
+                'loans',
+                'savings',
+                'shares',
+                'transactions',
+              ];
               return Column(
                 children: order.map((key) {
                   final entry =
@@ -426,125 +432,288 @@ class _BackendDiagnosticsCard extends ConsumerWidget {
 }
 
 class _TopHeader extends StatelessWidget {
-  final String firstName;
+  final String accountName;
+  final String? imageUrl;
 
-  const _TopHeader({required this.firstName});
+  const _TopHeader({required this.accountName, this.imageUrl});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final notificationService = NotificationService.instance;
+    final greeting = _timeBasedGreeting(DateTime.now());
+    final initials = accountName.trim().isEmpty
+        ? 'U'
+        : accountName
+              .trim()
+              .split(RegExp(r'\s+'))
+              .where((segment) => segment.isNotEmpty)
+              .take(2)
+              .map((segment) => segment[0].toUpperCase())
+              .join();
+    final displayName = accountName.trim().isEmpty
+        ? 'Member'
+        : accountName.trim();
+    final greetingName =
+        displayName
+            .split(RegExp(r'\s+'))
+            .where((segment) => segment.isNotEmpty)
+            .firstOrNull ??
+        displayName;
+
+    final avatar = imageUrl != null && imageUrl!.trim().isNotEmpty
+        ? ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: Image.network(
+              imageUrl!,
+              width: 46,
+              height: 46,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) =>
+                  _HeaderInitialsAvatar(initials: initials),
+            ),
+          )
+        : _HeaderInitialsAvatar(initials: initials);
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Welcome back, $firstName',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Row(
-              children: [
-                Text(
-                  'Your finances at a glance',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    'Secure',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
         Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(16),
             onTap: () {
               if (!context.mounted) return;
-              context.push('/notifications');
+              context.push('/profile');
             },
-            child: FutureBuilder<int>(
-              future: notificationService.getUnreadCount(),
-              builder: (context, snapshot) {
-                final unreadCount = snapshot.data ?? 0;
-
-                return Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.30),
-                    ),
+            child: Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    theme.colorScheme.primary,
+                    theme.colorScheme.primary.withValues(alpha: 0.7),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.24),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
                   ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Icon(
-                        unreadCount > 0
-                            ? Icons.notifications_active_outlined
-                            : Icons.notifications_none,
-                        color: theme.colorScheme.onSurface,
-                        size: 20,
-                      ),
-                      if (unreadCount > 0)
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Container(
-                            constraints: const BoxConstraints(
-                              minWidth: 16,
-                              minHeight: 16,
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Center(
-                              child: Text(
-                                unreadCount > 9 ? '9+' : '$unreadCount',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: theme.colorScheme.onPrimary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 9,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              },
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: avatar,
             ),
           ),
         ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$greeting, $greetingName',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Row(
+                children: [
+                  Text(
+                    'Your finances at a glance',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      'Secure',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        Row(
+          children: [
+            _HeaderActionButton(
+              icon: Icons.search_rounded,
+              tooltip: 'Search',
+              onTap: () => context.push('/transactions'),
+            ),
+            const SizedBox(width: 8),
+            _HeaderActionButton(
+              icon: Icons.menu_rounded,
+              tooltip: 'Menu',
+              onTap: () => context.push('/profile'),
+            ),
+            const SizedBox(width: 8),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(999),
+                onTap: () {
+                  if (!context.mounted) return;
+                  context.push('/notifications');
+                },
+                child: FutureBuilder<int>(
+                  future: notificationService.getUnreadCount(),
+                  builder: (context, snapshot) {
+                    final unreadCount = snapshot.data ?? 0;
+
+                    return Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: theme.colorScheme.outline.withValues(
+                            alpha: 0.30,
+                          ),
+                        ),
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Icon(
+                            unreadCount > 0
+                                ? Icons.notifications_active_outlined
+                                : Icons.notifications_none,
+                            color: theme.colorScheme.onSurface,
+                            size: 20,
+                          ),
+                          if (unreadCount > 0)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                constraints: const BoxConstraints(
+                                  minWidth: 16,
+                                  minHeight: 16,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    unreadCount > 9 ? '9+' : '$unreadCount',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.onPrimary,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 9,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
       ],
+    );
+  }
+}
+
+String _timeBasedGreeting(DateTime time) {
+  if (time.hour < 12) return 'Good morning';
+  if (time.hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+class _HeaderActionButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  const _HeaderActionButton({
+    required this.icon,
+    required this.tooltip,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: Tooltip(
+        message: tooltip,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.22),
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 20, color: theme.colorScheme.onSurface),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderInitialsAvatar extends StatelessWidget {
+  final String initials;
+
+  const _HeaderInitialsAvatar({required this.initials});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: 46,
+      height: 46,
+      color: theme.colorScheme.primary,
+      alignment: Alignment.center,
+      child: Text(
+        initials.isEmpty ? 'U' : initials,
+        style: theme.textTheme.titleMedium?.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 }
@@ -562,13 +731,6 @@ class _AccountInfoCard extends StatelessWidget {
         ? 'Unknown'
         : '${viewData.accountStatus.trim()[0].toUpperCase()}${viewData.accountStatus.trim().substring(1).toLowerCase()}';
     final statusStyle = _AccountStatusStyle.fromStatusKey(statusKey);
-
-    final initials = viewData.accountName
-        .split(RegExp(r'\s+'))
-        .where((e) => e.isNotEmpty)
-        .take(2)
-        .map((e) => e.characters.first.toUpperCase())
-        .join();
 
     return Container(
       width: double.infinity,
@@ -634,77 +796,17 @@ class _AccountInfoCard extends StatelessWidget {
                 ),
               ),
             ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: TreeLogoBadge(size: 132, opacity: 0.34),
+            ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 16, 16, 18),
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.22),
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          initials.isEmpty ? 'U' : initials,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: _DashboardUi.cardTextColor,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              viewData.accountName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.1,
-                                height: 1.05,
-                                color: _DashboardUi.cardTextColor,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Account Holder',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.25,
-                                color: _DashboardUi.cardTextColor.withValues(
-                                  alpha: 0.78,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              'Current Account · Gold Member',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: _DashboardUi.cardTextColor.withValues(
-                                  alpha: 0.65,
-                                ),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 18),
                   Row(
                     children: [
                       Expanded(
@@ -715,7 +817,7 @@ class _AccountInfoCard extends StatelessWidget {
                           textColor: _DashboardUi.cardTextColor,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: _CardInfoTile(
                           icon: Icons.credit_card_outlined,
@@ -726,77 +828,122 @@ class _AccountInfoCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  // Live balance
+                  const SizedBox(height: 10),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
+                      horizontal: 12,
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.22),
+                        color: Colors.white.withValues(alpha: 0.18),
                       ),
                     ),
                     child: Row(
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Available Balance',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: _DashboardUi.cardTextColor.withValues(
-                                  alpha: 0.72,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    'Available Balance',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: _DashboardUi.cardTextColor
+                                          .withValues(alpha: 0.72),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    Icons.trending_up_rounded,
+                                    size: 12,
+                                    color: Colors.greenAccent.shade100,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                viewData.availableBalance == null
+                                    ? 'GH₵ —'
+                                    : 'GH₵ ${viewData.availableBalance!.toStringAsFixed(2)}',
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  color: _DashboardUi.cardTextColor,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.6,
                                 ),
-                                fontWeight: FontWeight.w500,
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'GH₵ ${viewData.availableBalance.toStringAsFixed(2)}',
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                color: _DashboardUi.cardTextColor,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(10),
+                            ],
                           ),
-                          child: const Icon(
-                            Icons.account_balance_wallet_outlined,
-                            color: Colors.white,
-                            size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          width: 42,
+                          height: 42,
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.72),
+                            ),
+                          ),
+                          child: ClipOval(
+                            child: Image.asset(
+                              'images/adepa_teachers_logo.png',
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _InfoPill(
+                          label: 'Income',
+                          value: '+GH₵ 2.8k',
+                          color: const Color(0xFFB8F1CB),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _InfoPill(
+                          label: 'Spend',
+                          value: '-GH₵ 1.2k',
+                          color: const Color(0xFFFFE4B5),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _InfoPill(
+                          label: 'Saved',
+                          value: 'GH₵ 18.4k',
+                          color: const Color(0xFFD8EEFF),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
                   Align(
                     alignment: Alignment.bottomRight,
                     child: Transform.translate(
-                      offset: const Offset(2, 3),
+                      offset: const Offset(0, 1),
                       child: Wrap(
                         spacing: 8,
                         runAlignment: WrapAlignment.end,
                         alignment: WrapAlignment.end,
                         children: [
-                          // Tier Badge
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
+                              horizontal: 10,
+                              vertical: 5,
                             ),
                             decoration: BoxDecoration(
                               color: Colors.amber.withValues(alpha: 0.18),
@@ -810,7 +957,7 @@ class _AccountInfoCard extends StatelessWidget {
                               children: [
                                 Icon(
                                   Icons.star_rounded,
-                                  size: 13,
+                                  size: 12,
                                   color: Colors.amber.shade300,
                                 ),
                                 const SizedBox(width: 4),
@@ -819,13 +966,12 @@ class _AccountInfoCard extends StatelessWidget {
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: Colors.amber.shade300,
                                     fontWeight: FontWeight.w700,
-                                    fontSize: 11,
+                                    fontSize: 10,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          // Alert Badge (if needed)
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
@@ -843,7 +989,7 @@ class _AccountInfoCard extends StatelessWidget {
                               children: [
                                 Icon(
                                   statusStyle.icon,
-                                  size: 12,
+                                  size: 11,
                                   color: statusStyle.textColor,
                                 ),
                                 const SizedBox(width: 4),
@@ -852,7 +998,7 @@ class _AccountInfoCard extends StatelessWidget {
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: statusStyle.textColor,
                                     fontWeight: FontWeight.w700,
-                                    fontSize: 11,
+                                    fontSize: 10,
                                   ),
                                 ),
                               ],
@@ -948,6 +1094,66 @@ class _CardInfoTile extends StatelessWidget {
   }
 }
 
+class _InfoPill extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _InfoPill({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CardCurvePainter extends CustomPainter {
   final Color color;
   const _CardCurvePainter({required this.color});
@@ -1032,7 +1238,8 @@ class _DashboardProfileViewData {
   final String branchName;
   final String accountNumber;
   final String accountStatus;
-  final double availableBalance;
+  final double? availableBalance;
+  final String? profileImageUrl;
 
   const _DashboardProfileViewData({
     required this.accountName,
@@ -1040,19 +1247,21 @@ class _DashboardProfileViewData {
     required this.accountNumber,
     required this.accountStatus,
     required this.availableBalance,
+    required this.profileImageUrl,
   });
 
   factory _DashboardProfileViewData.fromProfile(Map<String, dynamic>? profile) {
     return _DashboardProfileViewData(
-      accountName: _readProfileString(profile, 'name', 'John Doe'),
-      branchName: _readProfileString(profile, 'branch', 'Accra Main'),
+      accountName: _readProfileName(profile),
+      branchName: _readProfileString(profile, 'branch', 'Unavailable'),
       accountNumber: _readProfileString(
         profile,
         'account_number',
-        '0123456789',
+        'Unavailable',
       ),
-      accountStatus: _readProfileString(profile, 'status', 'Active'),
-      availableBalance: _readProfileDouble(profile, 'balance', 0),
+      accountStatus: _readProfileString(profile, 'status', 'Unavailable'),
+      availableBalance: _readOptionalProfileDouble(profile, 'balance'),
+      profileImageUrl: _readProfileImageUrl(profile),
     );
   }
 }
@@ -1126,7 +1335,7 @@ class _QuickActions extends StatelessWidget {
           return SizedBox(
             width: itemWidth,
             child: AspectRatio(
-              aspectRatio: 1.28,
+              aspectRatio: 1.18,
               child: _QuickAction(
                 icon: item.icon,
                 label: item.label,
@@ -1184,7 +1393,7 @@ const List<_QuickActionItem> _quickActionItems = [
   _QuickActionItem(
     icon: Icons.trending_up,
     label: 'Investment',
-    route: '/investment',
+    route: '/investments',
     accentColor: Color(0xFF1F7AE0),
   ),
   _QuickActionItem(
@@ -1207,18 +1416,64 @@ String _readProfileString(
   return fallback;
 }
 
-double _readProfileDouble(
-  Map<String, dynamic>? profile,
-  String key,
-  double fallback,
-) {
+String _readProfileName(Map<String, dynamic>? profile) {
+  final firstName = _readProfileString(profile, 'first_name', '');
+  final lastName = _readProfileString(profile, 'last_name', '');
+  if (firstName.isNotEmpty || lastName.isNotEmpty) {
+    final combined = [
+      firstName,
+      lastName,
+    ].where((segment) => segment.trim().isNotEmpty).join(' ').trim();
+    if (combined.isNotEmpty) return combined;
+  }
+
+  final preferredKeys = [
+    'name',
+    'full_name',
+    'fullName',
+    'account_name',
+    'accountName',
+  ];
+
+  for (final key in preferredKeys) {
+    final value = profile?[key];
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
+    }
+  }
+
+  return 'John Doe';
+}
+
+String? _readProfileImageUrl(Map<String, dynamic>? profile) {
+  const preferredKeys = [
+    'avatar',
+    'avatar_url',
+    'profile_image',
+    'profile_image_url',
+    'image_url',
+    'photo_url',
+    'picture',
+    'photo',
+    'profile_picture',
+    'profilePicture',
+  ];
+
+  for (final key in preferredKeys) {
+    final value = profile?[key];
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+double? _readOptionalProfileDouble(Map<String, dynamic>? profile, String key) {
   final value = profile?[key];
   if (value is num) return value.toDouble();
-  if (value is String) {
-    final parsed = double.tryParse(value.trim());
-    if (parsed != null) return parsed;
-  }
-  return fallback;
+  if (value is String) return double.tryParse(value.replaceAll(',', ''));
+  return null;
 }
 
 String _maskAccountNumber(String accountNumber) {
@@ -1251,35 +1506,35 @@ class _QuickAction extends StatelessWidget {
       opacity: disabled ? 0.38 : 1.0,
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           child: Ink(
             width: double.infinity,
             height: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
             decoration: BoxDecoration(
               color: surfaceTint,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(22),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  accentColor.withValues(alpha: 0.10),
+                  accentColor.withValues(alpha: 0.12),
                   surfaceTint,
                   surfaceTint,
                 ],
               ),
               border: Border.all(
-                color: accentColor.withValues(alpha: 0.18),
+                color: accentColor.withValues(alpha: 0.16),
                 width: 1.2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: accentColor.withValues(alpha: 0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
+                  color: accentColor.withValues(alpha: 0.10),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
                 ),
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.04),
@@ -1302,8 +1557,8 @@ class _QuickAction extends StatelessWidget {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            accentColor.withValues(alpha: 0.22),
-                            accentColor.withValues(alpha: 0.10),
+                            accentColor.withValues(alpha: 0.20),
+                            accentColor.withValues(alpha: 0.08),
                           ],
                         ),
                         border: Border.all(
@@ -1343,6 +1598,28 @@ class _QuickAction extends StatelessWidget {
                     height: 1.05,
                   ),
                 ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: accentColor.withValues(alpha: 0.82),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Open',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: accentColor,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.12,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -1368,10 +1645,25 @@ class _RecentTransactions extends ConsumerWidget {
         Row(
           children: [
             Text(
-              'Recent Transactions',
+              'Activity',
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.1,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEAF5EE),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                'Live',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: const Color(0xFF2E8B57),
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             const Spacer(),
@@ -1381,7 +1673,7 @@ class _RecentTransactions extends ConsumerWidget {
                 padding: EdgeInsets.zero,
               ),
               onPressed: () => context.go('/transactions'),
-              child: const Text('See all'),
+              child: const Text('View all'),
             ),
           ],
         ),
@@ -1397,17 +1689,18 @@ class _RecentTransactions extends ConsumerWidget {
             }
             final recent = txns.take(5).toList();
             return Container(
+              padding: const EdgeInsets.only(top: 8, bottom: 10),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(22),
                 border: Border.all(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.22),
+                  color: theme.colorScheme.outline.withValues(alpha: 0.18),
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 5),
                   ),
                 ],
               ),
@@ -1417,13 +1710,22 @@ class _RecentTransactions extends ConsumerWidget {
                 itemCount: recent.length,
                 separatorBuilder: (_, _) => Divider(
                   height: 1,
-                  indent: 60,
-                  color: theme.colorScheme.outline.withValues(alpha: 0.20),
+                  indent: 64,
+                  color: theme.colorScheme.outline.withValues(alpha: 0.16),
                 ),
-                itemBuilder: (_, i) => Padding(
+                itemBuilder: (_, i) => Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 10),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                    horizontal: 8,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: i.isEven
+                        ? theme.colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.25,
+                          )
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: _DashboardTransactionTile(txn: recent[i]),
                 ),
@@ -1443,10 +1745,18 @@ class _DashboardTransactionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isCredit = (txn['type'] as String? ?? 'debit') == 'credit';
-    final amount = (txn['amount'] as num?)?.toDouble() ?? 0.0;
+    final transactionType = (txn['type'] as String? ?? 'unknown').toLowerCase();
+    final isCredit =
+        transactionType == 'credit' || transactionType == 'deposit';
+    final isDebit = const {
+      'debit',
+      'withdraw',
+      'withdrawal',
+    }.contains(transactionType);
+    final amount = (txn['amount'] as num?)?.toDouble();
     final description = txn['description'] as String? ?? '';
     final dateStr = txn['date'] as String? ?? '';
+    final status = (txn['status'] as String? ?? 'unknown').toLowerCase();
 
     DateTime? date;
     try {
@@ -1455,24 +1765,37 @@ class _DashboardTransactionTile extends StatelessWidget {
 
     final accentColor = isCredit
         ? theme.colorScheme.primary
-        : theme.colorScheme.error;
+        : isDebit
+        ? theme.colorScheme.error
+        : theme.colorScheme.onSurface;
+    final badgeColor = status == 'pending'
+        ? const Color(0xFFE2A93B)
+        : status == 'completed' || status == 'success' || status == 'successful'
+        ? theme.colorScheme.primary
+        : theme.colorScheme.outline;
+
+    final label = description.isEmpty ? 'Transaction' : description;
+    final icon = isCredit
+        ? Icons.call_received_rounded
+        : isDebit
+        ? Icons.call_made_rounded
+        : _transactionIcon(label);
 
     return Row(
       children: [
         Container(
-          width: 38,
-          height: 38,
+          width: 42,
+          height: 42,
           decoration: BoxDecoration(
-            color: accentColor.withValues(alpha: 0.10),
-            shape: BoxShape.circle,
+            color: isCredit
+                ? theme.colorScheme.primary.withValues(alpha: 0.10)
+                : isDebit
+                ? theme.colorScheme.error.withValues(alpha: 0.10)
+                : theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: accentColor.withValues(alpha: 0.12)),
           ),
-          child: Icon(
-            isCredit
-                ? Icons.arrow_downward_rounded
-                : Icons.arrow_upward_rounded,
-            size: 17,
-            color: accentColor,
-          ),
+          child: Icon(icon, size: 18, color: accentColor),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -1480,16 +1803,17 @@ class _DashboardTransactionTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                description.isEmpty ? 'Transaction' : description,
+                label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
+              const SizedBox(height: 2),
               if (date != null)
                 Text(
-                  DateFormat('MMM d, y').format(date),
+                  DateFormat('MMM d, y • h:mm a').format(date),
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
                   ),
@@ -1497,15 +1821,68 @@ class _DashboardTransactionTile extends StatelessWidget {
             ],
           ),
         ),
-        Text(
-          '${isCredit ? '+' : '-'} ₵${amount.toStringAsFixed(2)}',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: accentColor,
-          ),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              '${isCredit
+                  ? '+'
+                  : isDebit
+                  ? '-'
+                  : ''} ₵${amount?.toStringAsFixed(2) ?? '—'}',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: accentColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: badgeColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: badgeColor.withValues(alpha: 0.16)),
+              ),
+              child: Text(
+                status == 'pending'
+                    ? 'Pending'
+                    : status == 'completed' ||
+                          status == 'success' ||
+                          status == 'successful'
+                    ? 'Completed'
+                    : 'Status unavailable',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: badgeColor,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
+  }
+
+  IconData _transactionIcon(String label) {
+    final value = label.toLowerCase();
+    if (value.contains('airtime') ||
+        value.contains('bill') ||
+        value.contains('payment')) {
+      return Icons.phone_iphone_rounded;
+    }
+    if (value.contains('save') || value.contains('deposit')) {
+      return Icons.savings_rounded;
+    }
+    if (value.contains('loan') || value.contains('repay')) {
+      return Icons.account_balance_wallet_rounded;
+    }
+    if (value.contains('share') ||
+        value.contains('stock') ||
+        value.contains('investment')) {
+      return Icons.trending_up_rounded;
+    }
+    return Icons.receipt_long_outlined;
   }
 }
 

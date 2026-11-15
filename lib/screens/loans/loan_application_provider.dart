@@ -7,115 +7,87 @@ class LoanApplicationState {
   final double amount;
   final String purpose;
   final String repaymentPlan;
-  final int planMonths;
-  final double effectiveRate;
-  final DateTime submittedAt;
-  final String referenceNumber;
-  final double repaidAmount;
+  final DateTime preparedAt;
+  final bool isSubmitted;
+  final String? submissionMessage;
 
   const LoanApplicationState({
     required this.amount,
     required this.purpose,
     required this.repaymentPlan,
-    required this.planMonths,
-    required this.effectiveRate,
-    required this.submittedAt,
-    required this.referenceNumber,
-    this.repaidAmount = 0.0,
+    required this.preparedAt,
+    this.isSubmitted = false,
+    this.submissionMessage,
   });
 
-  double get totalInterest => amount * effectiveRate;
-  double get totalWithInterest => amount + totalInterest;
-  double get outstandingBalance =>
-      (totalWithInterest - repaidAmount).clamp(0, totalWithInterest);
-  double get monthlyInstallment => totalWithInterest / planMonths;
-  DateTime get dueDate => submittedAt.add(Duration(days: planMonths * 30));
-  double get progressFraction =>
-      totalWithInterest > 0 ? repaidAmount / totalWithInterest : 0.0;
+  Map<String, dynamic> toJson() => {
+    'amount': amount,
+    'purpose': purpose,
+    'repaymentPlan': repaymentPlan,
+    'preparedAt': preparedAt.toIso8601String(),
+    'isSubmitted': isSubmitted,
+    if (submissionMessage != null) 'submissionMessage': submissionMessage,
+  };
 
-  LoanApplicationState copyWith({double? repaidAmount}) {
+  factory LoanApplicationState.fromJson(Map<String, dynamic> json) {
+    final amount = json['amount'];
+    final purpose = json['purpose'];
+    final repaymentPlan = json['repaymentPlan'];
+    final preparedAt = DateTime.tryParse(json['preparedAt']?.toString() ?? '');
+
+    if (amount is! num ||
+        purpose is! String ||
+        repaymentPlan is! String ||
+        preparedAt == null) {
+      throw const FormatException('Invalid saved loan application draft.');
+    }
+
+    return LoanApplicationState(
+      amount: amount.toDouble(),
+      purpose: purpose,
+      repaymentPlan: repaymentPlan,
+      preparedAt: preparedAt,
+      isSubmitted: json['isSubmitted'] == true,
+      submissionMessage: json['submissionMessage'] as String?,
+    );
+  }
+
+  LoanApplicationState copyWith({
+    bool? isSubmitted,
+    String? submissionMessage,
+  }) {
     return LoanApplicationState(
       amount: amount,
       purpose: purpose,
       repaymentPlan: repaymentPlan,
-      planMonths: planMonths,
-      effectiveRate: effectiveRate,
-      submittedAt: submittedAt,
-      referenceNumber: referenceNumber,
-      repaidAmount: repaidAmount ?? this.repaidAmount,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'amount': amount,
-      'purpose': purpose,
-      'repaymentPlan': repaymentPlan,
-      'planMonths': planMonths,
-      'effectiveRate': effectiveRate,
-      'submittedAt': submittedAt.toIso8601String(),
-      'referenceNumber': referenceNumber,
-      'repaidAmount': repaidAmount,
-    };
-  }
-
-  factory LoanApplicationState.fromJson(Map<String, dynamic> json) {
-    return LoanApplicationState(
-      amount: (json['amount'] as num).toDouble(),
-      purpose: json['purpose'] as String,
-      repaymentPlan: json['repaymentPlan'] as String,
-      planMonths: json['planMonths'] as int,
-      effectiveRate: (json['effectiveRate'] as num).toDouble(),
-      submittedAt:
-          DateTime.tryParse(json['submittedAt'] as String? ?? '') ??
-          DateTime.now(),
-      referenceNumber: json['referenceNumber'] as String,
-      repaidAmount: (json['repaidAmount'] as num?)?.toDouble() ?? 0,
+      preparedAt: preparedAt,
+      isSubmitted: isSubmitted ?? this.isSubmitted,
+      submissionMessage: submissionMessage ?? this.submissionMessage,
     );
   }
 }
 
 class LoanApplicationNotifier extends StateNotifier<LoanApplicationState?> {
-  static const _storageKey = 'loan_application_state_v1';
+  static const _storageKey = 'loan_application_draft_v2';
 
   LoanApplicationNotifier() : super(null) {
-    _restorePersistedState();
+    _restorePersistedDraft();
   }
 
-  void submit({
+  Future<void> prepareDraft({
     required double amount,
     required String purpose,
     required String repaymentPlan,
-  }) {
-    final months = int.tryParse(repaymentPlan.split(' ').first) ?? 3;
-    final rate = _rateForMonths(months);
-    final now = DateTime.now();
-    final seed = (now.millisecondsSinceEpoch % 9000 + 1000).toString().padLeft(
-      4,
-      '0',
-    );
-    final ref = 'LN-${now.year}-$seed';
-    state = LoanApplicationState(
+  }) async {
+    final draft = LoanApplicationState(
       amount: amount,
-      purpose: purpose,
+      purpose: purpose.trim(),
       repaymentPlan: repaymentPlan,
-      planMonths: months,
-      effectiveRate: rate,
-      submittedAt: now,
-      referenceNumber: ref,
+      preparedAt: DateTime.now(),
     );
-    _persistState();
-  }
-
-  void recordPayment(double paid) {
-    if (state == null) return;
-    state = state!.copyWith(
-      repaidAmount: (state!.repaidAmount + paid).clamp(
-        0,
-        state!.totalWithInterest,
-      ),
-    );
-    _persistState();
+    state = draft;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_storageKey, jsonEncode(draft.toJson()));
   }
 
   Future<void> clear() async {
@@ -124,35 +96,34 @@ class LoanApplicationNotifier extends StateNotifier<LoanApplicationState?> {
     await prefs.remove(_storageKey);
   }
 
-  Future<void> _restorePersistedState() async {
+  Future<void> markSubmitted({String? message}) async {
+    final current = state;
+    if (current == null) {
+      throw StateError('Cannot mark a missing loan application as submitted.');
+    }
+    final submitted = current.copyWith(
+      isSubmitted: true,
+      submissionMessage: message,
+    );
+    state = submitted;
     final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_storageKey, jsonEncode(submitted.toJson()));
+  }
+
+  Future<void> _restorePersistedDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('loan_application_state_v1');
     final raw = prefs.getString(_storageKey);
     if (raw == null || raw.isEmpty) return;
 
     try {
-      final data = jsonDecode(raw) as Map<String, dynamic>;
-      state = LoanApplicationState.fromJson(data);
-    } catch (_) {
-      // Ignore invalid cached payloads.
-    }
-  }
-
-  Future<void> _persistState() async {
-    final current = state;
-    if (current == null) return;
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_storageKey, jsonEncode(current.toJson()));
-  }
-
-  static double _rateForMonths(int months) {
-    switch (months) {
-      case 3:
-        return 0.06;
-      case 6:
-        return 0.10;
-      default:
-        return 0.12;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException('Invalid saved loan application draft.');
+      }
+      state = LoanApplicationState.fromJson(decoded);
+    } on FormatException {
+      await prefs.remove(_storageKey);
     }
   }
 }

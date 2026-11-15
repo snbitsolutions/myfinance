@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
 import '../../core/color_ext.dart';
 import '../../core/modern_input.dart';
+import '../../core/providers/app_providers.dart';
 
 // ─── Internal account model ───────────────────────────────────────────────────
 
@@ -25,61 +26,98 @@ class _InternalAccount {
   });
 }
 
-const List<_InternalAccount> _internalAccounts = [
-  _InternalAccount(
-    id: 'member',
-    name: 'Member Savings',
-    typeLabel: 'Savings',
-    icon: Icons.savings_rounded,
-    color: Color(0xFF2E8B57),
-    balance: 1250.00,
-  ),
-  _InternalAccount(
-    id: 'current',
-    name: 'Current Account',
-    typeLabel: 'Current',
-    icon: Icons.account_balance_wallet_rounded,
-    color: Color(0xFF1976D2),
-    balance: 8400.00,
-  ),
-  _InternalAccount(
-    id: 'kiddy',
-    name: 'Kiddy Savings',
-    typeLabel: 'Savings',
-    icon: Icons.child_care_rounded,
-    color: Color(0xFFE64A19),
-    balance: 320.00,
-  ),
-  _InternalAccount(
-    id: 'fixed',
-    name: 'Fixed Deposit',
-    typeLabel: 'Fixed',
-    icon: Icons.lock_clock_rounded,
-    color: Color(0xFF6A1B9A),
-    balance: 5000.00,
-  ),
-];
-
 const List<int> _quickTransferAmounts = [50, 100, 200, 500];
+
+/// Types of transfer destinations supported by the transfer flow.
+enum TransferDestination { internal, member, bank, mobile }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class TransferScreen extends StatefulWidget {
+class TransferScreen extends ConsumerStatefulWidget {
   const TransferScreen({super.key});
 
   @override
-  State<TransferScreen> createState() => _TransferScreenState();
+  ConsumerState<TransferScreen> createState() => _TransferScreenState();
 }
 
-class _TransferScreenState extends State<TransferScreen> {
+class _TransferScreenState extends ConsumerState<TransferScreen> {
   String? _fromAccountId;
   String? _toAccountId;
   final _amountController = TextEditingController();
 
+  // Selected destination (internal accounts, member, bank, or mobile money)
+  TransferDestination _destination = TransferDestination.internal;
+
+  // External recipient inputs
+  final TextEditingController _memberIdController = TextEditingController();
+  final TextEditingController _bankAccountController = TextEditingController();
+  final TextEditingController _bankNameController = TextEditingController();
+  final TextEditingController _mobileNumberController = TextEditingController();
+
   @override
   void dispose() {
     _amountController.dispose();
+    _memberIdController.dispose();
+    _bankAccountController.dispose();
+    _bankNameController.dispose();
+    _mobileNumberController.dispose();
     super.dispose();
+  }
+
+  List<_InternalAccount> get _internalAccounts {
+    final savings = ref.watch(savingsProvider).valueOrNull ?? const [];
+    final shares = ref.watch(sharesProvider).valueOrNull ?? const [];
+    final accounts = <_InternalAccount>[];
+
+    void addAccounts(
+      List<Map<String, dynamic>> items,
+      String typeLabel,
+      IconData icon,
+      Color color,
+    ) {
+      for (final item in items) {
+        final id =
+            (item['id'] ?? item['product_id'] ?? item['savings_id'] ?? '')
+                .toString()
+                .trim();
+        if (id.isEmpty) continue;
+        final name =
+            (item['pro_name'] ??
+                    item['name'] ??
+                    item['product_name'] ??
+                    typeLabel)
+                .toString()
+                .trim();
+        final rawBalance = item['balance'] ?? item['current_balance'] ?? 0;
+        final balance = rawBalance is num
+            ? rawBalance.toDouble()
+            : double.tryParse(rawBalance.toString().replaceAll(',', '')) ?? 0;
+        accounts.add(
+          _InternalAccount(
+            id: id,
+            name: name,
+            typeLabel: typeLabel,
+            icon: icon,
+            color: color,
+            balance: balance,
+          ),
+        );
+      }
+    }
+
+    addAccounts(
+      savings,
+      'Savings',
+      Icons.savings_rounded,
+      const Color(0xFF2E8B57),
+    );
+    addAccounts(
+      shares,
+      'Shares',
+      Icons.pie_chart_rounded,
+      const Color(0xFF1976D2),
+    );
+    return accounts;
   }
 
   _InternalAccount? _findAccountById(String? id) {
@@ -96,14 +134,7 @@ class _TransferScreenState extends State<TransferScreen> {
 
   double get _amount => double.tryParse(_amountController.text) ?? 0;
 
-  bool get _canSubmit {
-    final from = _fromAccount;
-    if (from == null || _toAccountId == null) return false;
-    if (_fromAccountId == _toAccountId) return false;
-    if (_amount <= 0) return false;
-    if (_amount > from.balance) return false;
-    return true;
-  }
+  bool get _canSubmit => false;
 
   void _setQuickAmount(double amount) {
     setState(() => _amountController.text = amount.toStringAsFixed(2));
@@ -111,316 +142,518 @@ class _TransferScreenState extends State<TransferScreen> {
 
   Future<void> _onConfirmTransferPressed() async {
     FocusManager.instance.primaryFocus?.unfocus();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Transfers are unavailable until secure backend transfer verification is connected.',
-        ),
-      ),
-    );
+    if (!_canSubmit) return;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isTablet = MediaQuery.sizeOf(context).width >= 900;
-    final fee = _amount * 0.005;
-    final totalDebit = _amount + fee;
+    final totalDebit = _amount;
     const gap = SizedBox(height: 12);
     final accent = theme.colorScheme.primary;
 
     return AppScaffold(
       title: 'Transfer',
-      child: Stack(
-        children: [
-          Positioned(
-            right: -26,
-            top: -8,
-            child: IgnorePointer(
-              child: Container(
-                width: 110,
-                height: 110,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: theme.colorScheme.primary.withOpacitySafe(0.06),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: -18,
-            top: 210,
-            child: IgnorePointer(
-              child: Container(
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: theme.colorScheme.secondary.withOpacitySafe(0.04),
-                ),
-              ),
-            ),
-          ),
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: isTablet ? 980 : double.infinity,
-              ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _PageIntro(theme: theme),
-                    gap,
-
-                    // From Account
-                    AppCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _SectionHeader(
-                            title: 'From Account',
-                            subtitle: 'Select the account to debit',
-                            icon: Icons.arrow_upward_rounded,
-                            theme: theme,
-                            accentColor: accent,
-                          ),
-                          const SizedBox(height: 12),
-                          ..._internalAccounts.map(
-                            (acc) => _AccountTile(
-                              account: acc,
-                              selected: _fromAccountId == acc.id,
-                              disabled: _toAccountId == acc.id,
-                              onTap: () => setState(() {
-                                _fromAccountId = acc.id;
-                                if (_toAccountId == acc.id) _toAccountId = null;
-                              }),
-                              theme: theme,
-                            ),
-                          ),
-                        ],
+      child: ColoredBox(
+        color: const Color(0xFFF4F7F4),
+        child: Column(
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: isTablet ? 980 : double.infinity,
                       ),
-                    ),
-
-                    // Arrow divider
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: accent.withOpacitySafe(0.10),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: accent.withOpacitySafe(0.20),
-                            ),
-                          ),
-                          child: Icon(
-                            Icons.swap_vert_rounded,
-                            color: accent,
-                            size: 22,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // To Account
-                    AppCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _SectionHeader(
-                            title: 'To Account',
-                            subtitle: 'Select the account to credit',
-                            icon: Icons.arrow_downward_rounded,
-                            theme: theme,
-                            accentColor: accent,
-                          ),
-                          const SizedBox(height: 12),
-                          ..._internalAccounts.map(
-                            (acc) => _AccountTile(
-                              account: acc,
-                              selected: _toAccountId == acc.id,
-                              disabled: _fromAccountId == acc.id,
-                              onTap: () => setState(() {
-                                _toAccountId = acc.id;
-                                if (_fromAccountId == acc.id) {
-                                  _fromAccountId = null;
-                                }
-                              }),
-                              theme: theme,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    gap,
-
-                    // Amount entry
-                    AppCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _SectionHeader(
-                            title: 'Amount',
-                            subtitle: _fromAccount != null
-                                ? 'Available: GH₵ ${_fromAccount!.balance.toStringAsFixed(2)}'
-                                : 'Enter the amount to transfer',
-                            icon: Icons.payments_rounded,
-                            theme: theme,
-                            accentColor: accent,
-                          ),
-                          const SizedBox(height: 12),
-                          ModernInput(
-                            label: 'Transfer Amount',
-                            hintText: '0.00',
-                            controller: _amountController,
-                            enableInteractiveSelection: false,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            prefixText: 'GH₵ ',
-                            onChanged: (_) => setState(() {}),
-                          ),
-                          if (_fromAccount != null &&
-                              _amount > _fromAccount!.balance) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.warning_amber_rounded,
-                                  size: 16,
-                                  color: theme.colorScheme.error,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Amount exceeds available balance.',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.error,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-
-                    gap,
-
-                    if (!isTablet) ...[
-                      AppCard(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            _SectionHeader(
-                              title: 'Quick Amount',
-                              subtitle: 'Tap an amount to auto-fill',
-                              icon: Icons.flash_on_rounded,
-                              theme: theme,
-                              accentColor: accent,
+                            _PageIntro(theme: theme),
+                            gap,
+
+                            // Destination selector (Internal, Member, Bank, Mobile Money)
+                            _TransferCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _SectionHeader(
+                                    title: 'Select Destination',
+                                    subtitle:
+                                        'Choose where you want to send money',
+                                    icon: Icons.send_rounded,
+                                    theme: theme,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Wrap(
+                                    spacing: 8,
+                                    children: [
+                                      ChoiceChip(
+                                        label: const Text('Internal'),
+                                        selected:
+                                            _destination ==
+                                            TransferDestination.internal,
+                                        onSelected: (v) => setState(() {
+                                          _destination =
+                                              TransferDestination.internal;
+                                          _toAccountId = null;
+                                        }),
+                                      ),
+                                      ChoiceChip(
+                                        label: const Text('Member'),
+                                        selected:
+                                            _destination ==
+                                            TransferDestination.member,
+                                        onSelected: (v) => setState(() {
+                                          _destination =
+                                              TransferDestination.member;
+                                          _toAccountId = null;
+                                        }),
+                                      ),
+                                      ChoiceChip(
+                                        label: const Text('Bank'),
+                                        selected:
+                                            _destination ==
+                                            TransferDestination.bank,
+                                        onSelected: (v) => setState(() {
+                                          _destination =
+                                              TransferDestination.bank;
+                                          _toAccountId = null;
+                                        }),
+                                      ),
+                                      ChoiceChip(
+                                        label: const Text('Mobile Money'),
+                                        selected:
+                                            _destination ==
+                                            TransferDestination.mobile,
+                                        onSelected: (v) => setState(() {
+                                          _destination =
+                                              TransferDestination.mobile;
+                                          _toAccountId = null;
+                                        }),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: _quickTransferAmounts
-                                  .map(
-                                    (amount) => ActionChip(
-                                      label: Text('GH₵ $amount'),
-                                      onPressed: () =>
-                                          _setQuickAmount(amount.toDouble()),
-                                      avatar: Icon(
-                                        Icons.bolt_rounded,
-                                        size: 16,
-                                        color: accent,
+                            gap,
+
+                            // From Account
+                            if (_destination == TransferDestination.internal)
+                              _TransferCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _SectionHeader(
+                                      title: 'From Account',
+                                      subtitle: 'Select the account to debit',
+                                      icon: Icons.arrow_upward_rounded,
+                                      theme: theme,
+                                      accentColor: accent,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    ..._internalAccounts.map(
+                                      (acc) => _AccountTile(
+                                        account: acc,
+                                        selected: _fromAccountId == acc.id,
+                                        disabled: _toAccountId == acc.id,
+                                        onTap: () => setState(() {
+                                          _fromAccountId = acc.id;
+                                          if (_toAccountId == acc.id) {
+                                            _toAccountId = null;
+                                          }
+                                        }),
+                                        theme: theme,
                                       ),
                                     ),
-                                  )
-                                  .toList(),
+                                  ],
+                                ),
+                              ),
+
+                            // Arrow divider
+                            Center(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 4,
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: accent.withOpacitySafe(0.10),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: accent.withOpacitySafe(0.20),
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.swap_vert_rounded,
+                                    color: accent,
+                                    size: 22,
+                                  ),
+                                ),
+                              ),
                             ),
+
+                            // To Account
+                            if (_destination == TransferDestination.internal)
+                              _TransferCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _SectionHeader(
+                                      title: 'To Account',
+                                      subtitle: 'Select the account to credit',
+                                      icon: Icons.arrow_downward_rounded,
+                                      theme: theme,
+                                      accentColor: accent,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    ..._internalAccounts.map(
+                                      (acc) => _AccountTile(
+                                        account: acc,
+                                        selected: _toAccountId == acc.id,
+                                        disabled: _fromAccountId == acc.id,
+                                        onTap: () => setState(() {
+                                          _toAccountId = acc.id;
+                                          if (_fromAccountId == acc.id) {
+                                            _fromAccountId = null;
+                                          }
+                                        }),
+                                        theme: theme,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                            gap,
+
+                            // Recipient selection for external destinations
+                            if (_destination != TransferDestination.internal)
+                              _TransferCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _SectionHeader(
+                                      title: 'Select Recipient',
+                                      subtitle:
+                                          'Choose or enter recipient details',
+                                      icon: Icons.person_rounded,
+                                      theme: theme,
+                                    ),
+                                    const SizedBox(height: 10),
+                                    if (_destination ==
+                                        TransferDestination.member) ...[
+                                      ModernInput(
+                                        label: 'Member ID or Phone',
+                                        controller: _memberIdController,
+                                        hintText: 'e.g. 00483921 or 0241234567',
+                                      ),
+                                      const SizedBox(height: 8),
+                                      const Text(
+                                        'Member lookup is unavailable until recipient verification is connected to the backend.',
+                                      ),
+                                    ] else if (_destination ==
+                                        TransferDestination.bank) ...[
+                                      ModernInput(
+                                        label: 'Bank Name',
+                                        controller: _bankNameController,
+                                        hintText: 'e.g. GCB Bank',
+                                      ),
+                                      const SizedBox(height: 8),
+                                      ModernInput(
+                                        label: 'Account Number',
+                                        controller: _bankAccountController,
+                                        hintText: 'e.g. 1234567890',
+                                      ),
+                                      const SizedBox(height: 8),
+                                      const Text(
+                                        'Bank account verification is unavailable because no recipient lookup API is connected.',
+                                      ),
+                                    ] else if (_destination ==
+                                        TransferDestination.mobile) ...[
+                                      ModernInput(
+                                        label: 'Mobile Number',
+                                        controller: _mobileNumberController,
+                                        hintText: 'e.g. 0241234567',
+                                      ),
+                                      const SizedBox(height: 8),
+                                      const Text(
+                                        'Mobile money recipient verification is unavailable because no lookup API is connected.',
+                                      ),
+                                    ],
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Recipient lookup is unavailable. External transfers cannot be submitted until the backend supports verification and processing.',
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: theme.colorScheme.error,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                            // Amount entry
+                            _TransferCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _SectionHeader(
+                                    title: 'Amount',
+                                    subtitle: _fromAccount != null
+                                        ? 'Available: GH₵ ${_fromAccount!.balance.toStringAsFixed(2)}'
+                                        : 'Enter the amount to transfer',
+                                    icon: Icons.payments_rounded,
+                                    theme: theme,
+                                    accentColor: accent,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  ModernInput(
+                                    label: 'Transfer Amount',
+                                    hintText: '0.00',
+                                    controller: _amountController,
+                                    enableInteractiveSelection: false,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                        ),
+                                    prefixText: 'GH₵ ',
+                                    onChanged: (_) => setState(() {}),
+                                  ),
+                                  if (_fromAccount != null &&
+                                      _amount > _fromAccount!.balance) ...[
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.warning_amber_rounded,
+                                          size: 16,
+                                          color: theme.colorScheme.error,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Amount exceeds available balance.',
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                                color: theme.colorScheme.error,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+
+                            gap,
+
+                            if (!isTablet) ...[
+                              _TransferCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _SectionHeader(
+                                      title: 'Quick Amount',
+                                      subtitle: 'Tap an amount to auto-fill',
+                                      icon: Icons.flash_on_rounded,
+                                      theme: theme,
+                                      accentColor: accent,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: _quickTransferAmounts
+                                          .map(
+                                            (amount) => ChoiceChip(
+                                              label: Text('GH₵ $amount'),
+                                              selected: _amount == amount,
+                                              showCheckmark: false,
+                                              onSelected: (_) =>
+                                                  _setQuickAmount(
+                                                    amount.toDouble(),
+                                                  ),
+                                              labelStyle: TextStyle(
+                                                color: _amount == amount
+                                                    ? Colors.white
+                                                    : const Color(0xFF3B5144),
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                              backgroundColor: Colors.white,
+                                              selectedColor: accent,
+                                              side: BorderSide(
+                                                color: _amount == amount
+                                                    ? accent
+                                                    : const Color(0xFFE1E9E3),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              gap,
+                              _FeeSummary(amount: _amount, theme: theme),
+                              const SizedBox(height: 18),
+                            ] else ...[
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: _TransferCard(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          _SectionHeader(
+                                            title: 'Quick Amount',
+                                            subtitle:
+                                                'Tap an amount to auto-fill',
+                                            icon: Icons.flash_on_rounded,
+                                            theme: theme,
+                                            accentColor: accent,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 8,
+                                            children: _quickTransferAmounts
+                                                .map(
+                                                  (amount) => ChoiceChip(
+                                                    label: Text('GH₵ $amount'),
+                                                    selected: _amount == amount,
+                                                    showCheckmark: false,
+                                                    onSelected: (_) =>
+                                                        _setQuickAmount(
+                                                          amount.toDouble(),
+                                                        ),
+                                                    labelStyle: TextStyle(
+                                                      color: _amount == amount
+                                                          ? Colors.white
+                                                          : const Color(
+                                                              0xFF3B5144,
+                                                            ),
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                    backgroundColor:
+                                                        Colors.white,
+                                                    selectedColor: accent,
+                                                    side: BorderSide(
+                                                      color: _amount == amount
+                                                          ? accent
+                                                          : const Color(
+                                                              0xFFE1E9E3,
+                                                            ),
+                                                    ),
+                                                  ),
+                                                )
+                                                .toList(),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      children: [
+                                        _FeeSummary(
+                                          amount: _amount,
+                                          theme: theme,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),
-                      gap,
-                      _FeeSummary(amount: _amount, theme: theme),
-                      const SizedBox(height: 18),
-                      _ConfirmButton(
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9FBF9),
+                border: const Border(top: BorderSide(color: Color(0xFFE6ECE7))),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.035),
+                    blurRadius: 16,
+                    offset: const Offset(0, -5),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: _ConfirmButton(
                         canSubmit: _canSubmit,
                         accent: accent,
                         theme: theme,
                         totalDebit: totalDebit,
                         onPressed: _onConfirmTransferPressed,
                       ),
-                    ] else ...[
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: AppCard(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _SectionHeader(
-                                    title: 'Quick Amount',
-                                    subtitle: 'Tap an amount to auto-fill',
-                                    icon: Icons.flash_on_rounded,
-                                    theme: theme,
-                                    accentColor: accent,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: _quickTransferAmounts
-                                        .map(
-                                          (amount) => ActionChip(
-                                            label: Text('GH₵ $amount'),
-                                            onPressed: () => _setQuickAmount(
-                                              amount.toDouble(),
-                                            ),
-                                            avatar: Icon(
-                                              Icons.bolt_rounded,
-                                              size: 16,
-                                              color: accent,
-                                            ),
-                                          ),
-                                        )
-                                        .toList(),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              children: [
-                                _FeeSummary(amount: _amount, theme: theme),
-                                const SizedBox(height: 18),
-                                _ConfirmButton(
-                                  canSubmit: _canSubmit,
-                                  accent: accent,
-                                  theme: theme,
-                                  totalDebit: totalDebit,
-                                  onPressed: _onConfirmTransferPressed,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Transfer processing is not available yet. No money will be moved.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFF718077),
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TransferCard extends StatelessWidget {
+  final Widget child;
+
+  const _TransferCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE3EAE4)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.035),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
+      child: child,
     );
   }
 }
@@ -458,13 +691,13 @@ class _AccountTile extends StatelessWidget {
               ? color.withValues(alpha: 0.10)
               : disabled
               ? theme.colorScheme.outline.withValues(alpha: 0.04)
-              : theme.colorScheme.outline.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(14),
+              : Colors.white,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: selected
                 ? color.withValues(alpha: 0.40)
-                : theme.colorScheme.outline.withValues(alpha: 0.12),
-            width: selected ? 2 : 1,
+                : const Color(0xFFE8EEE9),
+            width: selected ? 1.5 : 1,
           ),
         ),
         child: Row(
@@ -485,6 +718,7 @@ class _AccountTile extends StatelessWidget {
                   Text(
                     account.name,
                     style: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: disabled
                           ? theme.colorScheme.onSurface.withOpacitySafe(0.35)
@@ -657,63 +891,70 @@ class _SectionHeader extends StatelessWidget {
 class _PageIntro extends StatelessWidget {
   final ThemeData theme;
   const _PageIntro({required this.theme});
+
   @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          theme.colorScheme.primary,
-          theme.colorScheme.primary.withOpacitySafe(0.82),
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF26734A), Color(0xFF164B35)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF164B35).withValues(alpha: 0.18),
+            blurRadius: 20,
+            offset: const Offset(0, 9),
+          ),
         ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
       ),
-      borderRadius: BorderRadius.circular(18),
-      boxShadow: [
-        BoxShadow(
-          color: theme.colorScheme.primary.withOpacitySafe(0.2),
-          blurRadius: 14,
-          offset: const Offset(0, 6),
-        ),
-      ],
-    ),
-    child: Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(12),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: const Icon(
+              Icons.swap_horiz_rounded,
+              color: Colors.white,
+              size: 25,
+            ),
           ),
-          child: const Icon(Icons.swap_horiz_rounded, color: Colors.white),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Internal Transfer',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Transfer money',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Move funds between your MyFinance accounts instantly.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.9),
+                const SizedBox(height: 5),
+                Text(
+                  'Choose where your money comes from and where it needs to go.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.86),
+                    height: 1.4,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 class _FeeSummary extends StatelessWidget {
@@ -723,36 +964,24 @@ class _FeeSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (amount <= 0) return const SizedBox.shrink();
-    final fee = amount * 0.005;
-    final total = amount + fee;
-    return AppCard(
+    return _TransferCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SectionHeader(
-            title: 'Fee Summary',
-            subtitle: 'Review fees before confirming',
+            title: 'Transfer Amount',
+            subtitle: 'Fees and transfer limits are not available',
             icon: Icons.receipt_long_rounded,
             theme: theme,
           ),
           const SizedBox(height: 12),
-          _fr('Transfer Amount', 'GH₵ ${amount.toStringAsFixed(2)}', theme),
+          _fr('Amount', 'GH₵ ${amount.toStringAsFixed(2)}', theme),
           const SizedBox(height: 8),
-          _fr(
-            'Internal Fee (0.5%)',
-            'GH₵ ${fee.toStringAsFixed(2)}',
-            theme,
-            isSubtle: true,
-          ),
-          Divider(
-            height: 20,
-            color: theme.colorScheme.outline.withOpacitySafe(0.15),
-          ),
-          _fr(
-            'Total Debit',
-            'GH₵ ${total.toStringAsFixed(2)}',
-            theme,
-            isBold: true,
+          Text(
+            'Transfers are unavailable because the backend contract does not accept the selected accounts and amount. Fees and limits are also unconfirmed.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.outline,
+            ),
           ),
         ],
       ),

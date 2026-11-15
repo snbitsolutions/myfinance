@@ -1,0 +1,45 @@
+flows:
+  - name: "authenticated session identity"
+    medium: database
+    key: "secure token + userId + userEmail + sessionDeviceFingerprint"
+    writer:
+      unit: authentication
+      source_loc: "lib/core/providers/app_providers.dart:760"
+    reader:
+      unit: dashboard
+      source_loc: "lib/core/providers/app_providers.dart:1023"
+    pairing: matched
+    must_preserve: true
+    must_confirm: null
+    verification_hint: "After OTP login, reload dashboard data and confirm the same account and phone identity are used."
+    notes: "Token is secure storage; userId/userEmail are SharedPreferences; device fingerprint binds the session."
+
+  - name: "legacy PIN credential for customer APIs"
+    medium: database
+    key: "secure.userPin"
+    writer:
+      unit: authentication
+      source_loc: "lib/core/providers/app_providers.dart:343"
+    reader:
+      unit: investments-and-shares
+      source_loc: "lib/core/providers/app_providers.dart:1166"
+    pairing: unmatched-reader
+    must_preserve: true
+    must_confirm: runtime
+    verification_hint: "Login using phone + OTP without setting a PIN, then open investments/shares and verify whether backend calls succeed."
+    notes: "Phone+OTP establishes a session, but some legacy data endpoints still explicitly require a stored PIN."
+
+  - name: "biometric preference"
+    medium: database
+    key: "biometricAuth"
+    writer:
+      unit: profile-and-settings
+      source_loc: "lib/screens/profile/settings_screen.dart:1088"
+    reader:
+      unit: authentication
+      source_loc: "lib/screens/auth/login_screen.dart:153"
+    pairing: matched
+    must_preserve: true
+    must_confirm: null
+    verification_hint: "Enable biometric setting, sign out, reopen login, and verify the icon appears and restores the bound session."
+    notes: "Preference controls visibility; biometric success still depends on a valid secure stored session."

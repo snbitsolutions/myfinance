@@ -3,8 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/color_ext.dart';
 import 'savings_model.dart';
 
-/// A simple menu showing the different savings products/types a user can choose.
-/// Tapping an item navigates directly to that type's detail screen.
+/// A menu showing the different savings products/types a user can create.
 class SavingsTypesScreen extends StatelessWidget {
   const SavingsTypesScreen({super.key});
 
@@ -201,16 +200,10 @@ class SavingsTypesScreen extends StatelessWidget {
                       children: [
                         IconButton(
                           icon: Icon(
-                            Icons.arrow_back,
+                            Icons.arrow_back_ios_new_rounded,
                             color: theme.colorScheme.onSurface,
                           ),
-                          onPressed: () {
-                            if (context.canPop()) {
-                              context.pop();
-                            } else {
-                              context.go('/home');
-                            }
-                          },
+                          onPressed: () => context.go('/savings'),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -257,7 +250,14 @@ class SavingsTypesScreen extends StatelessWidget {
                         return _SavingsTypeCard(
                           type: type,
                           onTap: () {
-                            context.go('/savings/${Uri.encodeComponent(type.id)}');
+                            final typeQuery = switch (type.id) {
+                              'member-savings' => 'member',
+                              'current-savings' => 'current',
+                              'kiddy-savings' => 'kiddy',
+                              'fixed-savings' => 'fixed',
+                              _ => 'member',
+                            };
+                            context.go('/savings/create?type=$typeQuery');
                           },
                         );
                       },

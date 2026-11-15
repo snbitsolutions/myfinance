@@ -1,0 +1,17 @@
+seams:
+  - id: "lib/core/services/api_service.dart:98"
+    description: "Flutter UI/provider layer calls the external Adepa/STCCU mobile API through a shared Dio client."
+    source: inferred
+    cut_between:
+      migrated_side: authentication
+      frozen_side: external-adepa-mobile-api
+    protocol_shift: null
+    frozen_side_rule: "External API request paths, field names, status semantics, and credential requirements MUST NOT be changed without an API contract decision."
+  - id: "lib/core/providers/app_providers.dart:1166"
+    description: "Investment/share endpoints still require a stored PIN while primary login is phone plus OTP."
+    source: inferred
+    cut_between:
+      migrated_side: authentication
+      frozen_side: investments-and-shares
+    protocol_shift: null
+    frozen_side_rule: "Do not remove the investment/share PIN requirement until the backend contract is verified and a replacement credential path is implemented."

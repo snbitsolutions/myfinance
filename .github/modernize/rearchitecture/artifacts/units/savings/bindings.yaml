@@ -1,0 +1,9 @@
+unit: savings
+bindings:
+  - type: route-declaration
+    name: "Savings routes /savings/:id and nested deposit/withdraw/transfer routes"
+    source_loc: "lib/router/app_router.dart:728"
+    target: "Savings screens and flow screens"
+    must_appear_in_target: true
+    notes: "The savings ID is passed through path parameters."
+runtime_config: []

@@ -1,0 +1,26 @@
+unit: profile-and-settings
+side_effects:
+  - source_loc: "lib/screens/profile/settings_screen.dart:1088"
+    effect: "Persists biometric preference and updates local UI state."
+    must_preserve: true
+  - source_loc: "lib/core/providers/app_providers.dart:952"
+    effect: "Clears secure session secrets and identity preferences on logout."
+    must_preserve: true
+branches:
+  - source_loc: "lib/screens/profile/settings_screen.dart:1076"
+    condition: "Biometric enabled but device lacks biometric support."
+    behavior: "Rejects the toggle and shows a user-facing message."
+    must_preserve: true
+error_paths:
+  - source_loc: "lib/screens/profile/settings_screen.dart:1112"
+    trigger: "Logout failure."
+    outcome: "Keeps the user on settings and shows a failure SnackBar."
+    contract: "Logout failure must not be represented as successful navigation."
+    must_preserve: true
+concurrency:
+  model: async
+  tx_boundary:
+    source_loc: "lib/core/providers/app_providers.dart:952"
+    scope: "Secure auth cleanup and AuthState unauthenticated transition."
+    isolation: "not specified"
+    must_preserve: true

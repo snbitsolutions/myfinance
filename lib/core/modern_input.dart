@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'color_ext.dart';
 import 'layout/responsive.dart';
 
@@ -11,6 +12,7 @@ class ModernInput extends StatelessWidget {
   final IconData? prefixIcon;
   final int? maxLength;
   final int? maxLines;
+  final List<TextInputFormatter>? inputFormatters;
   final ValueChanged<String>? onChanged;
   final String? errorText;
   final String? helperText;
@@ -26,6 +28,7 @@ class ModernInput extends StatelessWidget {
     this.prefixIcon,
     this.maxLength,
     this.maxLines = 1,
+    this.inputFormatters,
     this.onChanged,
     this.errorText,
     this.helperText,
@@ -54,6 +57,7 @@ class ModernInput extends StatelessWidget {
           keyboardType: keyboardType,
           maxLength: maxLength,
           maxLines: maxLines,
+          inputFormatters: inputFormatters,
           onChanged: onChanged,
           decoration: InputDecoration(
             prefixText: prefixText,

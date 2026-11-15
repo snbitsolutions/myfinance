@@ -8,16 +8,26 @@ class NavigationHistory {
 
   final List<String> _history = <String>[];
   bool _isAttached = false;
+  GoRouter? _attachedRouter;
 
   void attach(GoRouter router) {
-    if (_isAttached) return;
+    if (_isAttached && identical(_attachedRouter, router)) return;
+
+    _history.clear();
     _isAttached = true;
+    _attachedRouter = router;
 
     void syncCurrentLocation() {
       final current = _currentLocation(router);
       if (current == null || current.isEmpty) return;
       if (_history.isEmpty || _history.last != current) {
         _history.add(current);
+      }
+
+      // Authentication screens must not remain reachable through back
+      // navigation after the user enters the authenticated app shell.
+      if (!_isAuthenticationLocation(current)) {
+        _history.removeWhere(_isAuthenticationLocation);
       }
 
       // Keep memory bounded.
@@ -50,11 +60,69 @@ class NavigationHistory {
 
     if (_history.isNotEmpty) {
       final previous = _history.last;
-      context.go(previous);
+      if (previous != current) {
+        context.go(previous);
+        return;
+      }
+    }
+
+    final fallbackFromPath = _fallbackRouteForPath(current);
+    if (fallbackFromPath != null) {
+      context.go(fallbackFromPath);
       return;
     }
 
     context.go(fallbackRoute);
+  }
+
+  String? _fallbackRouteForPath(String? current) {
+    if (current == null || current.isEmpty) return null;
+
+    final path = current.split('?').first.split('#').first;
+
+    if (path == '/loan-detail' ||
+        path.startsWith('/loan-detail/') ||
+        path.startsWith('/loans/')) {
+      return '/loans';
+    }
+
+    if (path == '/loan-status' ||
+        path == '/apply-loan' ||
+        path == '/repayment' ||
+        path.startsWith('/repayment/')) {
+      return '/loans';
+    }
+
+    if (path.startsWith('/shares/')) {
+      return '/shares';
+    }
+
+    if (path.startsWith('/savings/')) {
+      return '/savings';
+    }
+
+    if (path.startsWith('/payment')) {
+      return '/home';
+    }
+
+    return null;
+  }
+
+  bool _isAuthenticationLocation(String location) {
+    final path = location.split('?').first.split('#').first;
+    const authenticationRoutes = <String>{
+      '/',
+      '/onboarding',
+      '/login',
+      '/signup',
+      '/existing-member-enrollment',
+      '/otp',
+      '/set-pin',
+    };
+
+    return authenticationRoutes.any(
+      (route) => path == route || path.startsWith('$route/'),
+    );
   }
 
   String? _currentLocation(GoRouter router) {

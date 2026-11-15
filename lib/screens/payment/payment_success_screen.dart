@@ -1,11 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/color_ext.dart';
 import '../../core/app_card.dart';
+import '../../core/app_scaffold.dart';
+import '../../core/providers/app_providers.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/app_scaffold.dart';
-
-class PaymentSuccessScreen extends StatelessWidget {
+class PaymentSuccessScreen extends ConsumerStatefulWidget {
   final double? amount;
   final DateTime? processedAt;
   final String? reference;
@@ -15,6 +18,10 @@ class PaymentSuccessScreen extends StatelessWidget {
   final String? primaryActionRoute;
   final String? secondaryActionLabel;
   final String? secondaryActionRoute;
+  final String? account;
+  final String? paymentMethod;
+  final double? newBalance;
+  final bool isPending;
 
   const PaymentSuccessScreen({
     super.key,
@@ -27,16 +34,449 @@ class PaymentSuccessScreen extends StatelessWidget {
     this.primaryActionRoute,
     this.secondaryActionLabel,
     this.secondaryActionRoute,
+    this.account,
+    this.paymentMethod,
+    this.newBalance,
+    this.isPending = false,
+  });
+
+  @override
+  ConsumerState<PaymentSuccessScreen> createState() =>
+      _PaymentSuccessScreenState();
+}
+
+class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
+  static const _statusCheckInterval = Duration(seconds: 10);
+  static const _maxAutomaticStatusChecks = 6;
+
+  Timer? _statusCheckTimer;
+  int _automaticStatusChecks = 0;
+  bool _isCheckingStatus = false;
+  bool _isConfirmed = false;
+  bool _isFailed = false;
+  String? _statusCheckMessage;
+
+  bool get _hasReference =>
+      widget.reference != null && widget.reference!.trim().isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isPending && _hasReference) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _checkTransactionStatus();
+      });
+      _statusCheckTimer = Timer.periodic(_statusCheckInterval, (_) {
+        if (_automaticStatusChecks >= _maxAutomaticStatusChecks) {
+          _statusCheckTimer?.cancel();
+          return;
+        }
+        _automaticStatusChecks++;
+        _checkTransactionStatus();
+      });
+    }
+  }
+
+  Future<void> _checkTransactionStatus() async {
+    if (!mounted ||
+        !widget.isPending ||
+        _isConfirmed ||
+        _isFailed ||
+        !_hasReference) {
+      return;
+    }
+    if (_isCheckingStatus) return;
+
+    setState(() {
+      _isCheckingStatus = true;
+      _statusCheckMessage = null;
+    });
+
+    try {
+      ref.invalidate(transactionsProvider);
+      final transactions = await ref.read(transactionsProvider.future);
+      if (!mounted) return;
+
+      final reference = widget.reference!.trim().toLowerCase();
+      final matchingTransaction = transactions.where((transaction) {
+        final transactionReference =
+            (transaction['transaction_id'] ?? transaction['reference'])
+                ?.toString()
+                .trim()
+                .toLowerCase();
+        return transactionReference == reference;
+      }).firstOrNull;
+      final status = matchingTransaction?['status']
+          ?.toString()
+          .trim()
+          .toLowerCase();
+
+      if (const {
+        '1',
+        'complete',
+        'completed',
+        'paid',
+        'success',
+        'successful',
+      }.contains(status)) {
+        _statusCheckTimer?.cancel();
+        ref.invalidate(savingsProvider);
+        ref.invalidate(userProfileProvider);
+        setState(() => _isConfirmed = true);
+      } else if (status == '0' ||
+          status == 'false' ||
+          const {
+            'cancelled',
+            'canceled',
+            'declined',
+            'denied',
+            'error',
+            'expired',
+            'failed',
+            'failure',
+            'rejected',
+          }.contains(status)) {
+        _statusCheckTimer?.cancel();
+        setState(() => _isFailed = true);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _statusCheckMessage =
+              'Could not check the latest status. Your request remains pending.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isCheckingStatus = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _statusCheckTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isPending = widget.isPending && !_isConfirmed && !_isFailed;
+    return _PaymentSuccessContent(
+      amount: widget.amount,
+      processedAt: widget.processedAt,
+      reference: widget.reference,
+      title: _isConfirmed
+          ? 'Deposit Successful'
+          : _isFailed
+          ? 'Deposit Failed'
+          : widget.title,
+      message: _isConfirmed
+          ? 'The provider confirmed your deposit.'
+          : _isFailed
+          ? 'The provider reported that your deposit failed. The amount was not deposited.'
+          : widget.message,
+      primaryActionLabel: widget.primaryActionLabel,
+      primaryActionRoute: widget.primaryActionRoute,
+      secondaryActionLabel: widget.secondaryActionLabel,
+      secondaryActionRoute: widget.secondaryActionRoute,
+      account: widget.account,
+      paymentMethod: widget.paymentMethod,
+      newBalance: widget.newBalance,
+      isPending: isPending,
+      isFailed: _isFailed,
+      isCheckingStatus: _isCheckingStatus,
+      statusCheckMessage: _statusCheckMessage,
+      onCheckStatus: _checkTransactionStatus,
+    );
+  }
+}
+
+class _PaymentSuccessContent extends StatelessWidget {
+  final double? amount;
+  final DateTime? processedAt;
+  final String? reference;
+  final String? title;
+  final String? message;
+  final String? primaryActionLabel;
+  final String? primaryActionRoute;
+  final String? secondaryActionLabel;
+  final String? secondaryActionRoute;
+  final String? account;
+  final String? paymentMethod;
+  final double? newBalance;
+  final bool isPending;
+  final bool isFailed;
+  final bool isCheckingStatus;
+  final String? statusCheckMessage;
+  final VoidCallback onCheckStatus;
+
+  const _PaymentSuccessContent({
+    this.amount,
+    this.processedAt,
+    this.reference,
+    this.title,
+    this.message,
+    this.primaryActionLabel,
+    this.primaryActionRoute,
+    this.secondaryActionLabel,
+    this.secondaryActionRoute,
+    this.account,
+    this.paymentMethod,
+    this.newBalance,
+    this.isPending = false,
+    this.isFailed = false,
+    this.isCheckingStatus = false,
+    this.statusCheckMessage,
+    required this.onCheckStatus,
   });
 
   String _formatAmount() {
-    final value = amount ?? 500;
-    return 'GH₵${value.toStringAsFixed(2)}';
+    final value = amount;
+    return value == null ? 'Unavailable' : 'GH₵${value.toStringAsFixed(2)}';
   }
 
-  String _formatProcessedAt() {
-    final value = processedAt ?? DateTime.now();
-    const months = [
+  String _formatReference() {
+    if (reference != null && reference!.trim().isNotEmpty) {
+      return reference!.trim();
+    }
+    return 'Unavailable';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final resolvedTitle = (title != null && title!.trim().isNotEmpty)
+        ? title!
+        : isFailed
+        ? 'Deposit Failed'
+        : (isPending ? 'Deposit Pending' : 'Provider reported completion');
+    final resolvedMessage = (message != null && message!.trim().isNotEmpty)
+        ? message!
+        : isFailed
+        ? 'The provider reported that your deposit failed. The amount was not deposited.'
+        : (isPending
+              ? 'Your request is awaiting provider confirmation.'
+              : 'The provider reported that the request completed.');
+    final resolvedAccount = account ?? 'Member Savings';
+    final resolvedPaymentMethod = paymentMethod ?? 'Mobile Money';
+    final resolvedNewBalance = newBalance;
+
+    return AppScaffold(
+      title: 'Deposit Status',
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isPending) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: isCheckingStatus ? null : onCheckStatus,
+                    icon: isCheckingStatus
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh_rounded),
+                    label: Text(
+                      isCheckingStatus
+                          ? 'Checking status...'
+                          : 'Check transaction status',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton(
+                  onPressed: () {
+                    if (primaryActionRoute != null &&
+                        primaryActionRoute!.trim().isNotEmpty) {
+                      context.go(primaryActionRoute!);
+                    } else {
+                      context.go('/savings');
+                    }
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(primaryActionLabel ?? 'Done'),
+                ),
+              ),
+              if (secondaryActionRoute != null &&
+                  secondaryActionRoute!.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                TextButton(
+                  onPressed: () => context.go(secondaryActionRoute!),
+                  child: Text(secondaryActionLabel ?? 'Home'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            // Success Icon with decorative dots
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                // Decorative dots scattered around
+                ..._generateDecorativeDots(),
+                // Center checkmark icon
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isFailed
+                        ? theme.colorScheme.error
+                        : theme.colorScheme.primary,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color:
+                            (isFailed
+                                    ? theme.colorScheme.error
+                                    : theme.colorScheme.primary)
+                                .withOpacitySafe(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    isFailed
+                        ? Icons.close_rounded
+                        : isPending
+                        ? Icons.hourglass_top_rounded
+                        : Icons.check_rounded,
+                    size: 56,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            // Title
+            Text(
+              resolvedTitle,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: theme.colorScheme.onSurface,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            // Message
+            Text(
+              resolvedMessage,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            // Amount section (plain background)
+            Text(
+              _formatAmount(),
+              style: theme.textTheme.displaySmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              isPending || isFailed ? 'Amount Requested' : 'Amount Deposited',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Transaction Details Card
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _TransactionDetailRow('Account', resolvedAccount, theme),
+                  _TransactionDetailRow('Method', resolvedPaymentMethod, theme),
+                  _TransactionDetailRow('Reference', _formatReference(), theme),
+                  _TransactionDetailRow('Date', _formatDateTime(), theme),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            // Balance Card
+            AppCard(
+              backgroundColor: const Color(0xFFF0F8EF),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.trending_up_rounded,
+                    color: theme.colorScheme.primary,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isPending
+                              ? 'Balance will update after confirmation'
+                              : isFailed
+                              ? 'Balance not updated'
+                              : 'Balance',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacitySafe(
+                              0.6,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isPending || isFailed || resolvedNewBalance == null
+                              ? 'Balance unavailable'
+                              : 'GH₵${resolvedNewBalance.toStringAsFixed(2)}',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (statusCheckMessage != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                statusCheckMessage!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDateTime() {
+    final date = processedAt;
+    if (date == null) return 'Unavailable';
+    final months = [
       'Jan',
       'Feb',
       'Mar',
@@ -50,231 +490,91 @@ class PaymentSuccessScreen extends StatelessWidget {
       'Nov',
       'Dec',
     ];
-    final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
-    final minute = value.minute.toString().padLeft(2, '0');
-    final period = value.hour >= 12 ? 'PM' : 'AM';
-    return '${months[value.month - 1]} ${value.day}, ${value.year} • $hour:$minute $period';
+    final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
+    final meridiem = date.hour >= 12 ? 'PM' : 'AM';
+    return '${date.day} ${months[date.month - 1]} ${date.year} • $hour:${date.minute.toString().padLeft(2, '0')} $meridiem';
   }
 
-  String _formatReference() {
-    if (reference != null && reference!.trim().isNotEmpty) {
-      return reference!.trim();
-    }
-    return 'TXN#${DateTime.now().millisecondsSinceEpoch}';
-  }
+  List<Widget> _generateDecorativeDots() {
+    final colors = [
+      const Color(0xFFE8F5E9),
+      const Color(0xFFFFF9C4),
+      const Color(0xFFE0F2F1),
+      const Color(0xFFF0F4C3),
+      const Color(0xFFE8F5E9),
+    ];
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final resolvedTitle =
-        (title != null && title!.trim().isNotEmpty)
-        ? title!
-        : 'Payment Successful';
-    final resolvedMessage =
-        (message != null && message!.trim().isNotEmpty)
-        ? message!
-        : 'Your transaction was completed successfully.';
-    final resolvedPrimaryActionLabel =
-      (primaryActionLabel != null && primaryActionLabel!.trim().isNotEmpty)
-      ? primaryActionLabel!
-      : 'Go Home';
-    final resolvedPrimaryActionRoute =
-      (primaryActionRoute != null && primaryActionRoute!.trim().isNotEmpty)
-      ? primaryActionRoute!
-      : '/home';
-    final resolvedSecondaryActionLabel =
-      (secondaryActionLabel != null && secondaryActionLabel!.trim().isNotEmpty)
-      ? secondaryActionLabel!
-      : 'View Transactions';
-    final resolvedSecondaryActionRoute =
-      (secondaryActionRoute != null && secondaryActionRoute!.trim().isNotEmpty)
-      ? secondaryActionRoute!
-      : '/transactions';
+    final positions = [
+      (dx: -40.0, dy: -60.0),
+      (dx: 60.0, dy: -50.0),
+      (dx: -70.0, dy: 20.0),
+      (dx: 80.0, dy: 30.0),
+      (dx: 0.0, dy: 80.0),
+    ];
 
-    return AppScaffold(
-      title: resolvedTitle,
-      showBack: false,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    theme.colorScheme.primary,
-                    theme.colorScheme.primary.withOpacitySafe(0.8),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: theme.colorScheme.primary.withOpacitySafe(0.22),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacitySafe(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check_circle_rounded,
-                      size: 64,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    resolvedTitle,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    resolvedMessage,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withOpacitySafe(0.92),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            AppCard(
-              backgroundColor: theme.colorScheme.primaryContainer
-                  .withOpacitySafe(0.1),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.receipt_long_rounded,
-                        size: 18,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Transaction Summary',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  _PaymentDetail(
-                    label: 'Amount',
-                    value: _formatAmount(),
-                    theme: theme,
-                  ),
-                  const SizedBox(height: 12),
-                  Divider(
-                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
-                  ),
-                  const SizedBox(height: 12),
-                  _PaymentDetail(
-                    label: 'Processed On',
-                    value: _formatProcessedAt(),
-                    theme: theme,
-                  ),
-                  const SizedBox(height: 12),
-                  Divider(
-                    color: theme.colorScheme.outline.withOpacitySafe(0.2),
-                  ),
-                  const SizedBox(height: 12),
-                  _PaymentDetail(
-                    label: 'Reference',
-                    value: _formatReference(),
-                    theme: theme,
-                    isMonospace: true,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: FilledButton.icon(
-                onPressed: () => context.go(resolvedPrimaryActionRoute),
-                icon: const Icon(Icons.home_rounded),
-                label: Text(resolvedPrimaryActionLabel),
-                style: FilledButton.styleFrom(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: OutlinedButton.icon(
-                onPressed: () => context.go(resolvedSecondaryActionRoute),
-                icon: const Icon(Icons.receipt_long_rounded),
-                label: Text(resolvedSecondaryActionLabel),
-                style: OutlinedButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
-            ),
-          ],
+    return List.generate(
+      colors.length,
+      (i) => Positioned(
+        left: 60 + positions[i].dx,
+        top: 60 + positions[i].dy,
+        child: Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(color: colors[i], shape: BoxShape.circle),
         ),
       ),
     );
   }
 }
 
-class _PaymentDetail extends StatelessWidget {
+class _TransactionDetailRow extends StatelessWidget {
+  final String icon;
   final String label;
   final String value;
   final ThemeData theme;
-  final bool isMonospace;
 
-  const _PaymentDetail({
-    required this.label,
-    required this.value,
-    required this.theme,
-    this.isMonospace = false,
-  });
+  const _TransactionDetailRow(this.label, this.value, this.theme) : icon = '';
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+    final iconMap = {
+      'Account': Icons.account_balance_wallet_rounded,
+      'Method': Icons.payment_rounded,
+      'Reference': Icons.receipt_rounded,
+      'Date': Icons.calendar_today_rounded,
+    };
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          Icon(
+            iconMap[label] ?? Icons.check_rounded,
+            size: 20,
+            color: theme.colorScheme.primary,
           ),
-        ),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            fontFamily: isMonospace ? 'monospace' : null,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
+                  ),
+                ),
+                Text(
+                  value,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

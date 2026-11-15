@@ -64,7 +64,7 @@ class AuthState {
   factory AuthState.authenticated({
     required String userId,
     required String userEmail,
-    required String authToken,
+    String? authToken,
     DateTime? tokenExpiresAt,
   }) {
     return AuthState(

@@ -27,6 +27,16 @@ class NetworkService {
 
   /// Initialize connectivity monitoring
   Future<void> initialize() async {
+    // Flutter web should not treat the browser as offline just because the native
+    // connectivity plugin is unavailable. It can still access the network and the
+    // browser will report online/offline state separately.
+    if (kIsWeb) {
+      _isConnected = true;
+      _connectivityController.add(true);
+      AppLogger.info('Network service initialized for web');
+      return;
+    }
+
     // Check initial connectivity
     await _checkConnectivity();
 
@@ -42,6 +52,12 @@ class NetworkService {
 
   /// Check current connectivity status
   Future<void> _checkConnectivity() async {
+    if (kIsWeb) {
+      _isConnected = true;
+      _connectivityController.add(true);
+      return;
+    }
+
     try {
       final result = await _connectivity.checkConnectivity();
       _handleConnectivityChange([result]);
@@ -56,12 +72,16 @@ class NetworkService {
   void _handleConnectivityChange(List<ConnectivityResult> results) {
     final wasConnected = _isConnected;
 
-    // Check if any connection type is available
+    // Check if any connection type is available. Some platforms report VPN or
+    // Bluetooth transports as valid connectivity, so treat them as connected.
     _isConnected = results.any(
       (result) =>
           result == ConnectivityResult.mobile ||
           result == ConnectivityResult.wifi ||
-          result == ConnectivityResult.ethernet,
+          result == ConnectivityResult.ethernet ||
+          result == ConnectivityResult.vpn ||
+          result == ConnectivityResult.bluetooth ||
+          result == ConnectivityResult.other,
     );
 
     if (wasConnected != _isConnected) {

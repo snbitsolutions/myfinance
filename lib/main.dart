@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'core/constants/app_constants.dart';
 import 'core/services/device_identity_service.dart';
 import 'core/services/http_client.dart';
@@ -13,11 +16,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize core services
-  await SecureAuthStorage.instance.initialize();
-  await HttpClient.instance.initializePreferences();
-  await NetworkService.instance.initialize();
-  await DeviceIdentityService().primeInstallationId();
+  await _initializeCoreServices();
 
   final prefs = await SharedPreferences.getInstance();
   final savedDebugBypass = prefs.getBool(
@@ -29,20 +28,39 @@ void main() async {
         AppConstants.debugApiPhoneNumber.trim().isNotEmpty &&
         AppConstants.debugApiAccountNumber.trim().isNotEmpty;
 
-    // Keep debug bypass opt-in: only auto-enable when test identity is
-    // provided, and auto-disable stale bypass when identity is absent.
-    if (hasSeededIdentity && savedDebugBypass == null) {
-      await prefs.setBool(AppConstants.sharedPrefKeyDebugBypassAuth, true);
-    } else if (!hasSeededIdentity && savedDebugBypass == true) {
+    // Keep debug bypass opt-in only. Do not silently auto-enable it just
+    // because a test identity is present; otherwise the app skips the login flow
+    // and starts on the home screen.
+    if (!hasSeededIdentity && savedDebugBypass == true) {
       await prefs.setBool(AppConstants.sharedPrefKeyDebugBypassAuth, false);
     }
   }
 
-  if (kDebugMode) {
+  if (kDebugMode && savedDebugBypass == true) {
     await _seedDebugBypassIdentity(prefs);
   }
 
   runApp(const ProviderScope(child: AdepaTeachersApp()));
+}
+
+Future<void> _initializeCoreServices() async {
+  try {
+    await _initializeCoreServicesSequentially().timeout(
+      const Duration(seconds: 8),
+    );
+  } on TimeoutException {
+    debugPrint('Core service initialization timed out; starting the app.');
+  } catch (error, stackTrace) {
+    debugPrint('Core service initialization failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+}
+
+Future<void> _initializeCoreServicesSequentially() async {
+  await SecureAuthStorage.instance.initialize();
+  await HttpClient.instance.initializePreferences();
+  await NetworkService.instance.initialize();
+  await DeviceIdentityService().primeInstallationId();
 }
 
 Future<void> _seedDebugBypassIdentity(SharedPreferences prefs) async {
@@ -50,11 +68,13 @@ Future<void> _seedDebugBypassIdentity(SharedPreferences prefs) async {
   final debugAccount = AppConstants.debugApiAccountNumber.trim();
   final debugPin = AppConstants.debugApiPin.trim();
 
-  if (debugPhone.isNotEmpty) {
+  if (debugPhone.isNotEmpty &&
+      !prefs.containsKey(AppConstants.sharedPrefKeyUserEmail)) {
     await prefs.setString(AppConstants.sharedPrefKeyUserEmail, debugPhone);
   }
 
-  if (debugAccount.isNotEmpty) {
+  if (debugAccount.isNotEmpty &&
+      !prefs.containsKey(AppConstants.sharedPrefKeyUserId)) {
     await prefs.setString(AppConstants.sharedPrefKeyUserId, debugAccount);
   }
 
@@ -181,11 +201,20 @@ class AdepaTeachersApp extends StatelessWidget {
       },
       theme: ThemeData(
         useMaterial3: true,
+        // Keep widgets with implicit or custom TextStyles on the same family
+        // as the shared text theme.
+        fontFamily: GoogleFonts.manrope().fontFamily,
         colorScheme: appColorScheme,
         scaffoldBackgroundColor: appColorScheme.surface,
         appBarTheme: AppBarTheme(
           backgroundColor: appColorScheme.secondary,
           elevation: 0,
+          centerTitle: true,
+          titleTextStyle: GoogleFonts.manrope(
+            color: appColorScheme.primary,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         bottomNavigationBarTheme: BottomNavigationBarThemeData(
           backgroundColor: Colors.white,
@@ -204,36 +233,36 @@ class AdepaTeachersApp extends StatelessWidget {
             ),
           ),
         ),
-        textTheme: const TextTheme(
-          displayLarge: TextStyle(
+        textTheme: GoogleFonts.manropeTextTheme().copyWith(
+          displayLarge: GoogleFonts.manrope(
             fontSize: 32,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF1B1B1B),
+            color: const Color(0xFF1B1B1B),
           ),
-          displayMedium: TextStyle(
+          displayMedium: GoogleFonts.manrope(
             fontSize: 28,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF1B1B1B),
+            color: const Color(0xFF1B1B1B),
           ),
-          titleLarge: TextStyle(
+          titleLarge: GoogleFonts.manrope(
             fontSize: 22,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF1B1B1B),
+            color: const Color(0xFF1B1B1B),
           ),
-          titleMedium: TextStyle(
+          titleMedium: GoogleFonts.manrope(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF1B1B1B),
+            color: const Color(0xFF1B1B1B),
           ),
-          bodyLarge: TextStyle(
+          bodyLarge: GoogleFonts.manrope(
             fontSize: 16,
             fontWeight: FontWeight.w500,
-            color: Color(0xFF404040),
+            color: const Color(0xFF404040),
           ),
-          bodyMedium: TextStyle(
+          bodyMedium: GoogleFonts.manrope(
             fontSize: 14,
             fontWeight: FontWeight.w400,
-            color: Color(0xFF606060),
+            color: const Color(0xFF606060),
           ),
         ),
       ),

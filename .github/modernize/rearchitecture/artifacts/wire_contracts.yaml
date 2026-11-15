@@ -1,0 +1,60 @@
+contracts:
+  - name: "Mobile login OTP request"
+    unit: authentication
+    type: rest
+    stability: frozen
+    source_loc: "lib/core/services/api_service.dart:298"
+    contract:
+      method: "POST"
+      path: "https://adepaye.com/api/mobileapp-api/sendOtp"
+      request: "{phone_number: integer international phone, member_id: integer five-digit member identifier}"
+      response: "backend status/message payload"
+      error: "AuthException when status is not successful or payload is empty"
+      auth: "request payload; bearer auth is not required for this public OTP call"
+    target_contract:
+      method: "POST /api/mobileapp-api/sendOtp"
+      notes: "Preserve numeric phone_number/member_id request fields and success status interpretation."
+    semantic_divergence:
+      - field: "phone_number"
+        issue: "Backend expects an integer international number; leading zero formatting must be normalized before serialization."
+        source_loc: "lib/core/services/api_service.dart:288"
+
+  - name: "Mobile verify OTP"
+    unit: authentication
+    type: rest
+    stability: frozen
+    source_loc: "lib/core/providers/app_providers.dart:728"
+    contract:
+      method: "POST"
+      path: "https://adepaye.com/api/mobileapp-api/verifyOtp"
+      request: "{account_number: five-digit member identifier, otp: four-digit code}"
+      response: "status plus optional token/account/member data"
+      error: "AuthException for non-success status or missing account number after confirmation fallback"
+      auth: "public OTP verification request"
+    target_contract:
+      method: "POST /api/mobileapp-api/verifyOtp"
+      notes: "Preserve status 0/1/200 success variants, account extraction, and confirmPhoneNumber fallback."
+    semantic_divergence:
+      - field: "status"
+        issue: "Published OTP verification accepts numeric/string zero as success while other endpoints use one/200/success."
+        source_loc: "lib/core/providers/app_providers.dart:742"
+
+  - name: "Authenticated customer data APIs"
+    unit: global
+    type: rest
+    stability: must_preserve
+    source_loc: "lib/core/constants/app_constants.dart:169"
+    contract:
+      method: "POST"
+      path: "https://adepaye.com/api/mobileapp-api/*"
+      request: "phone_number, full account_number, and endpoint-specific fields"
+      response: "normalized status/data/message payload"
+      error: "AppException subclasses mapped from Dio/network/backend failures"
+      auth: "secure session token and/or legacy endpoint credentials"
+    target_contract:
+      method: "POST documented mobile API endpoint"
+      notes: "Preserve full account number usage for customer-data calls; do not substitute the five-digit OTP identifier."
+    semantic_divergence:
+      - field: "account_number"
+        issue: "OTP verification may use a five-digit member ID, but downstream customer-data APIs require the full account number."
+        source_loc: "lib/core/providers/app_providers.dart:1081"

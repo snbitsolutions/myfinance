@@ -3,7 +3,11 @@
 <plist version="1.0">
 <dict>
     <key>method</key>
-    <string>debugging</string>
+    <string>app-store-connect</string>
+    <key>uploadSymbols</key>
+    <true/>
+    <key>manageAppVersionAndBuildNumber</key>
+    <false/>
     <key>teamID</key>
     <string>3A5K849G4M</string>
     <key>signingStyle</key>

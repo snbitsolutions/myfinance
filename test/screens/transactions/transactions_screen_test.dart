@@ -8,6 +8,7 @@ import 'package:adepa_teachers/core/providers/app_providers.dart';
 import 'package:adepa_teachers/core/services/api_service.dart';
 import 'package:adepa_teachers/core/services/device_identity_service.dart';
 import 'package:adepa_teachers/screens/transactions/transactions_screen.dart';
+import 'package:adepa_teachers/core/exceptions/app_exceptions.dart';
 
 class ThrowingUserService extends UserService {
   @override
@@ -60,75 +61,66 @@ void main() {
         return null;
       });
 
-  test(
-    'transactions provider uses fallback sample data when unauthenticated',
-    () async {
-      final container = ProviderContainer(
-        overrides: [
-          authProvider.overrideWith(
-            (ref) => AuthNotifier(
-              authService: AuthService(),
-              userService: UserService(),
-              deviceIdentityService: DeviceIdentityService(),
-            ),
+  test('transactions provider rejects an incomplete session', () async {
+    final container = ProviderContainer(
+      overrides: [
+        authProvider.overrideWith(
+          (ref) => AuthNotifier(
+            authService: AuthService(),
+            userService: UserService(),
+            deviceIdentityService: DeviceIdentityService(),
           ),
-        ],
-      );
-      addTearDown(container.dispose);
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
 
-      final transactions = await container.read(transactionsProvider.future);
+    await expectLater(
+      container.read(transactionsProvider.future),
+      throwsA(isA<ValidationException>()),
+    );
+  });
 
-      expect(transactions, isNotEmpty);
-      expect(transactions.first['description'], 'Salary deposit');
-    },
-  );
-
-  test(
-    'user profile provider uses fallback data when unauthenticated',
-    () async {
-      final container = ProviderContainer(
-        overrides: [
-          authProvider.overrideWith(
-            (ref) => AuthNotifier(
-              authService: AuthService(),
-              userService: UserService(),
-              deviceIdentityService: DeviceIdentityService(),
-            ),
+  test('user profile provider rejects an incomplete session', () async {
+    final container = ProviderContainer(
+      overrides: [
+        authProvider.overrideWith(
+          (ref) => AuthNotifier(
+            authService: AuthService(),
+            userService: UserService(),
+            deviceIdentityService: DeviceIdentityService(),
           ),
-        ],
-      );
-      addTearDown(container.dispose);
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
 
-      final profile = await container.read(userProfileProvider.future);
+    await expectLater(
+      container.read(userProfileProvider.future),
+      throwsA(isA<ValidationException>()),
+    );
+  });
 
-      expect(profile['name'], 'Demo User');
-      expect(profile['balance'], greaterThan(0));
-    },
-  );
-
-  test(
-    'user profile provider uses fallback data for debug-auth sessions',
-    () async {
-      final container = ProviderContainer(
-        overrides: [
-          authProvider.overrideWith(
-            (ref) => AuthNotifier(
-              authService: AuthService(),
-              userService: ThrowingUserService(),
-              deviceIdentityService: DeviceIdentityService(),
-            ),
+  test('user profile provider does not fabricate debug session data', () async {
+    final container = ProviderContainer(
+      overrides: [
+        authProvider.overrideWith(
+          (ref) => AuthNotifier(
+            authService: AuthService(),
+            userService: ThrowingUserService(),
+            deviceIdentityService: DeviceIdentityService(),
           ),
-          userServiceProvider.overrideWithValue(ThrowingUserService()),
-        ],
-      );
-      addTearDown(container.dispose);
+        ),
+        userServiceProvider.overrideWithValue(ThrowingUserService()),
+      ],
+    );
+    addTearDown(container.dispose);
 
-      final profile = await container.read(userProfileProvider.future);
-
-      expect(profile['name'], 'Demo User');
-      expect(profile['balance'], 5240.75);
-    },
-  );
+    await expectLater(
+      container.read(userProfileProvider.future),
+      throwsA(isA<ValidationException>()),
+    );
+  });
 
   testWidgets('transactions screen is overflow-safe on small screens', (
     tester,
@@ -162,7 +154,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Transactions'), findsOneWidget);
+    expect(find.text('Activity'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     // Drag if any scrollable is present (empty state may not have ListView)
@@ -171,6 +163,70 @@ void main() {
       await tester.drag(scrollables.first, const Offset(0, -300));
       await tester.pumpAndSettle();
     }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('transactions screen applies the selected statement period', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final currentMonthDate = DateTime(now.year, now.month, 2, 12);
+    final previousMonthDate = DateTime(now.year, now.month - 1, 2, 12);
+    final router = GoRouter(
+      initialLocation: '/transactions',
+      routes: [
+        GoRoute(
+          path: '/transactions',
+          builder: (context, state) => const TransactionsScreen(),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          transactionsProvider.overrideWith(
+            (ref) async => [
+              {
+                'transaction_id': 'current-month',
+                'type': 'credit',
+                'amount': 25,
+                'description': 'Current month transaction',
+                'date': currentMonthDate.toIso8601String(),
+              },
+              {
+                'transaction_id': 'previous-month',
+                'type': 'debit',
+                'amount': 10,
+                'description': 'Previous month transaction',
+                'date': previousMonthDate.toIso8601String(),
+              },
+            ],
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Current month transaction'), findsNWidgets(2));
+    expect(find.text('Previous month transaction'), findsNothing);
+
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('All Time').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Previous month transaction'), findsNWidgets(2));
+    final theme = Theme.of(tester.element(find.byType(TransactionsScreen)));
+    expect(
+      tester.widget<Text>(find.text('GH₵25.00')).style?.color,
+      theme.colorScheme.primary,
+    );
+    expect(
+      tester.widget<Text>(find.text('GH₵10.00')).style?.color,
+      theme.colorScheme.error,
+    );
     expect(tester.takeException(), isNull);
   });
 }

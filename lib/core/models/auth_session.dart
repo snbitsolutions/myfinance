@@ -36,15 +36,20 @@ class AuthSession {
   }
 
   static Map<String, dynamic> extractPayload(Map<String, dynamic> response) {
-    if (response['data'] is Map) {
-      final nested = response['data'] as Map;
-      if (nested['data'] is Map) {
-        return Map<String, dynamic>.from(nested['data'] as Map);
+    final cleaned = Map<String, dynamic>.from(response);
+
+    for (final key in const ['data', 'payload', 'result', 'response']) {
+      final value = cleaned[key];
+      if (value is Map) {
+        final nested = Map<String, dynamic>.from(value);
+        if (nested.containsKey('data') && nested['data'] is Map) {
+          return Map<String, dynamic>.from(nested['data'] as Map);
+        }
+        return nested;
       }
-      return Map<String, dynamic>.from(nested);
     }
 
-    return response;
+    return cleaned;
   }
 
   static bool isSuccessStatus(dynamic status) {

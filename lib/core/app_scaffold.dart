@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -10,6 +12,7 @@ class AppScaffold extends StatelessWidget {
   final Widget? bottomNavigationBar;
   final Widget? floatingActionButton;
   final bool showBack;
+  final String? backRoute;
 
   const AppScaffold({
     super.key,
@@ -19,20 +22,28 @@ class AppScaffold extends StatelessWidget {
     this.bottomNavigationBar,
     this.floatingActionButton,
     this.showBack = true,
+    this.backRoute,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final canPop = context.canPop();
+
     Future<void> handleBackNavigation() async {
-      // Prefer popping the Navigator; if nothing to pop, go to tracked previous page.
       if (!context.mounted) return;
+
+      if (backRoute != null) {
+        context.go(backRoute!);
+        return;
+      }
+
       if (context.canPop()) {
         context.pop();
-      } else {
-        await NavigationHistory.instance.goBack(context);
+        return;
       }
+
+      await NavigationHistory.instance.goBack(context);
     }
 
     return PopScope(
@@ -41,22 +52,32 @@ class AppScaffold extends StatelessWidget {
         if (didPop || !context.mounted) {
           return;
         }
-        NavigationHistory.instance.goBack(context);
+
+        unawaited(handleBackNavigation());
       },
       child: Scaffold(
         appBar: AppBar(
+          leadingWidth: showBack ? 56 : null,
           leading: showBack
               ? IconButton(
-                  icon: const Icon(Icons.arrow_back),
+                  constraints: const BoxConstraints.tightFor(
+                    width: 56,
+                    height: 56,
+                  ),
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                  tooltip: 'Back',
                   onPressed: handleBackNavigation,
                 )
               : null,
           title: Text(
             title,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.primary,
-            ),
+            style:
+                theme.appBarTheme.titleTextStyle ??
+                theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.primary,
+                ),
           ),
           centerTitle: true,
           elevation: 0.5,

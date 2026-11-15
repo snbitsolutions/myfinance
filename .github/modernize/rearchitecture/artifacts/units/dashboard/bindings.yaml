@@ -1,0 +1,9 @@
+unit: dashboard
+bindings:
+  - type: route-declaration
+    name: "ShellRoute with /home"
+    source_loc: "lib/router/app_router.dart:678"
+    target: "MainShell and ProductsScreen"
+    must_appear_in_target: true
+    notes: "Bottom navigation owns the authenticated app shell."
+runtime_config: []

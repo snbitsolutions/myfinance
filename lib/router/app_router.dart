@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'navigation_history.dart';
 import '../core/constants/app_constants.dart';
@@ -12,46 +12,74 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 // Splash & Onboarding
 import '../core/layout/main_shell.dart';
+import '../core/app_scaffold.dart';
+import '../core/app_card.dart' as core_app_card;
 import '../screens/splash/splash_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
+import '../screens/legal/privacy_policy_screen.dart';
+import '../screens/legal/terms_of_service_screen.dart';
 
 // Auth
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
-import '../screens/auth/account_number_screen.dart';
+import '../screens/auth/existing_member_enrollment_screen.dart';
 import '../screens/auth/otp_screen.dart';
+import '../screens/auth/registration_success_screen.dart';
 import '../screens/auth/set_pin_screen.dart';
 
-// Dashboard Tabs
-import '../screens/dashboard/dashboard_screen.dart';
-import '../screens/savings/savings_screen.dart';
-import '../screens/savings/savings_types_screen.dart';
-import '../screens/transactions/transactions_screen.dart';
-import '../screens/profile/profile_screen.dart';
-
-// Loans & Savings (non-tab screens)
+// Starter app shell only. All feature code has been cleared to allow a clean rebuild.
+import '../screens/error/app_error_screen.dart';
+import '../screens/investment/investments_screen.dart';
+import '../screens/investment/investment_detail_screen.dart';
 import '../screens/loans/apply_loan_screen.dart';
 import '../screens/loans/loan_detail_screen.dart';
-import '../screens/loans/loans_screen.dart';
 import '../screens/loans/loan_status_screen.dart';
+import '../screens/loans/loans_screen.dart' as loans_screen;
 import '../screens/loans/repayment_screen.dart';
-// Payments
+import '../screens/notifications/notifications_screen.dart';
+import '../screens/payment/mobile_purchase_screen.dart';
+import '../screens/payment/bills_payment_screen.dart';
+import '../screens/payment/payment_failed_screen.dart';
+import '../screens/payment/payment_receipt_screen.dart';
 import '../screens/payment/payment_screen.dart';
 import '../screens/payment/payment_success_screen.dart';
-import '../screens/payment/payment_failed_screen.dart';
-import '../screens/savings/create_savings_screen.dart';
-import '../screens/savings/savings_detail_screen.dart';
-import '../screens/savings/savings_model.dart';
-import '../screens/savings/savings_success_screen.dart';
-import '../screens/savings/transfer_screen.dart';
-import '../screens/savings/withdraw_savings_screen.dart';
+import '../screens/payment/payments_hub_screen.dart';
+import '../screens/payment/payroll_deduction_adjustment_screen.dart';
 import '../screens/profile/kyc_screen.dart';
+import '../screens/profile/profile_screen.dart';
 import '../screens/profile/settings_screen.dart';
-import '../screens/notifications/notifications_screen.dart';
+import '../screens/savings/create_savings_screen.dart';
+import '../screens/savings/savings_deposit_screen.dart';
+import '../screens/savings/savings_detail_screen.dart';
+import '../screens/savings/products_screen.dart';
+import '../screens/savings/savings_model.dart';
+import '../screens/savings/savings_screen.dart';
+import '../screens/savings/savings_success_screen.dart';
+import '../screens/savings/savings_types_screen.dart';
+import '../screens/savings/transfer_screen.dart';
+import '../screens/savings/withdrawal_flow/withdrawal_screen.dart';
+import '../screens/savings/withdrawal_flow/review_withdrawal_screen.dart';
+import '../screens/savings/withdrawal_flow/authenticate_withdrawal_screen.dart';
+import '../screens/savings/withdrawal_flow/processing_withdrawal_screen.dart';
+import '../screens/savings/withdrawal_flow/success_withdrawal_screen.dart';
+import '../screens/savings/withdrawal_flow/receipt_withdrawal_screen.dart';
+import '../screens/savings/withdrawal_flow/withdrawal_model.dart';
+import '../screens/savings/transfer_flow/transfer_destination_screen.dart';
+import '../screens/savings/transfer_flow/select_recipient_screen.dart';
+import '../screens/savings/transfer_flow/enter_recipient_details_screen.dart';
+import '../screens/savings/transfer_flow/verify_recipient_screen.dart';
+import '../screens/savings/transfer_flow/enter_transfer_amount_screen.dart';
+import '../screens/savings/transfer_flow/review_transfer_screen.dart';
+import '../screens/savings/transfer_flow/authenticate_transfer_screen.dart';
+import '../screens/savings/transfer_flow/processing_transfer_screen.dart';
+import '../screens/savings/transfer_flow/transfer_model.dart';
+import '../screens/transactions/transactions_screen.dart';
 import '../screens/shares/shares_screen.dart';
-import '../screens/investment/investment_activity_screen.dart';
-import '../screens/investment/investment_screen.dart';
-import '../screens/error/app_error_screen.dart';
+import '../screens/shares/share_detail_screen.dart';
+import '../screens/shares/buy_shares_screen.dart';
+import '../screens/shares/sell_shares_screen.dart';
+import '../screens/shares/portfolio_statement_screen.dart';
+import '../screens/shares/dividend_history_screen.dart';
 
 class AppRouter {
   static final GoRouter router = _createRouter();
@@ -69,6 +97,11 @@ class AppRouter {
   /// Resets the session cache. Intended for use in tests only.
   @visibleForTesting
   static void resetSessionCache() {
+    invalidateSessionCache();
+  }
+
+  /// Invalidates cached authentication results after a session is restored.
+  static void invalidateSessionCache() {
     _cachedHasBoundSession = null;
     _cachedHasBoundSessionAt = null;
     _sessionCheckInFlight = null;
@@ -77,13 +110,15 @@ class AppRouter {
   static const Set<String> _authRoutes = {
     '/login',
     '/signup',
-    '/account-number',
+    '/existing-member-enrollment',
     '/otp',
     '/set-pin',
   };
 
   static const Set<String> _preAuthRoutes = {
     '/',
+    '/terms',
+    '/privacy-policy',
     '/onboarding',
     ..._authRoutes,
   };
@@ -127,8 +162,10 @@ class AppRouter {
         return false;
       }
 
-      final token = await SecureAuthStorage.instance.readAuthToken() ?? '';
-      if (token.isNotEmpty) {
+      final currentFingerprint = await DeviceIdentityService()
+          .getInstallationFingerprint();
+      if (await SecureAuthStorage.instance
+          .hasAuthenticatedSessionBoundToFingerprint(currentFingerprint)) {
         return true;
       }
 
@@ -157,18 +194,20 @@ class AppRouter {
 
   static Future<bool> _computeHasBoundSession() async {
     final secureAuthStorage = SecureAuthStorage.instance;
-    final token = await secureAuthStorage.readAuthToken() ?? '';
-    if (token.isEmpty) {
-      return false;
-    }
-
     final currentFingerprint = await DeviceIdentityService()
         .getInstallationFingerprint();
     final isBoundToCurrentDevice = await secureAuthStorage
-        .hasSessionBoundToFingerprint(currentFingerprint);
+        .hasAuthenticatedSessionBoundToFingerprint(currentFingerprint);
 
     if (isBoundToCurrentDevice) {
-      return true;
+      final prefs = await SharedPreferences.getInstance();
+      final accountNumber =
+          prefs.getString(AppConstants.sharedPrefKeyUserId)?.trim() ?? '';
+      final phoneNumber =
+          prefs.getString(AppConstants.sharedPrefKeyUserEmail)?.trim() ?? '';
+      if (accountNumber.isNotEmpty && phoneNumber.isNotEmpty) {
+        return true;
+      }
     }
 
     final prefs = await SharedPreferences.getInstance();
@@ -176,6 +215,10 @@ class AppRouter {
     await prefs.remove(AppConstants.sharedPrefKeyUserId);
     await prefs.remove(AppConstants.sharedPrefKeyUserEmail);
     return false;
+  }
+
+  static Future<bool> _hasUsableSession() async {
+    return _hasBoundSession();
   }
 
   static Future<String?> _handleRedirect(GoRouterState state) async {
@@ -204,19 +247,34 @@ class AppRouter {
     });
   }
 
+  // Keep the splash and normal authentication flow active on startup.
+  static const bool _temporarilyBypassLoginForDev = false;
+
   static Future<String?> _computeRedirect(GoRouterState state) async {
     final path = state.uri.path;
 
     final prefs = await SharedPreferences.getInstance();
-    final storedUserId =
-        prefs.getString(AppConstants.sharedPrefKeyUserId)?.trim() ?? '';
-    final storedUserEmail =
-        prefs.getString(AppConstants.sharedPrefKeyUserEmail)?.trim() ?? '';
-    final seededUserId = AppConstants.debugApiAccountNumber.trim();
-    final seededUserEmail = AppConstants.debugApiPhoneNumber.trim();
-    final hasDebugIdentity =
-        (storedUserId.isNotEmpty && storedUserEmail.isNotEmpty) ||
-        (seededUserId.isNotEmpty && seededUserEmail.isNotEmpty);
+    final acceptedTermsVersion = prefs.getString(
+      AppConstants.sharedPrefKeyAcceptedTermsVersion,
+    );
+    final requiresTermsAcceptance =
+        path == '/onboarding' || _isInRouteSet(path, _authRoutes);
+    if (path != '/' &&
+        path != '/terms' &&
+        requiresTermsAcceptance &&
+        acceptedTermsVersion != AppConstants.termsOfServiceVersion) {
+      return '/terms';
+    }
+
+    if (_temporarilyBypassLoginForDev) {
+      if (path == '/' ||
+          path == '/onboarding' ||
+          _isInRouteSet(path, _authRoutes)) {
+        return '/home';
+      }
+      return null;
+    }
+
     final seenOnboarding =
         prefs.getBool(AppConstants.sharedPrefKeyOnboarding) ?? false;
     final debugBypassAuth = isDebugAuthBypassEnabled(
@@ -226,50 +284,31 @@ class AppRouter {
       ),
     );
 
-    // Keep splash navigation behavior intact for normal runs, but let the
-    // debug bypass skip directly to the home screen.
+    // Splash is the initial entry point. Users without onboarding complete must
+    // continue through onboarding before they can reach the sign-in screen.
     if (path == '/') {
-      if (debugBypassAuth) {
-        return hasDebugIdentity ? '/home' : '/login';
-      }
+      return null;
+    }
+
+    if (path == '/onboarding') {
+      return seenOnboarding ? '/login' : null;
+    }
+
+    if (_isInRouteSet(path, _preAuthRoutes)) {
       return null;
     }
 
     if (debugBypassAuth) {
-      // Allow auth flow when debug identity is not configured yet.
-      if (!hasDebugIdentity) {
-        if (!_isInRouteSet(path, _preAuthRoutes)) {
-          return '/login';
-        }
-        return null;
-      }
-
-      if (_isInRouteSet(path, _preAuthRoutes)) {
-        return '/home';
-      }
-      return null;
+      return '/login';
     }
 
     if (!seenOnboarding) {
-      return path == '/onboarding' ? null : '/onboarding';
+      return '/login';
     }
 
-    final hasSession = await _hasBoundSession();
-    final isPreAuthRoute = _isInRouteSet(path, _preAuthRoutes);
-    final isAuthRoute = _isInRouteSet(path, _authRoutes);
-
+    final hasSession = await _hasUsableSession();
     if (!hasSession) {
-      if (!isPreAuthRoute) {
-        return '/login';
-      }
-      if (path == '/onboarding') {
-        return '/login';
-      }
-      return null;
-    }
-
-    if (isAuthRoute || path == '/onboarding') {
-      return '/home';
+      return '/login';
     }
 
     return null;
@@ -277,7 +316,7 @@ class AppRouter {
 
   static GoRouter _createRouter() {
     final configuredRouter = GoRouter(
-      initialLocation: AppRouter.isDebugAuthBypassEnabled() ? '/home' : '/',
+      initialLocation: '/',
       redirect: (context, state) => _handleRedirect(state),
       errorBuilder: (context, state) {
         final errorMessage = state.error?.toString();
@@ -288,6 +327,16 @@ class AppRouter {
         // Splash & Onboarding
         // ===================
         GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
+        GoRoute(
+          path: '/terms',
+          builder: (context, state) => TermsOfServiceScreen(
+            reviewOnly: state.uri.queryParameters['viewOnly'] == 'true',
+          ),
+        ),
+        GoRoute(
+          path: '/privacy-policy',
+          builder: (context, state) => const PrivacyPolicyScreen(),
+        ),
         GoRoute(
           path: '/onboarding',
           builder: (context, state) => const OnboardingScreen(),
@@ -306,12 +355,13 @@ class AppRouter {
               SignupScreen(reason: state.uri.queryParameters['reason']),
         ),
         GoRoute(
-          path: '/account-number',
+          path: '/existing-member-enrollment',
           builder: (context, state) {
-            final extra = state.extra as Map<String, dynamic>?;
-            return AccountNumberScreen(
-              phoneNumber: extra?['phoneNumber'] as String? ?? '',
-            );
+            final memberType =
+                (state.uri.queryParameters['memberType'] ?? 'existing')
+                    .trim()
+                    .toLowerCase();
+            return ExistingMemberEnrollmentScreen(memberType: memberType);
           },
         ),
         GoRoute(
@@ -328,6 +378,23 @@ class AppRouter {
                   extra?['accountNumber'] as String? ??
                   query['accountNumber'] ??
                   '',
+              isRegistration: extra?['isRegistration'] as bool? ?? false,
+              transactionPin: extra?['transactionPin'] as String?,
+              transactionPinAlreadyProvisioned:
+                  extra?['transactionPinAlreadyProvisioned'] as bool? ?? false,
+              requiresPinSetup: extra?['requiresPinSetup'] as bool?,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/registration-success',
+          builder: (context, state) {
+            final extra = state.extra is Map<String, dynamic>
+                ? state.extra! as Map<String, dynamic>
+                : const <String, dynamic>{};
+            return RegistrationSuccessScreen(
+              accountNumber: extra['accountNumber'] as String? ?? '',
+              phoneNumber: extra['phoneNumber'] as String? ?? '',
             );
           },
         ),
@@ -352,25 +419,332 @@ class AppRouter {
           },
         ),
 
-        // =========================
-        // MAIN APP (Bottom Nav)
-        // =========================
+        GoRoute(
+          path: '/payments-hub',
+          builder: (context, state) => const PaymentsHubScreen(),
+        ),
+        GoRoute(
+          path: '/payroll-deduction-adjustment',
+          builder: (context, state) => const PayrollDeductionAdjustmentScreen(),
+        ),
+        GoRoute(
+          path: '/payment/bills',
+          builder: (context, state) => const BillsPaymentScreen(),
+        ),
+        GoRoute(
+          path: '/payment',
+          builder: (context, state) {
+            final query = state.uri.queryParameters;
+            final type = query['type'];
+            final extra = state.extra is Map<String, dynamic>
+                ? state.extra! as Map<String, dynamic>
+                : null;
+
+            // Route to supported payment flows.
+            if (type == 'bills') {
+              return const BillsPaymentScreen();
+            }
+            if (type == 'airtime') {
+              return const MobilePurchaseScreen();
+            }
+            if (type == 'data') {
+              return const MobilePurchaseScreen(isData: true);
+            }
+
+            return PaymentScreen(
+              sourceLabel:
+                  extra?['sourceLabel'] as String? ?? query['sourceLabel'],
+              returnRoute:
+                  extra?['returnRoute'] as String? ?? query['returnRoute'],
+              initialAmount: double.tryParse(query['amount'] ?? ''),
+              initialMethod: query['method'],
+              savingsId: query['savingsId'],
+            );
+          },
+        ),
+        GoRoute(
+          path: '/payment/deposit',
+          redirect: (context, state) {
+            final query = state.uri.queryParameters;
+            final returnRoute = query['returnRoute'] ?? '/savings';
+            return Uri(
+              path: '/payment',
+              queryParameters: {
+                'sourceLabel': 'Deposit',
+                'returnRoute': returnRoute,
+                if (query['savingsId']?.trim().isNotEmpty == true)
+                  'savingsId': query['savingsId'],
+              },
+            ).toString();
+          },
+        ),
+        GoRoute(
+          path: '/payment/receive',
+          redirect: (context, state) {
+            final query = state.uri.queryParameters;
+            final returnRoute = query['returnRoute'] ?? '/savings';
+            return Uri(
+              path: '/payment',
+              queryParameters: {
+                'sourceLabel': 'Receive Money',
+                'returnRoute': returnRoute,
+                if (query['savingsId']?.trim().isNotEmpty == true)
+                  'savingsId': query['savingsId'],
+              },
+            ).toString();
+          },
+        ),
+        GoRoute(
+          path: '/payment-success',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>? ?? const {};
+            return PaymentSuccessScreen(
+              amount: (extra['amount'] as num?)?.toDouble(),
+              processedAt: extra['processedAt'] != null
+                  ? DateTime.tryParse(extra['processedAt'] as String? ?? '')
+                  : null,
+              reference: extra['reference'] as String?,
+              title: extra['title'] as String?,
+              message: extra['message'] as String?,
+              primaryActionLabel: extra['primaryActionLabel'] as String?,
+              primaryActionRoute: extra['primaryActionRoute'] as String?,
+              secondaryActionLabel: extra['secondaryActionLabel'] as String?,
+              secondaryActionRoute: extra['secondaryActionRoute'] as String?,
+              account: extra['account'] as String?,
+              paymentMethod: extra['paymentMethod'] as String?,
+              newBalance: (extra['newBalance'] as num?)?.toDouble(),
+              isPending: extra['isPending'] as bool? ?? false,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/payment-failed',
+          builder: (context, state) {
+            final query = state.uri.queryParameters;
+            final extra = state.extra as Map<String, dynamic>? ?? const {};
+            final returnRoute =
+                extra['returnRoute'] as String? ??
+                query['returnRoute'] ??
+                '/home';
+            final amount =
+                (extra['amount'] as num?)?.toDouble() ??
+                double.tryParse(query['amount'] ?? '') ??
+                0;
+            final reason = extra['message'] as String? ?? query['reason'];
+            return PaymentFailedScreen(
+              returnRoute: returnRoute,
+              isDeposit:
+                  extra['isDeposit'] as bool? ?? query['isDeposit'] == 'true',
+              amount: amount,
+              reason: reason,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/payment-receipt',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>? ?? const {};
+            return PaymentReceiptScreen(
+              amount: (extra['amount'] as num?)?.toDouble(),
+              processedAt: extra['processedAt'] != null
+                  ? DateTime.tryParse(extra['processedAt'] as String? ?? '')
+                  : null,
+              reference: extra['reference'] as String?,
+              account: extra['account'] as String?,
+              paymentMethod: extra['paymentMethod'] as String?,
+              newBalance: (extra['newBalance'] as num?)?.toDouble(),
+              isPending: extra['isPending'] as bool? ?? false,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/transactions',
+          builder: (context, state) => const TransactionsScreen(),
+        ),
+        GoRoute(
+          path: '/notifications',
+          builder: (context, state) => const NotificationsScreen(),
+        ),
+        GoRoute(
+          path: '/settings',
+          builder: (context, state) => const SettingsScreen(),
+        ),
+        GoRoute(path: '/kyc', builder: (context, state) => const KycScreen()),
+        GoRoute(path: '/profile/edit', redirect: (context, state) => '/more'),
+        GoRoute(
+          path: '/investment',
+          redirect: (context, state) => '/investments',
+        ),
+        GoRoute(
+          path: '/apply-loan',
+          builder: (context, state) => const ApplyLoanScreen(),
+        ),
+        GoRoute(
+          path: '/loan-status',
+          builder: (context, state) => const LoanStatusScreen(),
+        ),
+        GoRoute(
+          path: '/loan-detail',
+          builder: (context, state) => const LoanDetailScreen(),
+        ),
+        GoRoute(
+          path: '/repayment',
+          builder: (context, state) {
+            final loanId = state.uri.queryParameters['loanId'];
+            return RepaymentScreen(loanId: loanId);
+          },
+        ),
+        GoRoute(
+          path: '/investments',
+          builder: (context, state) => const InvestmentsScreen(),
+          routes: [
+            GoRoute(
+              path: ':id',
+              builder: (context, state) {
+                final investmentId = state.pathParameters['id'];
+                return InvestmentDetailScreen(investmentId: investmentId);
+              },
+            ),
+          ],
+        ),
+        GoRoute(
+          path: '/investment/activity',
+          redirect: (context, state) => '/investments',
+        ),
+        // Withdrawal flow routes
+        GoRoute(
+          path: '/withdrawal',
+          builder: (context, state) {
+            final savingsId = state.uri.queryParameters['savingsId'] ?? '';
+            return WithdrawalScreen(savingsId: savingsId);
+          },
+        ),
+        GoRoute(
+          path: '/withdrawal/review',
+          builder: (context, state) {
+            final data = state.extra as WithdrawalData;
+            return ReviewWithdrawalScreen(data: data);
+          },
+        ),
+        GoRoute(
+          path: '/withdrawal/authenticate',
+          builder: (context, state) {
+            final data = state.extra as WithdrawalData;
+            return AuthenticateWithdrawalScreen(data: data);
+          },
+        ),
+        GoRoute(
+          path: '/withdrawal/processing',
+          builder: (context, state) {
+            final data = state.extra as WithdrawalData;
+            return ProcessingWithdrawalScreen(data: data);
+          },
+        ),
+        GoRoute(
+          path: '/withdrawal/success',
+          builder: (context, state) {
+            final data = state.extra as WithdrawalData;
+            return SuccessWithdrawalScreen(data: data);
+          },
+        ),
+        GoRoute(
+          path: '/withdrawal/receipt',
+          builder: (context, state) {
+            final data = state.extra as WithdrawalData;
+            return ReceiptWithdrawalScreen(data: data);
+          },
+        ),
+        // Transfer flow routes
+        GoRoute(
+          path: '/transfer',
+          builder: (context, state) {
+            final savingsId = state.uri.queryParameters['savingsId'] ?? '';
+            return TransferDestinationScreen(
+              initialData: TransferData(savingsId: savingsId),
+            );
+          },
+        ),
+        GoRoute(
+          path: '/transfer/select-recipient',
+          builder: (context, state) {
+            final data = state.extra as TransferData;
+            return SelectRecipientScreen(initialData: data);
+          },
+        ),
+        GoRoute(
+          path: '/transfer/enter-details',
+          builder: (context, state) {
+            final data = state.extra as TransferData;
+            return EnterRecipientDetailsScreen(initialData: data);
+          },
+        ),
+        GoRoute(
+          path: '/transfer/verify-recipient',
+          builder: (context, state) {
+            final data = state.extra as TransferData;
+            return VerifyRecipientScreen(initialData: data);
+          },
+        ),
+        GoRoute(
+          path: '/transfer/enter-amount',
+          builder: (context, state) {
+            final data = state.extra as TransferData;
+            return EnterTransferAmountScreen(initialData: data);
+          },
+        ),
+        GoRoute(
+          path: '/transfer/review',
+          builder: (context, state) {
+            final data = state.extra as TransferData;
+            return ReviewTransferScreen(initialData: data);
+          },
+        ),
+        GoRoute(
+          path: '/transfer/authenticate',
+          builder: (context, state) => const AuthenticateTransferScreen(),
+        ),
+        GoRoute(
+          path: '/transfer/processing',
+          builder: (context, state) => ProcessingTransferScreen(
+            initialData: state.extra as TransferData?,
+          ),
+        ),
+        GoRoute(
+          path: '/transfer/success',
+          builder: (context, state) => ProcessingTransferScreen(
+            initialData: state.extra as TransferData?,
+          ),
+        ),
+        GoRoute(
+          path: '/transfer/receipt',
+          builder: (context, state) => ProcessingTransferScreen(
+            initialData: state.extra as TransferData?,
+          ),
+        ),
         ShellRoute(
           builder: (context, state, child) {
             return MainShell(child: child);
           },
           routes: [
-            // Tabs
             GoRoute(
               path: '/home',
-              builder: (context, state) => const DashboardScreen(),
+              builder: (context, state) => const ProductsScreen(),
             ),
             GoRoute(
               path: '/savings',
+              builder: (context, state) => const SavingsScreen(),
+            ),
+            GoRoute(
+              path: '/savings/create',
               builder: (context, state) {
-                // if a type query parameter is provided we could filter inside
-                // the savings screen; currently ignored.
-                return const SavingsScreen();
+                final type = state.uri.queryParameters['type'];
+                final selectedType = switch (type) {
+                  'current' => SavingsType.currentSaving,
+                  'kiddy' => SavingsType.kiddySaving,
+                  'fixed' => SavingsType.fixedDeposit,
+                  _ => SavingsType.memberSaving,
+                };
+                return CreateSavingsScreen(initialType: selectedType);
               },
             ),
             GoRoute(
@@ -378,205 +752,180 @@ class AppRouter {
               builder: (context, state) => const SavingsTypesScreen(),
             ),
             GoRoute(
-              path: '/transactions',
-              builder: (context, state) {
-                List<Map<String, dynamic>>? savingsTransactions;
-                final extra = state.extra;
-                if (extra is Map<String, dynamic>) {
-                  final raw = extra['savingsTransactions'];
-                  if (raw is List) {
-                    savingsTransactions = raw
-                        .whereType<Map>()
-                        .map((item) => Map<String, dynamic>.from(item))
-                        .toList();
-                  }
-                }
-
-                return TransactionsScreen(
-                  savingsId: state.uri.queryParameters['savingsId'],
-                  savingsTitle: state.uri.queryParameters['savingsTitle'],
-                  savingsTransactions: savingsTransactions,
-                );
-              },
-            ),
-            GoRoute(
-              path: '/profile',
-              builder: (context, state) => const ProfileScreen(),
-            ),
-
-            // Sub-pages (still keep bottom nav)
-            GoRoute(
-              path: '/loans',
-              builder: (context, state) => const LoansScreen(),
-            ),
-            GoRoute(
-              path: '/apply-loan',
-              builder: (context, state) => const ApplyLoanScreen(),
-            ),
-            GoRoute(
-              path: '/loan-status',
-              builder: (context, state) => const LoanStatusScreen(),
-            ),
-            GoRoute(
-              path: '/loan-detail',
-              builder: (context, state) => const LoanDetailScreen(),
-            ),
-            GoRoute(
-              path: '/repayment',
-              builder: (context, state) => const RepaymentScreen(),
-            ),
-            GoRoute(
-              path: '/payment',
-              builder: (context, state) {
-                final source = state.uri.queryParameters['source'];
-                return PaymentScreen(
-                  sourceLabel: source == 'existing_account'
-                      ? 'Existing account'
-                      : source == 'investment'
-                      ? 'Investment'
-                      : null,
-                );
-              },
-            ),
-            GoRoute(
-              path: '/payment-success',
-              builder: (context, state) {
-                final extra = state.extra;
-                if (extra is Map<String, dynamic>) {
-                  final rawAmount = extra['amount'];
-                  final rawProcessedAt = extra['processedAt'];
-                  final rawReference = extra['reference'];
-                  final rawTitle = extra['title'];
-                  final rawMessage = extra['message'];
-                  final rawPrimaryActionLabel = extra['primaryActionLabel'];
-                  final rawPrimaryActionRoute = extra['primaryActionRoute'];
-                  final rawSecondaryActionLabel = extra['secondaryActionLabel'];
-                  final rawSecondaryActionRoute = extra['secondaryActionRoute'];
-
-                  final amount = rawAmount is num ? rawAmount.toDouble() : null;
-                  final processedAt = rawProcessedAt is String
-                      ? DateTime.tryParse(rawProcessedAt)
-                      : null;
-                  final reference = rawReference is String
-                      ? rawReference
-                      : null;
-                  final title = rawTitle is String
-                      ? rawTitle
-                      : 'Payment Successful';
-                  final message = rawMessage is String
-                      ? rawMessage
-                      : 'Your transaction was completed successfully.';
-                  final primaryActionLabel = rawPrimaryActionLabel is String
-                      ? rawPrimaryActionLabel
-                      : null;
-                  final primaryActionRoute = rawPrimaryActionRoute is String
-                      ? rawPrimaryActionRoute
-                      : null;
-                  final secondaryActionLabel = rawSecondaryActionLabel is String
-                      ? rawSecondaryActionLabel
-                      : null;
-                  final secondaryActionRoute = rawSecondaryActionRoute is String
-                      ? rawSecondaryActionRoute
-                      : null;
-
-                  return PaymentSuccessScreen(
-                    amount: amount,
-                    processedAt: processedAt,
-                    reference: reference,
-                    title: title,
-                    message: message,
-                    primaryActionLabel: primaryActionLabel,
-                    primaryActionRoute: primaryActionRoute,
-                    secondaryActionLabel: secondaryActionLabel,
-                    secondaryActionRoute: secondaryActionRoute,
-                  );
-                }
-                return const PaymentSuccessScreen();
-              },
-            ),
-            GoRoute(
-              path: '/payment-failed',
-              builder: (context, state) => const PaymentFailedScreen(),
-            ),
-            GoRoute(
-              path: '/savings/create',
-              builder: (context, state) {
-                final typeParam = state.uri.queryParameters['type'];
-                SavingsType? initialType;
-                switch (typeParam) {
-                  case 'member':
-                    initialType = SavingsType.memberSaving;
-                    break;
-                  case 'current':
-                    initialType = SavingsType.currentSaving;
-                    break;
-                  case 'kiddy':
-                    initialType = SavingsType.kiddySaving;
-                    break;
-                  case 'fixed':
-                    initialType = SavingsType.fixedDeposit;
-                    break;
-                }
-                return CreateSavingsScreen(initialType: initialType);
-              },
-            ),
-            GoRoute(
               name: 'savings-success',
               path: '/savings/success',
               builder: (context, state) {
-                final savings = state.extra as Savings;
+                final savings = state.extra;
+                if (savings is! Savings) {
+                  return const SavingsScreen();
+                }
                 return SavingsSuccessScreen(savings: savings);
               },
+            ),
+            GoRoute(
+              path: '/savings/withdraw',
+              builder: (context, state) => const WithdrawalScreen(),
             ),
             GoRoute(
               path: '/savings/transfer',
               builder: (context, state) => const TransferScreen(),
             ),
             GoRoute(
-              path: '/savings/withdraw',
-              builder: (context, state) => const WithdrawSavingsScreen(),
-            ),
-            GoRoute(
-              path: '/savings/:id/withdraw',
-              builder: (context, state) {
-                final id = state.pathParameters['id']!;
-                return WithdrawSavingsScreen(savingsId: id);
-              },
-            ),
-            GoRoute(
               path: '/savings/:id',
               builder: (context, state) {
-                final id = state.pathParameters['id']!;
-                final extra = state.extra;
+                final id = state.pathParameters['id'] ?? 'custom-savings';
+                final savings = state.extra;
                 return SavingsDetailScreen(
                   savingsId: id,
-                  savings: extra is Savings ? extra : null,
+                  savings: savings is Savings ? savings : null,
                 );
               },
             ),
             GoRoute(
-              path: '/kyc',
-              builder: (context, state) => const KycScreen(),
+              path: '/savings/:id/deposit',
+              builder: (context, state) {
+                final id = state.pathParameters['id'] ?? 'custom-savings';
+                final savings = state.extra;
+                return SavingsDepositScreen(
+                  savingsId: id,
+                  savings: savings is Savings ? savings : null,
+                );
+              },
             ),
             GoRoute(
-              path: '/settings',
-              builder: (context, state) => const SettingsScreen(),
+              path: '/savings/:id/withdraw',
+              builder: (context, state) {
+                final id = state.pathParameters['id'] ?? 'custom-savings';
+                return WithdrawalScreen(savingsId: id);
+              },
+              routes: [
+                GoRoute(
+                  path: 'review',
+                  builder: (context, state) {
+                    final data = state.extra as WithdrawalData;
+                    return ReviewWithdrawalScreen(data: data);
+                  },
+                ),
+                GoRoute(
+                  path: 'authenticate',
+                  builder: (context, state) {
+                    final data = state.extra as WithdrawalData;
+                    return AuthenticateWithdrawalScreen(data: data);
+                  },
+                ),
+                GoRoute(
+                  path: 'processing',
+                  builder: (context, state) {
+                    final data = state.extra as WithdrawalData;
+                    return ProcessingWithdrawalScreen(data: data);
+                  },
+                ),
+                GoRoute(
+                  path: 'success',
+                  builder: (context, state) {
+                    final data = state.extra as WithdrawalData;
+                    return SuccessWithdrawalScreen(data: data);
+                  },
+                ),
+                GoRoute(
+                  path: 'receipt',
+                  builder: (context, state) {
+                    final data = state.extra as WithdrawalData;
+                    return ReceiptWithdrawalScreen(data: data);
+                  },
+                ),
+              ],
             ),
             GoRoute(
-              path: '/notifications',
-              builder: (context, state) => const NotificationsScreen(),
+              path: '/savings/:id/transfer',
+              builder: (context, state) => const TransferScreen(),
+            ),
+            GoRoute(
+              path: '/savings/:id/statement',
+              builder: (context, state) {
+                final id = state.pathParameters['id'] ?? 'custom-savings';
+                final savings = state.extra;
+                final remoteSavings = savings is Savings ? savings : null;
+                return PortfolioStatementScreen(
+                  productId: remoteSavings != null && !remoteSavings.isRemote
+                      ? null
+                      : id,
+                  accountTitle: remoteSavings?.title,
+                );
+              },
+            ),
+            GoRoute(
+              path: '/savings/:id/edit',
+              builder: (context, state) => const CreateSavingsScreen(),
+            ),
+            GoRoute(
+              path: '/pay',
+              builder: (context, state) => const PaymentsHubScreen(),
+            ),
+            GoRoute(
+              path: '/activity',
+              builder: (context, state) => const TransactionsScreen(),
+            ),
+            GoRoute(
+              path: '/more',
+              builder: (context, state) => const ProfileScreen(),
+            ),
+            GoRoute(
+              path: '/loans',
+              builder: (context, state) => const loans_screen.LoansScreen(),
+              routes: [
+                GoRoute(
+                  path: ':id',
+                  builder: (context, state) {
+                    final loanId = state.pathParameters['id'];
+                    return LoanDetailScreen(loanId: loanId);
+                  },
+                ),
+              ],
             ),
             GoRoute(
               path: '/shares',
               builder: (context, state) => const SharesScreen(),
-            ),
-            GoRoute(
-              path: '/investment',
-              builder: (context, state) => const InvestmentScreen(),
-            ),
-            GoRoute(
-              path: '/investment/activity',
-              builder: (context, state) => const InvestmentActivityScreen(),
+              routes: [
+                GoRoute(
+                  path: 'buy',
+                  builder: (context, state) => const BuySharesScreen(),
+                ),
+                GoRoute(
+                  path: 'buy/review',
+                  builder: (context, state) {
+                    final data = state.extra as Map<String, dynamic>;
+                    return _ReviewBuySharesScreen(data: data);
+                  },
+                ),
+                GoRoute(
+                  path: 'sell',
+                  builder: (context, state) => const SellSharesScreen(),
+                ),
+                GoRoute(
+                  path: 'sell/review',
+                  builder: (context, state) {
+                    final data = state.extra as Map<String, dynamic>;
+                    return _ReviewSellSharesScreen(data: data);
+                  },
+                ),
+                GoRoute(
+                  path: 'statement',
+                  builder: (context, state) =>
+                      const PortfolioStatementScreen(isShares: true),
+                ),
+                GoRoute(
+                  path: 'dividends',
+                  builder: (context, state) => const DividendHistoryScreen(),
+                ),
+                GoRoute(
+                  path: ':id',
+                  builder: (context, state) {
+                    final shareId = state.pathParameters['id'];
+                    return ShareDetailScreen(shareId: shareId);
+                  },
+                ),
+              ],
             ),
           ],
         ),
@@ -585,5 +934,242 @@ class AppRouter {
 
     NavigationHistory.instance.attach(configuredRouter);
     return configuredRouter;
+  }
+}
+
+// Review Screens
+class _ReviewBuySharesScreen extends StatelessWidget {
+  final Map<String, dynamic> data;
+
+  const _ReviewBuySharesScreen({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return AppScaffold(
+      title: 'Review Purchase',
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              core_app_card.AppCard(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Order Summary',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _SummaryRow(
+                        label: 'Company',
+                        value: data['company'] as String,
+                        theme: theme,
+                      ),
+                      const SizedBox(height: 12),
+                      _SummaryRow(
+                        label: 'Quantity',
+                        value: '${data['quantity']} shares',
+                        theme: theme,
+                      ),
+                      const SizedBox(height: 12),
+                      _SummaryRow(
+                        label: 'Price per Share',
+                        value:
+                            'GH₵ ${(data['price'] as double).toStringAsFixed(2)}',
+                        theme: theme,
+                      ),
+                      const SizedBox(height: 16),
+                      Divider(color: theme.dividerColor),
+                      const SizedBox(height: 16),
+                      _SummaryRow(
+                        label: 'Total Amount',
+                        value:
+                            'GH₵ ${(data['total'] as double).toStringAsFixed(2)}',
+                        theme: theme,
+                        isBold: true,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Purchase order placed successfully'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (context.mounted) {
+                        context.go('/shares');
+                      }
+                    });
+                  },
+                  child: const Text('Confirm Purchase'),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: OutlinedButton(
+                  onPressed: () => context.pop(),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReviewSellSharesScreen extends StatelessWidget {
+  final Map<String, dynamic> data;
+
+  const _ReviewSellSharesScreen({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return AppScaffold(
+      title: 'Review Sale',
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              core_app_card.AppCard(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Sale Summary',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _SummaryRow(
+                        label: 'Company',
+                        value: data['company'] as String,
+                        theme: theme,
+                      ),
+                      const SizedBox(height: 12),
+                      _SummaryRow(
+                        label: 'Quantity',
+                        value: '${data['quantity']} shares',
+                        theme: theme,
+                      ),
+                      const SizedBox(height: 12),
+                      _SummaryRow(
+                        label: 'Price per Share',
+                        value:
+                            'GH₵ ${(data['price'] as double).toStringAsFixed(2)}',
+                        theme: theme,
+                      ),
+                      const SizedBox(height: 16),
+                      Divider(color: theme.dividerColor),
+                      const SizedBox(height: 16),
+                      _SummaryRow(
+                        label: 'Net Proceeds',
+                        value:
+                            'GH₵ ${(data['proceeds'] as double).toStringAsFixed(2)}',
+                        theme: theme,
+                        isBold: true,
+                        valueColor: Colors.green,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Sale order placed successfully'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (context.mounted) {
+                        context.go('/shares');
+                      }
+                    });
+                  },
+                  child: const Text('Confirm Sale'),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: OutlinedButton(
+                  onPressed: () => context.pop(),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final ThemeData theme;
+  final bool isBold;
+  final Color? valueColor;
+
+  const _SummaryRow({
+    required this.label,
+    required this.value,
+    required this.theme,
+    this.isBold = false,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: theme.textTheme.bodyMedium),
+        Text(
+          value,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            color: valueColor ?? (isBold ? theme.colorScheme.primary : null),
+          ),
+        ),
+      ],
+    );
   }
 }
