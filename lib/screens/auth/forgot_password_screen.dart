@@ -429,6 +429,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         TextField(
           controller: _newPasswordController,
           obscureText: true,
+          onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             prefixIcon: const Icon(
               Icons.lock_outline_rounded,
@@ -471,6 +472,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         TextField(
           controller: _confirmPasswordController,
           obscureText: true,
+          onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             prefixIcon: const Icon(
               Icons.lock_reset_rounded,

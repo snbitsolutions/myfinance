@@ -47,6 +47,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return phoneDigits.length >= 9 && _passwordController.text.isNotEmpty;
   }
 
+  void _clearCredentials() {
+    _phoneController.clear();
+    _passwordController.clear();
+    setState(() {});
+  }
+
   bool get _isLoginLocked =>
       _isPermanentlyLocked ||
       _failedLoginAttempts >= AppConstants.maxFailedLoginAttempts;
@@ -704,8 +710,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: TextButton(
-                                      onPressed: () =>
-                                          context.push('/forgot-password'),
+                                      onPressed: () {
+                                        _clearCredentials();
+                                        context.push('/forgot-password');
+                                      },
                                       style: TextButton.styleFrom(
                                         padding: EdgeInsets.zero,
                                       ),
@@ -795,7 +803,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                             ?.copyWith(color: Colors.white70),
                                       ),
                                       TextButton(
-                                        onPressed: () => context.go('/signup'),
+                                        onPressed: () {
+                                          _clearCredentials();
+                                          context.go('/signup');
+                                        },
                                         child: Text(
                                           'Sign up',
                                           style: theme.textTheme.bodySmall

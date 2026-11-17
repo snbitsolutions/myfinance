@@ -545,6 +545,9 @@ class AuthService extends BaseService {
       final response = await _httpClient.post<dynamic>(
         ApiEndpoints.login,
         data: request,
+        options: Options(
+          extra: {'skipAuthHeader': true, 'skipAuthRefresh': true},
+        ),
       );
       final data = normalizeResponsePayload(response.data);
       AppLogger.logApiResponse(

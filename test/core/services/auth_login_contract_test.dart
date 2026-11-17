@@ -61,6 +61,9 @@ void main() {
       expect(request.method, 'POST');
       expect(request.uri.path, endsWith('/login'));
       expect(request.contentType, Headers.jsonContentType);
+      expect(request.headers['Authorization'], isNull);
+      expect(request.extra['skipAuthHeader'], isTrue);
+      expect(request.extra['skipAuthRefresh'], isTrue);
       expect(body['phone_number'], 233241234567);
       expect(body['password'], 'account-pass-1040');
       expect(body['s_key'], isNotEmpty);
