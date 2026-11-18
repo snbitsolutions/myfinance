@@ -110,6 +110,21 @@ void main() {
     expect(body, isNot(contains('phone_make')));
   });
 
+  test('rejects registration without a transaction PIN before sending', () async {
+    await expectLater(
+      AuthService().register(
+        accountNumber: '0010600000040752',
+        phoneNumber: '0241234567',
+        birthDate: '1989-10-07',
+        password: 'member-pass-123',
+        imeiNumber: 100200300,
+        phoneMake: 'iPhone',
+      ),
+      throwsA(isA<ValidationException>()),
+    );
+    expect(adapter.request, isNull);
+  });
+
   test('accepts empty membership confirmation responses', () async {
     adapter = _RegistrationResponseAdapter('');
     dio.httpClientAdapter = adapter;

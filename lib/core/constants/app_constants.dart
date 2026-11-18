@@ -83,10 +83,16 @@ class AppConstants {
   static const String pinResetUnavailableMessage =
       'Forgot-PIN reset is not available because the backend does not document a PIN recovery endpoint.';
   static const String defaultMobileApiSKey = 'ArTM3c8yq0Lhlh';
+  // Keep the production value device-specific. Only a debug build may override
+  // this with a known test IMEI; the default should be zero so the app derives
+  // a unique backend device number from the installation ID instead of a shared
+  // static number.
   static const int defaultMobileApiImeiNumber = int.fromEnvironment(
     'DEBUG_API_IMEI',
-    defaultValue: 100200300,
+    defaultValue: 0,
   );
+  // Compatibility for accounts registered by app builds that used this number.
+  static const int legacyMobileApiImeiNumber = 100200300;
   static const String pinTooSimpleMessage =
       'PIN is too simple. Please choose a different PIN.';
 
@@ -136,6 +142,8 @@ class AppConstants {
       'secure.deviceVerifiedSession';
   static const String secureStorageKeyDeviceInstallId =
       'secure.deviceInstallId';
+  static const String secureStorageKeyBackendDeviceNumber =
+      'secure.backendDeviceNumber';
   static const String secureStorageKeyUserPin = 'secure.userPin';
   static const String sharedPrefKeyUserPin = 'userPin';
 
@@ -215,7 +223,7 @@ class ApiEndpoints {
       '$mobileApiBaseUrl/requestPasswordReset';
   static const String verifyPasswordResetOtp =
       '$mobileApiBaseUrl/verifyPasswordResetOtp';
-  static const String passwordReset = '$mobileApiBaseUrl/passwordReset';
+  static const String passwordReset = '$mobileApiBaseUrl/passwordRest';
   static const String requestDeletion = '$mobileApiBaseUrl/requestDeletion';
   static const String verifyDeletionOtp = '$mobileApiBaseUrl/verifyDeletionOtp';
   static const String deleteAccount = '$mobileApiBaseUrl/deleteAccount';

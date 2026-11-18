@@ -1,4 +1,5 @@
 import 'package:adepa_teachers/core/constants/app_constants.dart';
+import 'package:adepa_teachers/core/exceptions/app_exceptions.dart';
 import 'package:adepa_teachers/core/providers/app_providers.dart';
 import 'package:adepa_teachers/core/services/api_service.dart';
 import 'package:adepa_teachers/core/services/device_identity_service.dart';
@@ -13,6 +14,9 @@ class _RegistrationOtpAuthService extends AuthService {
   String? loginPassword;
   String? loginMemberName;
   Map<String, dynamic>? loginResponse;
+  bool rejectUnregisteredDeviceNumber = false;
+  final List<int> loginDeviceNumbers = [];
+  final List<int> pinLoginDeviceNumbers = [];
   String? otpPhoneNumber;
   String? otpAccountNumber;
 
@@ -22,7 +26,11 @@ class _RegistrationOtpAuthService extends AuthService {
     required String password,
     required int imeiNumber,
   }) async {
+    loginDeviceNumbers.add(imeiNumber);
     loginPassword = password;
+    if (rejectUnregisteredDeviceNumber && imeiNumber != 100200300) {
+      throw AuthException(message: 'Device authentication failed');
+    }
     return loginResponse ??
         {
           'status': 1,
@@ -30,6 +38,19 @@ class _RegistrationOtpAuthService extends AuthService {
           'account_number': '0010100000144795',
           if (loginMemberName != null) 'member_name': loginMemberName,
         };
+  }
+
+  @override
+  Future<Map<String, dynamic>> loginWithPhonePin({
+    required String phoneNumber,
+    required String pin,
+    required int imeiNumber,
+  }) async {
+    pinLoginDeviceNumbers.add(imeiNumber);
+    if (rejectUnregisteredDeviceNumber && imeiNumber != 100200300) {
+      return {'status': 0, 'message': 'Device authentication failed'};
+    }
+    return {'status': 1, 'account_number': '0010100000144795'};
   }
 
   @override
@@ -63,11 +84,21 @@ class _RegistrationOtpAuthService extends AuthService {
 }
 
 class _RegistrationDeviceIdentityService extends DeviceIdentityService {
+  _RegistrationDeviceIdentityService({this.deviceNumber = 100200300});
+
+  final int deviceNumber;
+  int? rememberedDeviceNumber;
+
   @override
   Future<String> getInstallationFingerprint() async => 'test-fingerprint';
 
   @override
-  Future<int> getBackendDeviceNumber() async => 100200300;
+  Future<int> getBackendDeviceNumber() async => deviceNumber;
+
+  @override
+  Future<void> rememberBackendDeviceNumber(int deviceNumber) async {
+    rememberedDeviceNumber = deviceNumber;
+  }
 }
 
 void main() {
@@ -191,6 +222,51 @@ void main() {
       secureStore[AppConstants.secureStorageKeyDeviceVerifiedSession],
       'true',
     );
+  });
+
+  test(
+    'password login retries with the legacy registered device number',
+    () async {
+      final authService = _RegistrationOtpAuthService()
+        ..rejectUnregisteredDeviceNumber = true;
+      final deviceIdentityService = _RegistrationDeviceIdentityService(
+        deviceNumber: 123456789012345,
+      );
+      final notifier = AuthNotifier(
+        authService: authService,
+        userService: UserService(),
+        deviceIdentityService: deviceIdentityService,
+      );
+      addTearDown(notifier.dispose);
+
+      final accountNumber = await notifier.login(
+        phoneNumber: '233241952608',
+        password: 'member-password',
+      );
+
+      expect(accountNumber, '0010100000144795');
+      expect(authService.loginDeviceNumbers, [123456789012345, 100200300]);
+      expect(deviceIdentityService.rememberedDeviceNumber, 100200300);
+    },
+  );
+
+  test('PIN login retries with the legacy registered device number', () async {
+    final authService = _RegistrationOtpAuthService()
+      ..rejectUnregisteredDeviceNumber = true;
+    final deviceIdentityService = _RegistrationDeviceIdentityService(
+      deviceNumber: 123456789012345,
+    );
+    final notifier = AuthNotifier(
+      authService: authService,
+      userService: UserService(),
+      deviceIdentityService: deviceIdentityService,
+    );
+    addTearDown(notifier.dispose);
+
+    await notifier.loginWithPhonePin(phoneNumber: '233241952608', pin: '1357');
+
+    expect(authService.pinLoginDeviceNumbers, [123456789012345, 100200300]);
+    expect(deviceIdentityService.rememberedDeviceNumber, 100200300);
   });
 
   test('password login accepts an is_success-only response', () async {

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/color_ext.dart';
 import '../../core/exceptions/app_exceptions.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/device_identity_service.dart';
 
 enum _ResetStep { account, otp, password }
 
@@ -22,6 +23,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final TextEditingController _confirmPasswordController =
       TextEditingController();
   final AuthService _authService = AuthService();
+  final DeviceIdentityService _deviceIdentityService = DeviceIdentityService();
 
   _ResetStep _step = _ResetStep.account;
   bool _isSubmitting = false;
@@ -78,8 +80,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     setState(() => _isSubmitting = true);
 
     try {
+      final imeiNumber = await _deviceIdentityService.getBackendDeviceNumber();
       final response = await _authService.requestPasswordReset(
         accountNumber: _normalizedAccountNumber,
+        imeiNumber: imeiNumber,
       );
       final requestId = response['request_id']?.toString();
       if (requestId == null || requestId.isEmpty) {
@@ -179,9 +183,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     setState(() => _isSubmitting = true);
 
     try {
+      final imeiNumber = await _deviceIdentityService.getBackendDeviceNumber();
       await _authService.passwordReset(
         requestId: _requestId!,
         newPassword: _newPasswordController.text.trim(),
+        imeiNumber: imeiNumber,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -238,6 +244,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         TextField(
           controller: _accountNumberController,
           keyboardType: TextInputType.number,
+          onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             prefixIcon: const Icon(
               Icons.numbers_outlined,
@@ -327,6 +334,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           controller: _otpController,
           keyboardType: TextInputType.number,
           maxLength: 6,
+          onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             counterText: '',
             prefixIcon: const Icon(
@@ -428,6 +436,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 8),
         TextField(
           controller: _newPasswordController,
+          keyboardType: TextInputType.visiblePassword,
           obscureText: true,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
@@ -471,6 +480,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 8),
         TextField(
           controller: _confirmPasswordController,
+          keyboardType: TextInputType.visiblePassword,
           obscureText: true,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(

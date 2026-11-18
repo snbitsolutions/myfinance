@@ -515,9 +515,13 @@ class _ProductCard extends StatelessWidget {
                 ),
               ],
             ),
-            child: Row(
-              children: [
-                Container(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final trailingWidth = (constraints.maxWidth * 0.45).clamp(
+                  100.0,
+                  170.0,
+                );
+                final iconWidget = Container(
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
@@ -525,53 +529,84 @@ class _ProductCard extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(icon, color: accent, size: 26),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF1B2A24),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF6A7A72),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                );
+                final titleAndSubtitle = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      amount,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: accent,
-                        fontWeight: FontWeight.w800,
+                    SizedBox(
+                      width: double.infinity,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          softWrap: false,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF1B2A24),
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: tint,
-                        shape: BoxShape.circle,
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF6A7A72),
                       ),
-                      child: Icon(Icons.chevron_right_rounded, color: accent),
                     ),
                   ],
-                ),
-              ],
+                );
+                final amountText = Text(
+                  amount,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: accent,
+                    fontWeight: FontWeight.w800,
+                  ),
+                );
+                final arrowWidget = Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: tint,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.chevron_right_rounded, color: accent),
+                );
+
+                return Row(
+                  children: [
+                    iconWidget,
+                    const SizedBox(width: 14),
+                    Expanded(child: titleAndSubtitle),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: trailingWidth,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: amountText,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          arrowWidget,
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
           Positioned(

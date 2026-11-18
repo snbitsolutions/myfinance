@@ -227,6 +227,50 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return _prefs ??= await SharedPreferences.getInstance();
   }
 
+  Future<Map<String, dynamic>> _authenticateWithDeviceNumberFallback({
+    required int deviceNumber,
+    required Future<Map<String, dynamic>> Function(int) authenticate,
+  }) async {
+    try {
+      final response = await authenticate(deviceNumber);
+      if (_isSuccessfulAuthResponse(response)) {
+        await deviceIdentityService.rememberBackendDeviceNumber(deviceNumber);
+        return response;
+      }
+      if (!_isDeviceAuthenticationFailure(response['message']?.toString()) ||
+          deviceNumber == AppConstants.legacyMobileApiImeiNumber) {
+        return response;
+      }
+    } on AuthException catch (error) {
+      if (!_isDeviceAuthenticationFailure(error.message) ||
+          deviceNumber == AppConstants.legacyMobileApiImeiNumber) {
+        rethrow;
+      }
+    }
+
+    // Older app builds registered devices with this shared number.
+    final response = await authenticate(AppConstants.legacyMobileApiImeiNumber);
+    if (_isSuccessfulAuthResponse(response)) {
+      await deviceIdentityService.rememberBackendDeviceNumber(
+        AppConstants.legacyMobileApiImeiNumber,
+      );
+    }
+    return response;
+  }
+
+  bool _isSuccessfulAuthResponse(Map<String, dynamic> response) {
+    return AuthSession.isSuccessStatus(response['status']) ||
+        AuthSession.isSuccessStatus(response['success']) ||
+        AuthSession.isSuccessStatus(response['is_success']) ||
+        AuthSession.fromResponse(response) != null;
+  }
+
+  bool _isDeviceAuthenticationFailure(String? message) {
+    final normalized = message?.trim().toLowerCase() ?? '';
+    return normalized.contains('device authentication failed') ||
+        normalized.contains('device auth failed');
+  }
+
   /// Load stored authentication from SharedPreferences
   void _loadStoredAuth() {
     _restoreStoredAuth();
@@ -325,10 +369,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     try {
       final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
-      final response = await authService.login(
-        phoneNumber: phoneNumber,
-        password: password,
-        imeiNumber: imeiNumber,
+      final response = await _authenticateWithDeviceNumberFallback(
+        deviceNumber: imeiNumber,
+        authenticate: (number) => authService.login(
+          phoneNumber: phoneNumber,
+          password: password,
+          imeiNumber: number,
+        ),
       );
       AppLogger.info('Login password accepted by backend.');
 
@@ -420,10 +467,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
       final fingerprint = await deviceIdentityService
           .getInstallationFingerprint();
-      final response = await authService.loginWithPhonePin(
-        phoneNumber: phoneNumber,
-        pin: pin,
-        imeiNumber: imeiNumber,
+      final response = await _authenticateWithDeviceNumberFallback(
+        deviceNumber: imeiNumber,
+        authenticate: (number) => authService.loginWithPhonePin(
+          phoneNumber: phoneNumber,
+          pin: pin,
+          imeiNumber: number,
+        ),
       );
       final session = AuthSession.fromResponse(response);
       final status = response['status'];
@@ -523,10 +573,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     try {
       final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
-      final response = await authService.loginWithPhonePin(
-        phoneNumber: phoneNumber,
-        pin: pin,
-        imeiNumber: imeiNumber,
+      final response = await _authenticateWithDeviceNumberFallback(
+        deviceNumber: imeiNumber,
+        authenticate: (number) => authService.loginWithPhonePin(
+          phoneNumber: phoneNumber,
+          pin: pin,
+          imeiNumber: number,
+        ),
       );
       final status = response['status'];
       final accountNumber = _findAccountNumber(response).trim();
@@ -979,6 +1032,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
       }
 
+      await deviceIdentityService.rememberBackendDeviceNumber(imeiNumber);
+
       // The register response confirms enrollment but does not include an OTP.
       // Request the SMS code explicitly before opening the verification screen.
       await authService.sendLoginOtp(
@@ -1046,6 +1101,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
             : 'New member registration failed. Please try again.',
       );
     }
+    await deviceIdentityService.rememberBackendDeviceNumber(imeiNumber);
+
     final generatedAccountNumber = _findAccountNumber(response).trim();
     _lastRegisteredAccountNumber = generatedAccountNumber.isEmpty
         ? null
@@ -1522,6 +1579,7 @@ final investmentsApiProvider = FutureProvider<List<Map<String, dynamic>>>((
           final currentValue =
               deposit['current_value'] ??
               deposit['maturity_value'] ??
+              deposit['maturity_amount'] ??
               deposit['balance'] ??
               principal;
           return {
@@ -1536,8 +1594,10 @@ final investmentsApiProvider = FutureProvider<List<Map<String, dynamic>>>((
             'plan':
                 deposit['plan'] ??
                 deposit['product_name'] ??
+                deposit['pro_name'] ??
                 deposit['name'] ??
                 'Fixed Deposit',
+            'status': deposit['status'] ?? deposit['pro_status'],
             'principal': principal,
             'current_value': currentValue,
             'total_interest':

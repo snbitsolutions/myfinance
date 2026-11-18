@@ -147,9 +147,23 @@ class AppRouter {
         environmentValue ??
         const bool.fromEnvironment('DEBUG_AUTH_BYPASS', defaultValue: false);
 
-    return (queryValue == 'true') ||
-        (savedPreferenceValue ?? false) ||
-        effectiveEnvironmentValue;
+    if (queryValue != null) {
+      final normalizedQueryValue = queryValue.trim().toLowerCase();
+      if (normalizedQueryValue == 'true' ||
+          normalizedQueryValue == '1' ||
+          normalizedQueryValue == 'yes' ||
+          normalizedQueryValue == 'on') {
+        return true;
+      }
+      if (normalizedQueryValue == 'false' ||
+          normalizedQueryValue == '0' ||
+          normalizedQueryValue == 'no' ||
+          normalizedQueryValue == 'off') {
+        return false;
+      }
+    }
+
+    return (savedPreferenceValue ?? false) || effectiveEnvironmentValue;
   }
 
   static Future<bool> _hasBoundSession() async {

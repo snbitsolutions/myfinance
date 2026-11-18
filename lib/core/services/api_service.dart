@@ -404,6 +404,11 @@ class AuthService extends BaseService {
           message: 'Transaction PIN must be exactly 4 digits.',
         );
       }
+      if (normalizedTransactionPin == null) {
+        throw ValidationException(
+          message: 'Transaction PIN is required for registration.',
+        );
+      }
 
       final request = <String, dynamic>{
         'acc_number':
@@ -413,10 +418,8 @@ class AuthService extends BaseService {
         'password': ?normalizedPassword,
         if (normalizedPin != null)
           'pin': int.tryParse(normalizedPin) ?? normalizedPin,
-        if (normalizedTransactionPin != null)
-          'trans_pin':
-              int.tryParse(normalizedTransactionPin) ??
-              normalizedTransactionPin,
+        'trans_pin':
+            int.tryParse(normalizedTransactionPin) ?? normalizedTransactionPin,
         // The API's legacy field name is imei_number; the value is an
         // app-installation ID because iOS and modern Android do not expose IMEI.
         'imei_number': imeiNumber,
@@ -622,6 +625,7 @@ class AuthService extends BaseService {
   /// Request a password reset code using the documented mobile-app contract.
   Future<Map<String, dynamic>> requestPasswordReset({
     required String accountNumber,
+    required int imeiNumber,
   }) async {
     return handleApiCall(() async {
       final normalizedAccount = accountNumber.replaceAll(RegExp(r'\D'), '');
@@ -630,8 +634,8 @@ class AuthService extends BaseService {
       }
 
       final request = <String, dynamic>{
-        'account_number': int.tryParse(normalizedAccount) ?? normalizedAccount,
-        'imei_number': AppConstants.defaultMobileApiImeiNumber,
+        'account_number': normalizedAccount,
+        'imei_number': imeiNumber,
         's_key': AppConstants.defaultMobileApiSKey,
       };
 
@@ -710,7 +714,7 @@ class AuthService extends BaseService {
   Future<Map<String, dynamic>> passwordReset({
     required String requestId,
     required String newPassword,
-    int? imeiNumber,
+    required int imeiNumber,
   }) async {
     return handleApiCall(() async {
       final normalizedPassword = newPassword.trim();
@@ -719,7 +723,7 @@ class AuthService extends BaseService {
       }
 
       final request = <String, dynamic>{
-        'imei_number': imeiNumber ?? AppConstants.defaultMobileApiImeiNumber,
+        'imei_number': imeiNumber,
         'password': int.tryParse(normalizedPassword) ?? normalizedPassword,
         'request_id': requestId,
         's_key': AppConstants.defaultMobileApiSKey,
@@ -1541,10 +1545,12 @@ class SavingsService extends BaseService {
           'name': textValue([
             entry['name'],
             entry['product_name'],
+            entry['pro_name'],
             entry['account_name'],
           ], 'Fixed Deposit'),
           'balance':
               entry['balance'] ??
+              entry['principal'] ??
               entry['principal_amount'] ??
               entry['deposit_amount'] ??
               entry['amount'] ??
