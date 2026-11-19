@@ -92,6 +92,40 @@ void main() {
     },
   );
 
+  test('loads fixed deposits from the documented products response', () async {
+    adapter = _DepositResponseAdapter(
+      '{"status":1,"message":"Product found","products":['
+      '{"id":"5293","pro_name":"91 days","pro_status":"Approved",'
+      '"principal":"16000.00","interest_rate":"9.50","duration":"91",'
+      '"maturity_amount":"16378.96","start_date":"2026-10-16",'
+      '"maturity_date":"2027-01-16"}]}',
+    );
+    savingsDio.httpClientAdapter = adapter;
+
+    final result = await SavingsService().getFixedDeposits(
+      accountNumber: '0010500000133848',
+      imeiNumber: 100200300,
+    );
+
+    expect(result['data'], [
+      {
+        'id': '5293',
+        'pro_name': '91 days',
+        'pro_status': 'Approved',
+        'principal': '16000.00',
+        'interest_rate': '9.50',
+        'duration': '91',
+        'maturity_amount': '16378.96',
+        'start_date': '2026-10-16',
+        'maturity_date': '2027-01-16',
+        'savings_id': '5293',
+        'name': '91 days',
+        'balance': '16000.00',
+        'type': 'fixed_deposit',
+      },
+    ]);
+  });
+
   test(
     'returns an empty list when the fixed deposit API has no records',
     () async {

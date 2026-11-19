@@ -245,6 +245,20 @@ void main() {
     );
   });
 
+  test(
+    'prefers an explicit false query override over saved or environment values',
+    () {
+      expect(
+        AppRouter.isDebugAuthBypassEnabled(
+          queryValue: 'false',
+          savedPreferenceValue: true,
+          environmentValue: true,
+        ),
+        isFalse,
+      );
+    },
+  );
+
   testWidgets('keeps startup on login even when debug auth bypass is enabled', (
     tester,
   ) async {

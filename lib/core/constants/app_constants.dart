@@ -74,10 +74,6 @@ class AppConstants {
       'Invalid phone number or password.';
   static const String invalidCredentialsErrorCode = 'invalid_credentials';
   static const int maxFailedLoginAttempts = 3;
-  static const String loginAttemptsLockedMessage =
-      'Sign-in is blocked on this device for this phone number after too many '
-      'incorrect password attempts. Please contact your financial institution '
-      'to reset your password.';
   static const String userNotFoundMessage = 'User account not found.';
   static const String accountLockedMessage =
       'Account is locked. Please contact support.';
@@ -87,6 +83,16 @@ class AppConstants {
   static const String pinResetUnavailableMessage =
       'Forgot-PIN reset is not available because the backend does not document a PIN recovery endpoint.';
   static const String defaultMobileApiSKey = 'ArTM3c8yq0Lhlh';
+  // Keep the production value device-specific. Only a debug build may override
+  // this with a known test IMEI; the default should be zero so the app derives
+  // a unique backend device number from the installation ID instead of a shared
+  // static number.
+  static const int defaultMobileApiImeiNumber = int.fromEnvironment(
+    'DEBUG_API_IMEI',
+    defaultValue: 0,
+  );
+  // Compatibility for accounts registered by app builds that used this number.
+  static const int legacyMobileApiImeiNumber = 100200300;
   static const String pinTooSimpleMessage =
       'PIN is too simple. Please choose a different PIN.';
 
@@ -136,6 +142,8 @@ class AppConstants {
       'secure.deviceVerifiedSession';
   static const String secureStorageKeyDeviceInstallId =
       'secure.deviceInstallId';
+  static const String secureStorageKeyBackendDeviceNumber =
+      'secure.backendDeviceNumber';
   static const String secureStorageKeyUserPin = 'secure.userPin';
   static const String sharedPrefKeyUserPin = 'userPin';
 
@@ -211,6 +219,14 @@ class ApiEndpoints {
   // Documented mobile app auth endpoints.
   static const String login = '$mobileApiBaseUrl/login';
   static const String logout = '$mobileApiBaseUrl/logout';
+  static const String requestPasswordReset =
+      '$mobileApiBaseUrl/requestPasswordReset';
+  static const String verifyPasswordResetOtp =
+      '$mobileApiBaseUrl/verifyPasswordResetOtp';
+  static const String passwordReset = '$mobileApiBaseUrl/passwordRest';
+  static const String requestDeletion = '$mobileApiBaseUrl/requestDeletion';
+  static const String verifyDeletionOtp = '$mobileApiBaseUrl/verifyDeletionOtp';
+  static const String deleteAccount = '$mobileApiBaseUrl/deleteAccount';
   static const String sendOtp = '/auth/send-otp';
   static const String verifyOtp = '/auth/verify-otp';
   static const String legacySetPin = '/auth/set-pin';

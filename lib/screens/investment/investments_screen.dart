@@ -332,13 +332,19 @@ class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
       ...item,
       'id': item['id'] ?? item['investment_id'] ?? item['account_id'] ?? '',
       'type': item['type'] ?? item['investment_type'] ?? 'Investment',
-      'plan': item['plan'] ?? item['plan_name'] ?? 'Investment Plan',
-      'status': item['status'] ?? 'Unavailable',
+      'plan':
+          item['plan'] ??
+          item['plan_name'] ??
+          item['pro_name'] ??
+          'Investment Plan',
+      'status': item['status'] ?? item['pro_status'] ?? 'Unavailable',
       'principal': principal,
       'current_value': current,
       'total_interest': interest,
       'monthly_value': _asDouble(
-        item['monthly_value'] ?? item['maturity_value'],
+        item['monthly_value'] ??
+            item['maturity_value'] ??
+            item['maturity_amount'],
       ),
       'interest_rate': _numberOrNull(item['interest_rate'] ?? item['rate']),
       'days_to_maturity': item['days_to_maturity'],

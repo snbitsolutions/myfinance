@@ -22,6 +22,7 @@ import '../screens/legal/terms_of_service_screen.dart';
 // Auth
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
+import '../screens/auth/forgot_password_screen.dart';
 import '../screens/auth/existing_member_enrollment_screen.dart';
 import '../screens/auth/otp_screen.dart';
 import '../screens/auth/registration_success_screen.dart';
@@ -110,6 +111,7 @@ class AppRouter {
   static const Set<String> _authRoutes = {
     '/login',
     '/signup',
+    '/forgot-password',
     '/existing-member-enrollment',
     '/otp',
     '/set-pin',
@@ -145,9 +147,23 @@ class AppRouter {
         environmentValue ??
         const bool.fromEnvironment('DEBUG_AUTH_BYPASS', defaultValue: false);
 
-    return (queryValue == 'true') ||
-        (savedPreferenceValue ?? false) ||
-        effectiveEnvironmentValue;
+    if (queryValue != null) {
+      final normalizedQueryValue = queryValue.trim().toLowerCase();
+      if (normalizedQueryValue == 'true' ||
+          normalizedQueryValue == '1' ||
+          normalizedQueryValue == 'yes' ||
+          normalizedQueryValue == 'on') {
+        return true;
+      }
+      if (normalizedQueryValue == 'false' ||
+          normalizedQueryValue == '0' ||
+          normalizedQueryValue == 'no' ||
+          normalizedQueryValue == 'off') {
+        return false;
+      }
+    }
+
+    return (savedPreferenceValue ?? false) || effectiveEnvironmentValue;
   }
 
   static Future<bool> _hasBoundSession() async {
@@ -353,6 +369,10 @@ class AppRouter {
           path: '/signup',
           builder: (context, state) =>
               SignupScreen(reason: state.uri.queryParameters['reason']),
+        ),
+        GoRoute(
+          path: '/forgot-password',
+          builder: (context, state) => const ForgotPasswordScreen(),
         ),
         GoRoute(
           path: '/existing-member-enrollment',

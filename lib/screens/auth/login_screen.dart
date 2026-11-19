@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'auth_flow_error_utils.dart';
 import '../../core/color_ext.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/exceptions/app_exceptions.dart';
@@ -30,7 +29,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isSubmitting = false;
   bool _biometricEnabled = false;
   bool _obscurePassword = true;
+  bool _isPermanentlyLocked = false;
   int _failedLoginAttempts = 0;
+  Duration? _loginLockoutRemaining;
+  Timer? _loginLockoutTimer;
   final _biometricAuthService = BiometricAuthService();
   final _loginAttemptTracker = LoginAttemptTracker();
 
@@ -45,8 +47,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return phoneDigits.length >= 9 && _passwordController.text.isNotEmpty;
   }
 
+  void _clearCredentials() {
+    _phoneController.clear();
+    _passwordController.clear();
+    setState(() {});
+  }
+
   bool get _isLoginLocked =>
+      _isPermanentlyLocked ||
       _failedLoginAttempts >= AppConstants.maxFailedLoginAttempts;
+
+  String get _formattedLockoutRemaining {
+    final seconds =
+        ((_loginLockoutRemaining?.inMilliseconds ?? 0) + 999) ~/ 1000;
+    final minutesPart = (seconds ~/ 60).toString().padLeft(2, '0');
+    final secondsPart = (seconds % 60).toString().padLeft(2, '0');
+    return '$minutesPart:$secondsPart';
+  }
 
   String get _normalizedPhoneNumber {
     final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
@@ -58,10 +75,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _onPhoneChanged(String _) {
-    setState(() {});
+    _loginLockoutTimer?.cancel();
+    setState(() {
+      _failedLoginAttempts = 0;
+      _isPermanentlyLocked = false;
+      _loginLockoutRemaining = null;
+    });
     final phoneNumber = _normalizedPhoneNumber;
     if (phoneNumber.replaceAll(RegExp(r'\D'), '').length < 9) {
-      setState(() => _failedLoginAttempts = 0);
       return;
     }
     unawaited(_loadFailedLoginAttempts(phoneNumber));
@@ -69,11 +90,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _loadFailedLoginAttempts(String phoneNumber) async {
     try {
+      final remaining = await _loginAttemptTracker.getLockoutRemaining(
+        phoneNumber,
+      );
       final attempts = await _loginAttemptTracker.getFailedAttempts(
         phoneNumber,
       );
+      final isPermanentlyLocked = await _loginAttemptTracker
+          .isPermanentlyLocked(phoneNumber);
       if (!mounted || phoneNumber != _normalizedPhoneNumber) return;
-      setState(() => _failedLoginAttempts = attempts);
+      setState(() {
+        _failedLoginAttempts = attempts;
+        _isPermanentlyLocked = isPermanentlyLocked;
+        _loginLockoutRemaining = remaining;
+      });
+      _startLockoutCountdown(phoneNumber, remaining);
     } on Exception catch (error) {
       AppLogger.error('Failed to load login attempt state', error);
       if (!mounted) return;
@@ -85,55 +116,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  Future<void> _showLoginAttemptsLockedDialog(String phoneNumber) async {
-    final pinResetConfirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Sign-in blocked'),
-        content: const Text(
-          '${AppConstants.loginAttemptsLockedMessage}\n\n'
-          "If support has reset your password, confirm below to clear this device's "
-          'local sign-in block. This will not reset or verify your password.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Password reset by support'),
-          ),
-        ],
-      ),
-    );
-    if (pinResetConfirmed != true || !mounted) return;
+  void _startLockoutCountdown(String phoneNumber, Duration? remaining) {
+    _loginLockoutTimer?.cancel();
+    if (remaining == null || remaining <= Duration.zero) return;
 
-    try {
-      await _loginAttemptTracker.resetFailedAttempts(phoneNumber);
-      if (!mounted) return;
-      if (phoneNumber == _normalizedPhoneNumber) {
-        setState(() => _failedLoginAttempts = 0);
+    _loginLockoutTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
+      try {
+        final updatedRemaining = await _loginAttemptTracker.getLockoutRemaining(
+          phoneNumber,
+        );
+        if (!mounted || phoneNumber != _normalizedPhoneNumber) return;
+        if (updatedRemaining == null || updatedRemaining <= Duration.zero) {
+          _loginLockoutTimer?.cancel();
+          setState(() {
+            _failedLoginAttempts = 0;
+            _loginLockoutRemaining = null;
+          });
+          return;
+        }
+        setState(() => _loginLockoutRemaining = updatedRemaining);
+      } on Exception catch (error) {
+        AppLogger.error('Failed to update login lockout countdown', error);
+        _loginLockoutTimer?.cancel();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to check sign-in status. Please try again.'),
+          ),
+        );
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'The local sign-in block was cleared. Your password will be verified '
-            'by the server when you sign in.',
-          ),
-        ),
-      );
-    } on Exception catch (error) {
-      AppLogger.error('Failed to clear login attempt state', error);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Unable to clear the local sign-in block. Please try again.',
-          ),
-        ),
-      );
-    }
+    });
   }
 
   Future<void> _showSnbSheet() async {
@@ -165,16 +177,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final phoneNumber = _normalizedPhoneNumber;
     var canContinue = false;
     try {
+      final isPermanentlyLocked = await _loginAttemptTracker
+          .isPermanentlyLocked(phoneNumber);
+      if (isPermanentlyLocked) {
+        if (!mounted) return;
+        setState(() {
+          _failedLoginAttempts = AppConstants.maxFailedLoginAttempts;
+          _isPermanentlyLocked = true;
+          _loginLockoutRemaining = null;
+        });
+        return;
+      }
+
+      final remaining = await _loginAttemptTracker.getLockoutRemaining(
+        phoneNumber,
+      );
       final failedAttempts = await _loginAttemptTracker.getFailedAttempts(
         phoneNumber,
       );
       if (!mounted) return;
       if (failedAttempts >= AppConstants.maxFailedLoginAttempts) {
-        setState(() => _failedLoginAttempts = failedAttempts);
-        await _showLoginAttemptsLockedDialog(phoneNumber);
+        setState(() {
+          _failedLoginAttempts = failedAttempts;
+          _isPermanentlyLocked = false;
+          _loginLockoutRemaining = remaining;
+        });
+        _startLockoutCountdown(phoneNumber, remaining);
         return;
       }
-      setState(() => _failedLoginAttempts = failedAttempts);
+      setState(() {
+        _failedLoginAttempts = failedAttempts;
+        _isPermanentlyLocked = false;
+        _loginLockoutRemaining = null;
+      });
       canContinue = true;
     } on Exception catch (error) {
       AppLogger.error('Failed to check login attempt state', error);
@@ -214,21 +249,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       context.go('/home');
     } on AppException catch (e) {
       if (!mounted) return;
-      if (shouldRedirectToSignup(e.message)) {
-        context.go('/signup?reason=not_registered');
-        return;
-      }
-
       if (e is AuthException &&
           e.code == AppConstants.invalidCredentialsErrorCode) {
         try {
           final attempts = await _loginAttemptTracker.recordFailedAttempt(
             phoneNumber,
           );
+          final isPermanentlyLocked = await _loginAttemptTracker
+              .isPermanentlyLocked(phoneNumber);
+          final remaining = await _loginAttemptTracker.getLockoutRemaining(
+            phoneNumber,
+          );
           if (!mounted) return;
-          setState(() => _failedLoginAttempts = attempts);
-          if (attempts >= AppConstants.maxFailedLoginAttempts) {
-            await _showLoginAttemptsLockedDialog(phoneNumber);
+          setState(() {
+            _failedLoginAttempts = attempts;
+            _isPermanentlyLocked = isPermanentlyLocked;
+            _loginLockoutRemaining = remaining;
+          });
+          if (isPermanentlyLocked) {
+            _loginLockoutTimer?.cancel();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text(AppConstants.accountLockedMessage)),
+            );
+          } else if (attempts >= AppConstants.maxFailedLoginAttempts) {
+            _startLockoutCountdown(phoneNumber, remaining);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Too many incorrect attempts. Try again in '
+                  '$_formattedLockoutRemaining.',
+                ),
+              ),
+            );
           } else {
             final remaining = AppConstants.maxFailedLoginAttempts - attempts;
             ScaffoldMessenger.of(context).showSnackBar(
@@ -290,13 +342,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
       if (savedPhoneNumber != null && savedPhoneNumber.isNotEmpty) {
         try {
+          final isPermanentlyLocked = await _loginAttemptTracker
+              .isPermanentlyLocked(savedPhoneNumber);
           final failedAttempts = await _loginAttemptTracker.getFailedAttempts(
             savedPhoneNumber,
           );
-          if (failedAttempts >= AppConstants.maxFailedLoginAttempts) {
+          if (isPermanentlyLocked ||
+              failedAttempts >= AppConstants.maxFailedLoginAttempts) {
+            final remaining = await _loginAttemptTracker.getLockoutRemaining(
+              savedPhoneNumber,
+            );
             if (!mounted) return;
-            setState(() => _failedLoginAttempts = failedAttempts);
-            await _showLoginAttemptsLockedDialog(savedPhoneNumber);
+            if (savedPhoneNumber == _normalizedPhoneNumber) {
+              setState(() {
+                _failedLoginAttempts = failedAttempts;
+                _isPermanentlyLocked = isPermanentlyLocked;
+                _loginLockoutRemaining = remaining;
+              });
+              _startLockoutCountdown(savedPhoneNumber, remaining);
+            }
             return;
           }
         } on Exception catch (error) {
@@ -362,6 +426,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   void dispose() {
+    _loginLockoutTimer?.cancel();
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -499,7 +564,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                                   BorderRadius.circular(10),
                                             ),
                                             child: IconButton(
-                                              onPressed: _isSubmitting
+                                              onPressed:
+                                                  _isSubmitting ||
+                                                      _isLoginLocked
                                                   ? null
                                                   : _handleBiometricSignIn,
                                               padding: EdgeInsets.zero,
@@ -639,26 +706,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     ),
                                     style: const TextStyle(color: Colors.white),
                                   ),
+                                  const SizedBox(height: 8),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton(
+                                      onPressed: () {
+                                        _clearCredentials();
+                                        context.push('/forgot-password');
+                                      },
+                                      style: TextButton.styleFrom(
+                                        padding: EdgeInsets.zero,
+                                      ),
+                                      child: Text(
+                                        'Forgot password?',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 28),
-                              if (_isLoginLocked) ...[
+                              if (_isPermanentlyLocked) ...[
                                 Text(
-                                  AppConstants.loginAttemptsLockedMessage,
+                                  AppConstants.accountLockedMessage,
                                   textAlign: TextAlign.center,
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: Colors.white,
                                   ),
                                 ),
-                                TextButton(
-                                  onPressed: _isSubmitting
-                                      ? null
-                                      : () => _showLoginAttemptsLockedDialog(
-                                          _normalizedPhoneNumber,
-                                        ),
-                                  child: const Text(
-                                    'I have reset my password with support',
-                                    style: TextStyle(color: Colors.white),
+                                const SizedBox(height: 16),
+                              ] else if (_isLoginLocked) ...[
+                                Text(
+                                  'Too many incorrect attempts. Try again in '
+                                  '$_formattedLockoutRemaining.',
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: Colors.white,
                                   ),
                                 ),
                                 const SizedBox(height: 16),
@@ -716,7 +803,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                             ?.copyWith(color: Colors.white70),
                                       ),
                                       TextButton(
-                                        onPressed: () => context.go('/signup'),
+                                        onPressed: () {
+                                          _clearCredentials();
+                                          context.go('/signup');
+                                        },
                                         child: Text(
                                           'Sign up',
                                           style: theme.textTheme.bodySmall

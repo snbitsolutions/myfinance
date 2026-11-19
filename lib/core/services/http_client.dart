@@ -74,7 +74,7 @@ class HttpClient {
         onRequest: (options, handler) async {
           // Keep API auth optional in debug mode for backend endpoints that
           // rely on request payload credentials instead of bearer tokens.
-          if (_isDebugNoAuthMode) {
+          if (_isDebugNoAuthMode || options.extra['skipAuthHeader'] == true) {
             options.headers.remove('Authorization');
           } else if (options.extra['skipAuthRefresh'] != true) {
             await initializePreferences();

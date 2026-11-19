@@ -139,6 +139,30 @@ class SecureAuthStorage {
     );
   }
 
+  Future<int?> readBackendDeviceNumber() async {
+    await initialize();
+    final value = await _storage.read(
+      key: AppConstants.secureStorageKeyBackendDeviceNumber,
+    );
+    return int.tryParse(value ?? '');
+  }
+
+  Future<void> writeBackendDeviceNumber(int deviceNumber) async {
+    if (deviceNumber <= 0) {
+      throw ArgumentError.value(
+        deviceNumber,
+        'deviceNumber',
+        'Must be a positive number.',
+      );
+    }
+
+    await initialize();
+    await _storage.write(
+      key: AppConstants.secureStorageKeyBackendDeviceNumber,
+      value: deviceNumber.toString(),
+    );
+  }
+
   Future<void> storePin(String pin) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(AppConstants.sharedPrefKeyUserPin);

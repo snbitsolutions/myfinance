@@ -59,14 +59,12 @@ class _DashboardContent extends ConsumerStatefulWidget {
 
 class _DashboardContentState extends ConsumerState<_DashboardContent> {
   Future<void> _onRefresh() async {
-    ref.invalidate(userProfileProvider);
-    ref.invalidate(transactionsProvider);
-    try {
-      await Future.wait([
-        ref.read(userProfileProvider.future),
-        ref.read(transactionsProvider.future),
-      ]);
-    } catch (_) {}
+    await refreshMemberAccountData(
+      ref,
+      refreshLoans: true,
+      refreshShares: true,
+      refreshInvestments: true,
+    );
   }
 
   @override

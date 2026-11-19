@@ -553,10 +553,69 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
             type: type,
             date: date,
             category: type == TransactionType.deposit ? 'Income' : 'Expense',
+            status: txn['status']?.toString().trim().toLowerCase() ?? 'unknown',
           );
         })
         .whereType<AppTransaction>()
         .toList();
+  }
+
+  String _displayStatus(String status) {
+    final normalized = status.trim().toLowerCase();
+    if (const {
+      '1',
+      'complete',
+      'completed',
+      'confirmed',
+      'done',
+      'paid',
+      'success',
+      'successful',
+      'approved',
+      'settled',
+    }.contains(normalized)) {
+      return 'Completed';
+    }
+    if (const {
+      '0',
+      'accepted',
+      'awaiting_authorization',
+      'awaiting_confirmation',
+      'created',
+      'initiated',
+      'pending',
+      'processing',
+      'queued',
+    }.contains(normalized)) {
+      return 'Pending';
+    }
+    if (const {
+      'cancelled',
+      'canceled',
+      'declined',
+      'denied',
+      'error',
+      'expired',
+      'failed',
+      'failure',
+      'rejected',
+    }.contains(normalized)) {
+      return 'Failed';
+    }
+    return 'Status unavailable';
+  }
+
+  Color _statusColor(String status, ThemeData theme) {
+    switch (_displayStatus(status)) {
+      case 'Completed':
+        return Colors.green;
+      case 'Pending':
+        return Colors.orange;
+      case 'Failed':
+        return theme.colorScheme.error;
+      default:
+        return theme.colorScheme.outline;
+    }
   }
 
   bool _isWithinSelectedPeriod(DateTime date, DateTime now) {
@@ -956,6 +1015,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               : isDebit || isRepayment
               ? '-'
               : ''}GH₵${transaction.amount!.toStringAsFixed(2)}';
+    final statusLabel = _displayStatus(transaction.status);
+    final statusColor = _statusColor(transaction.status, theme);
     final receiptText = [
       'ADEPA - Transaction Receipt',
       'Transaction: ${transaction.title}',
@@ -966,7 +1027,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         'Description: ${transaction.description}',
       if (transaction.category?.isNotEmpty == true)
         'Category: ${transaction.category}',
-      'Status: Completed',
+      'Status: $statusLabel',
     ].join('\n');
 
     showModalBottomSheet(
@@ -1108,8 +1169,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                     _buildDetailRow(
                       theme,
                       'Status',
-                      'Completed',
-                      valueColor: Colors.green,
+                      statusLabel,
+                      valueColor: statusColor,
                     ),
                   ],
                 ),

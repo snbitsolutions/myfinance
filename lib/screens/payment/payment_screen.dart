@@ -202,10 +202,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           : double.tryParse(newBalanceValue?.toString() ?? '');
       final isPending = response['is_pending'] == true;
 
-      ref.invalidate(savingsProvider);
-      ref.invalidate(transactionsProvider);
-      ref.invalidate(userProfileProvider);
+      await refreshMemberAccountData(ref);
 
+      if (!mounted) return;
       context.push(
         '/payment-success',
         extra: {

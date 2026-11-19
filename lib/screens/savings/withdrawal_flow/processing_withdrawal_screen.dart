@@ -86,9 +86,9 @@ class _ProcessingWithdrawalScreenState
         ),
         newBalance: newBalance,
       );
-      ref.invalidate(savingsProvider);
-      ref.invalidate(transactionsProvider);
-      ref.invalidate(userProfileProvider);
+      ref.invalidate(withdrawalAccountProvider(savingsId));
+      await refreshMemberAccountData(ref);
+      if (!mounted) return;
       context.push("/withdrawal/success", extra: updatedData);
     } catch (error) {
       if (!mounted) return;
