@@ -337,6 +337,7 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(savingsProvider);
     final liveSavings = widget.savings ?? _findLiveSavings();
     final baseSavings = liveSavings != null
         ? _fromSavedGoal(liveSavings)

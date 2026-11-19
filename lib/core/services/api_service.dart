@@ -2444,7 +2444,12 @@ class TransactionService extends BaseService {
 
         return {
           'transaction_id':
-              (txn['id'] ?? txn['transaction_id'] ?? txn['reference'])
+              (txn['id'] ??
+                      txn['transaction_id'] ??
+                      txn['trans_id'] ??
+                      txn['reference'] ??
+                      txn['external_transaction_id'] ??
+                      txn['client_reference'])
                   ?.toString()
                   .trim() ??
               '',
@@ -2460,7 +2465,15 @@ class TransactionService extends BaseService {
                   .trim() ??
               '',
           'date': rawDate?.toString(),
-          'status': (txn['status'] ?? 'unknown').toString().toLowerCase(),
+          'status':
+              (txn['status'] ??
+                      txn['state'] ??
+                      txn['transaction_status'] ??
+                      txn['payment_status'] ??
+                      'unknown')
+                  .toString()
+                  .trim()
+                  .toLowerCase(),
           'balance': _toDoubleOrNull(txn['balance'] ?? txn['running_balance']),
         };
       }).toList();

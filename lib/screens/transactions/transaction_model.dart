@@ -8,6 +8,7 @@ class AppTransaction {
   final TransactionType type;
   final DateTime date;
   final String? category;
+  final String status;
 
   AppTransaction({
     required this.id,
@@ -17,5 +18,6 @@ class AppTransaction {
     required this.type,
     required this.date,
     this.category,
+    this.status = 'unknown',
   });
 }

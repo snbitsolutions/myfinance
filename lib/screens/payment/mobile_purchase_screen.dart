@@ -24,6 +24,8 @@ class MobilePurchaseScreen extends ConsumerStatefulWidget {
 
 class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
   static const List<String> _networks = ['MTN', 'Telecel', 'AirtelTigo'];
+  static const Duration _statusCheckInterval = Duration(seconds: 10);
+  static const int _maxAutomaticStatusChecks = 6;
 
   static const List<int> _presetAmounts = [5, 10, 20, 50, 100];
   static const String _airtimeProductId = '51437';
@@ -36,9 +38,123 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
   int _currentStep = 0;
   bool _isProcessing = false;
   bool _isPending = false;
+  bool _isFailed = false;
+  bool _isConfirmed = false;
   String? _transactionReference;
   DateTime? _submittedAt;
   String? _submissionError;
+  Timer? _statusCheckTimer;
+  int _automaticStatusChecks = 0;
+  bool _isCheckingStatus = false;
+
+  void _startStatusPolling() {
+    if (!_isPending || _transactionReference == null) return;
+    _statusCheckTimer?.cancel();
+    _automaticStatusChecks = 0;
+    _checkPurchaseStatus();
+    _statusCheckTimer = Timer.periodic(_statusCheckInterval, (_) {
+      if (_automaticStatusChecks >= _maxAutomaticStatusChecks) {
+        _statusCheckTimer?.cancel();
+        return;
+      }
+      _automaticStatusChecks++;
+      _checkPurchaseStatus();
+    });
+  }
+
+  Future<void> _checkPurchaseStatus() async {
+    if (!mounted ||
+        !_isPending ||
+        _isCheckingStatus ||
+        (_transactionReference ?? '').trim().isEmpty) {
+      return;
+    }
+    _isCheckingStatus = true;
+    try {
+      ref.invalidate(transactionsProvider);
+      final transactions = await ref.read(transactionsProvider.future);
+      if (!mounted) return;
+
+      final reference = _transactionReference!.trim().toLowerCase();
+      final matchingTransaction = transactions.where((transaction) {
+        for (final key in const [
+          'transaction_id',
+          'transactionId',
+          'reference',
+          'trans_id',
+          'id',
+          'external_transaction_id',
+          'client_reference',
+        ]) {
+          final transactionReference = transaction[key]
+              ?.toString()
+              .trim()
+              .toLowerCase();
+          if (transactionReference == reference) return true;
+        }
+        return false;
+      }).firstOrNull;
+      if (matchingTransaction == null) return;
+
+      String? status;
+      for (final key in const [
+        'status',
+        'state',
+        'transaction_status',
+        'payment_status',
+      ]) {
+        final value = matchingTransaction[key]?.toString().trim().toLowerCase();
+        if (value != null && value.isNotEmpty) {
+          status = value;
+          break;
+        }
+      }
+
+      if (const {
+        '1',
+        'complete',
+        'completed',
+        'confirmed',
+        'done',
+        'paid',
+        'success',
+        'successful',
+        'approved',
+        'settled',
+      }.contains(status)) {
+        _statusCheckTimer?.cancel();
+        if (!mounted) return;
+        setState(() {
+          _isPending = false;
+          _isFailed = false;
+          _isConfirmed = true;
+        });
+        await refreshMemberAccountData(ref);
+      } else if (const {
+        '0',
+        'cancelled',
+        'canceled',
+        'declined',
+        'denied',
+        'error',
+        'expired',
+        'failed',
+        'failure',
+        'rejected',
+      }.contains(status)) {
+        _statusCheckTimer?.cancel();
+        if (!mounted) return;
+        setState(() {
+          _isPending = false;
+          _isFailed = true;
+          _isConfirmed = false;
+        });
+      }
+    } catch (_) {
+    } finally {
+      _isCheckingStatus = false;
+    }
+  }
 
   bool get _isPhoneValid {
     final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
@@ -123,11 +239,15 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
         }
         if (!mounted) return;
         _isPending = result['is_pending'] == true;
+        _isConfirmed = !_isPending;
+        _isFailed = false;
         _transactionReference =
             (result['reference'] ?? result['transaction_id'])?.toString();
         _submittedAt = DateTime.now();
-        ref.invalidate(transactionsProvider);
+        await refreshMemberAccountData(ref);
+        if (!mounted) return;
         setState(() => _currentStep = 4);
+        _startStatusPolling();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -202,6 +322,7 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
 
   @override
   void dispose() {
+    _statusCheckTimer?.cancel();
     _phoneController.dispose();
     _amountController.dispose();
     super.dispose();
@@ -434,6 +555,25 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
   }
 
   Widget _buildSuccessStep() {
+    final title = _isFailed
+        ? '$_serviceTitle Failed'
+        : _isConfirmed
+        ? '$_serviceTitle Successful'
+        : _isPending
+        ? '$_serviceTitle Pending'
+        : '$_serviceTitle request initiated';
+    final message = _isFailed
+        ? 'The provider reported that the purchase failed.'
+        : _isConfirmed
+        ? 'The provider confirmed your purchase.'
+        : _isPending
+        ? 'Your request was accepted and is awaiting confirmation.'
+        : 'The request was sent. The provider has not confirmed completion.';
+    final icon = _isPending
+        ? Icons.hourglass_top_rounded
+        : _isConfirmed
+        ? Icons.check_circle_outline_rounded
+        : Icons.info_outline_rounded;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -450,19 +590,11 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
               color: const Color(0xFFEAF5EE),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              _isPending
-                  ? Icons.hourglass_top_rounded
-                  : Icons.info_outline_rounded,
-              size: 42,
-              color: Color(0xFF2E8B57),
-            ),
+            child: Icon(icon, size: 42, color: Color(0xFF2E8B57)),
           ),
           const SizedBox(height: 18),
           Text(
-            _isPending
-                ? '$_serviceTitle Pending'
-                : '$_serviceTitle request initiated',
+            title,
             textAlign: TextAlign.center,
             style: Theme.of(
               context,
@@ -470,9 +602,7 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            _isPending
-                ? 'Your request was accepted and is awaiting confirmation.'
-                : 'The request was sent. The provider has not confirmed completion.',
+            message,
             textAlign: TextAlign.center,
             style: Theme.of(
               context,
@@ -493,9 +623,14 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
   }
 
   Widget _buildReceiptStep() {
+    final status = _isFailed
+        ? 'Failed'
+        : _isPending
+        ? 'Pending'
+        : 'Provider reported completion';
     final receiptText = [
       'ADEPA - $_serviceTitle Receipt',
-      'Status: ${_isPending ? 'Pending' : 'Provider reported completion'}',
+      'Status: $status',
       'Network: $_selectedNetwork',
       'Phone: ${_phoneController.text}',
       'Amount: GH₵ ${_selectedAmount.toStringAsFixed(2)}',

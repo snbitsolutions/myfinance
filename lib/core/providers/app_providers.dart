@@ -1707,6 +1707,59 @@ final transactionsProvider = FutureProvider<List<Map<String, dynamic>>>((
   }
 });
 
+Future<void> refreshMemberAccountData(
+  WidgetRef ref, {
+  bool refreshLoans = false,
+  bool refreshShares = false,
+  bool refreshInvestments = false,
+}) async {
+  ref.invalidate(userProfileProvider);
+  try {
+    await ref.read(userProfileProvider.future);
+  } on AppException catch (error) {
+    AppLogger.warning('Profile balance refresh failed', error);
+  }
+
+  ref.invalidate(savingsProvider);
+  try {
+    await ref.read(savingsProvider.future);
+  } on AppException catch (error) {
+    AppLogger.warning('Savings balance refresh failed', error);
+  }
+
+  ref.invalidate(transactionsProvider);
+  try {
+    await ref.read(transactionsProvider.future);
+  } on AppException catch (error) {
+    AppLogger.warning('Transaction refresh failed', error);
+  }
+
+  if (refreshLoans) {
+    ref.invalidate(loansProvider);
+    try {
+      await ref.read(loansProvider.future);
+    } on AppException catch (error) {
+      AppLogger.warning('Loan refresh failed', error);
+    }
+  }
+  if (refreshShares) {
+    ref.invalidate(sharesProvider);
+    try {
+      await ref.read(sharesProvider.future);
+    } on AppException catch (error) {
+      AppLogger.warning('Shares refresh failed', error);
+    }
+  }
+  if (refreshInvestments) {
+    ref.invalidate(investmentsApiProvider);
+    try {
+      await ref.read(investmentsApiProvider.future);
+    } on AppException catch (error) {
+      AppLogger.warning('Investment refresh failed', error);
+    }
+  }
+}
+
 Future<Map<String, String>> _runBackendProbe({
   required Future<void> Function() action,
 }) async {
