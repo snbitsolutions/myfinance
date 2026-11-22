@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/constants/app_constants.dart';
+import 'core/providers/app_providers.dart';
 import 'core/services/device_identity_service.dart';
 import 'core/services/http_client.dart';
 import 'core/services/network_service.dart';
@@ -89,11 +90,13 @@ class InactivityAutoExit extends StatefulWidget {
     super.key,
     required this.child,
     this.timeout = const Duration(seconds: 60),
+    this.enabled = true,
     this.onTimeout,
   });
 
   final Widget child;
   final Duration timeout;
+  final bool enabled;
   final VoidCallback? onTimeout;
 
   @override
@@ -108,16 +111,32 @@ class _InactivityAutoExitState extends State<InactivityAutoExit>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _startIdleTimer();
+    if (widget.enabled) {
+      _startIdleTimer();
+    }
+  }
+
+  @override
+  void didUpdateWidget(InactivityAutoExit oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.enabled) {
+      _idleTimer?.cancel();
+    } else if (!oldWidget.enabled || oldWidget.timeout != widget.timeout) {
+      _startIdleTimer();
+    }
   }
 
   void _startIdleTimer() {
+    if (!widget.enabled) {
+      _idleTimer?.cancel();
+      return;
+    }
     _idleTimer?.cancel();
     _idleTimer = Timer(widget.timeout, _handleIdleTimeout);
   }
 
   void _handleIdleTimeout() {
-    if (!mounted) return;
+    if (!mounted || !widget.enabled) return;
     if (widget.onTimeout != null) {
       widget.onTimeout!();
     } else {
@@ -126,7 +145,7 @@ class _InactivityAutoExitState extends State<InactivityAutoExit>
   }
 
   void _recordActivity([PointerEvent? _]) {
-    if (mounted) {
+    if (mounted && widget.enabled) {
       _startIdleTimer();
     }
   }
@@ -134,7 +153,9 @@ class _InactivityAutoExitState extends State<InactivityAutoExit>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _startIdleTimer();
+      if (widget.enabled) {
+        _startIdleTimer();
+      }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
@@ -216,11 +237,12 @@ class RedirectLoadingOverlay extends StatelessWidget {
   }
 }
 
-class AdepaTeachersApp extends StatelessWidget {
+class AdepaTeachersApp extends ConsumerWidget {
   const AdepaTeachersApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isAuthenticated = ref.watch(authProvider).isAuthenticated;
     const appColorScheme = ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF2E8B57),
@@ -274,6 +296,7 @@ class AdepaTeachersApp extends StatelessWidget {
           valueListenable: AppRouter.redirectLoading,
           builder: (_, isLoading, inner) {
             return InactivityAutoExit(
+              enabled: isAuthenticated,
               child: RedirectLoadingOverlay(
                 isLoading: isLoading,
                 child: inner!,

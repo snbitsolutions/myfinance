@@ -47,4 +47,22 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(timeoutCount, 1);
   });
+
+  testWidgets('does not run before sign-in', (tester) async {
+    var timeoutCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: InactivityAutoExit(
+          enabled: false,
+          timeout: const Duration(seconds: 60),
+          onTimeout: () => timeoutCount++,
+          child: const Scaffold(body: Text('Signed out')),
+        ),
+      ),
+    );
+
+    await tester.pump(const Duration(minutes: 5));
+    expect(timeoutCount, 0);
+  });
 }
