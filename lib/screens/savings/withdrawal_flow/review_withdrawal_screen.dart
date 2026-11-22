@@ -40,9 +40,7 @@ class ReviewWithdrawalScreen extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    data.availableBalance == null
-                        ? 'Balance unavailable'
-                        : 'GH₵ ${data.availableBalance!.toStringAsFixed(2)}',
+                    'GH₵ ${(data.availableBalance ?? 0).toStringAsFixed(2)}',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),

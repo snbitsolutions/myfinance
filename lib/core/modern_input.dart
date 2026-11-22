@@ -14,6 +14,7 @@ class ModernInput extends StatelessWidget {
   final int? maxLines;
   final List<TextInputFormatter>? inputFormatters;
   final ValueChanged<String>? onChanged;
+  final bool obscureText;
   final String? errorText;
   final String? helperText;
   final bool enableInteractiveSelection;
@@ -30,6 +31,7 @@ class ModernInput extends StatelessWidget {
     this.maxLines = 1,
     this.inputFormatters,
     this.onChanged,
+    this.obscureText = false,
     this.errorText,
     this.helperText,
     this.enableInteractiveSelection = true,
@@ -55,6 +57,7 @@ class ModernInput extends StatelessWidget {
           controller: controller,
           enableInteractiveSelection: enableInteractiveSelection,
           keyboardType: keyboardType,
+          obscureText: obscureText,
           maxLength: maxLength,
           maxLines: maxLines,
           inputFormatters: inputFormatters,

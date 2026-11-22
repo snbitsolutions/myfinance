@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/providers/app_providers.dart';
 import 'savings_model.dart';
 
@@ -31,17 +32,10 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
     return double.tryParse(cleaned) ?? 0;
   }
 
-  bool get _canContinue => _amount > 0;
+  bool get _canContinue => _amount >= AppConstants.minimumSavingsDeposit;
 
-  Map<String, dynamic>? _selectedAccount(Map<String, dynamic>? profile) {
-    final savings = profile?['savings'];
-    if (savings is! List) return null;
-
-    for (final item in savings) {
-      if (item is! Map) continue;
-      final account = <String, dynamic>{
-        for (final entry in item.entries) entry.key.toString(): entry.value,
-      };
+  Map<String, dynamic>? _selectedAccount(List<Map<String, dynamic>> accounts) {
+    for (final account in accounts) {
       final id =
           (account['id'] ??
                   account['product_id'] ??
@@ -53,9 +47,9 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
     return null;
   }
 
-  double _readAmount(Object? value) {
+  double? _readAmount(Object? value) {
     if (value is num) return value.toDouble();
-    return double.tryParse(value?.toString().replaceAll(',', '') ?? '') ?? 0;
+    return double.tryParse(value?.toString().replaceAll(',', '') ?? '');
   }
 
   void _applyQuickAmount(int value) {
@@ -68,6 +62,20 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
   }
 
   void _continueToPayment() {
+    final savings = ref.read(savingsProvider).valueOrNull ?? const [];
+    if (!_canContinue || _selectedAccount(savings) == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _canContinue
+                ? 'No matching savings account was found. Refresh and try again.'
+                : 'The minimum deposit is GH₵ ${AppConstants.minimumSavingsDeposit.toStringAsFixed(2)}.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final returnRoute = '/savings/${widget.savingsId}';
     final destination = Uri(
       path: '/payment',
@@ -93,21 +101,38 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
     final profile = ref.watch(userProfileProvider).valueOrNull;
-    final account = _selectedAccount(profile);
+    final savingsAsync = ref.watch(savingsProvider);
+    final account = _selectedAccount(savingsAsync.valueOrNull ?? const []);
+    final remoteSavings =
+        widget.savings?.id == widget.savingsId &&
+            widget.savings?.isRemote == true
+        ? widget.savings
+        : null;
     final accountTitle =
         (account?['pro_name'] ??
                 account?['name'] ??
                 account?['product_name'] ??
-                'Savings Account')
+                remoteSavings?.title ??
+                (savingsAsync.isLoading
+                    ? 'Loading savings account'
+                    : 'Savings account not found'))
             .toString()
             .trim();
     final accountNumber =
         (profile?['account_number'] ?? profile?['accountNumber'] ?? '')
             .toString()
             .trim();
-    final balance = _readAmount(
-      account?['balance'] ?? account?['current_balance'],
-    );
+    final balance =
+        _readAmount(
+          account?['balance'] ??
+              account?['current_balance'] ??
+              account?['amount'],
+        ) ??
+        (remoteSavings?.balanceAvailable == true
+            ? remoteSavings?.balance
+            : null);
+    final canContinue =
+        _canContinue && account != null && !savingsAsync.isLoading;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7F4),
@@ -156,6 +181,7 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
                       title: accountTitle,
                       accountNumber: accountNumber,
                       balance: balance,
+                      isAvailable: account != null || remoteSavings != null,
                     ),
                     const SizedBox(height: 28),
                     Row(
@@ -173,13 +199,13 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
                             color: const Color(0xFFE5F1E9),
                             borderRadius: BorderRadius.circular(30),
                           ),
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
                               horizontal: 11,
                               vertical: 6,
                             ),
                             child: Text(
-                              'Min. GH₵ 10',
+                              'Min. GH₵ ${AppConstants.minimumSavingsDeposit.toStringAsFixed(0)}',
                               style: TextStyle(
                                 color: Color(0xFF286B45),
                                 fontSize: 11,
@@ -247,6 +273,18 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
+                    if (_amount > 0 &&
+                        _amount < AppConstants.minimumSavingsDeposit)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Text(
+                          'The minimum deposit is GH₵ ${AppConstants.minimumSavingsDeposit.toStringAsFixed(2)}.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     Wrap(
                       spacing: 9,
                       runSpacing: 9,
@@ -296,13 +334,13 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
                     _FundingOption(
                       icon: Icons.account_balance_rounded,
                       title: 'Bank account',
-                      subtitle: 'Bank deposits are not available yet',
+                      subtitle: 'Use Mobile Money; bank deposits are not enabled yet',
                       selected: _selectedMethod == 'Bank Account',
-                      unavailable: true,
+                      isDisabled: true,
                       onTap: () => ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text(
-                            'Bank-account deposits are not available yet. Use Mobile Money.',
+                            'Bank deposits are not enabled yet. Use Mobile Money.',
                           ),
                         ),
                       ),
@@ -330,7 +368,7 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
                   width: double.infinity,
                   height: 56,
                   child: FilledButton(
-                    onPressed: _canContinue ? _continueToPayment : null,
+                    onPressed: canContinue ? _continueToPayment : null,
                     style: FilledButton.styleFrom(
                       backgroundColor: primary,
                       disabledBackgroundColor: const Color(0xFFCAD5CD),
@@ -377,12 +415,14 @@ class _SavingsDepositScreenState extends ConsumerState<SavingsDepositScreen> {
 class _AccountBalanceCard extends StatelessWidget {
   final String title;
   final String accountNumber;
-  final double balance;
+  final double? balance;
+  final bool isAvailable;
 
   const _AccountBalanceCard({
     required this.title,
     required this.accountNumber,
     required this.balance,
+    required this.isAvailable,
   });
 
   @override
@@ -462,11 +502,12 @@ class _AccountBalanceCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const Icon(
-                    Icons.verified_rounded,
-                    color: Color(0xFFB7E2C4),
-                    size: 20,
-                  ),
+                  if (isAvailable)
+                    const Icon(
+                      Icons.verified_rounded,
+                      color: Color(0xFFB7E2C4),
+                      size: 20,
+                    ),
                 ],
               ),
               const SizedBox(height: 22),
@@ -481,7 +522,7 @@ class _AccountBalanceCard extends StatelessWidget {
               ),
               const SizedBox(height: 5),
               Text(
-                'GH₵ ${balance.toStringAsFixed(2)}',
+                'GH₵ ${(balance ?? 0).toStringAsFixed(2)}',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 25,
@@ -514,7 +555,7 @@ class _FundingOption extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool selected;
-  final bool unavailable;
+  final bool isDisabled;
   final VoidCallback onTap;
 
   const _FundingOption({
@@ -523,7 +564,7 @@ class _FundingOption extends StatelessWidget {
     required this.subtitle,
     required this.selected,
     required this.onTap,
-    this.unavailable = false,
+    this.isDisabled = false,
   });
 
   @override
@@ -551,14 +592,14 @@ class _FundingOption extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: unavailable
+                  color: isDisabled
                       ? const Color(0xFFF0F2F0)
                       : const Color(0xFFEAF3ED),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
                   icon,
-                  color: unavailable
+                  color: isDisabled
                       ? const Color(0xFF89948D)
                       : const Color(0xFF286B45),
                   size: 21,
@@ -572,7 +613,7 @@ class _FundingOption extends StatelessWidget {
                     Text(
                       title,
                       style: TextStyle(
-                        color: unavailable
+                        color: isDisabled
                             ? const Color(0xFF7C8980)
                             : const Color(0xFF25372B),
                         fontWeight: FontWeight.w700,
@@ -590,7 +631,7 @@ class _FundingOption extends StatelessWidget {
                   ],
                 ),
               ),
-              if (unavailable)
+              if (isDisabled)
                 const Icon(
                   Icons.lock_outline_rounded,
                   color: Color(0xFF99A39C),

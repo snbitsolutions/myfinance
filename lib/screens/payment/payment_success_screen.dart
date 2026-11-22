@@ -254,14 +254,14 @@ class _PaymentSuccessContent extends StatelessWidget {
 
   String _formatAmount() {
     final value = amount;
-    return value == null ? 'Unavailable' : 'GH₵${value.toStringAsFixed(2)}';
+    return value == null ? '—' : 'GH₵${value.toStringAsFixed(2)}';
   }
 
   String _formatReference() {
     if (reference != null && reference!.trim().isNotEmpty) {
       return reference!.trim();
     }
-    return 'Unavailable';
+    return '—';
   }
 
   @override
@@ -467,9 +467,11 @@ class _PaymentSuccessContent extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          isPending || isFailed || resolvedNewBalance == null
-                              ? 'Balance unavailable'
-                              : 'GH₵${resolvedNewBalance.toStringAsFixed(2)}',
+                          isPending
+                              ? 'Pending confirmation'
+                              : isFailed
+                              ? 'Not updated'
+                              : 'GH₵${(resolvedNewBalance ?? 0).toStringAsFixed(2)}',
                           style: theme.textTheme.bodyLarge?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
@@ -498,7 +500,7 @@ class _PaymentSuccessContent extends StatelessWidget {
 
   String _formatDateTime() {
     final date = processedAt;
-    if (date == null) return 'Unavailable';
+    if (date == null) return '—';
     final months = [
       'Jan',
       'Feb',

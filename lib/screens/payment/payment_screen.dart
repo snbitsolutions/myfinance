@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
 import '../../core/color_ext.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/exceptions/app_exceptions.dart';
 import '../../core/layout/responsive.dart';
 import '../../core/modern_input.dart';
@@ -102,9 +103,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   String? _resolvedSavingsId(List<Map<String, dynamic>> accounts) {
     final routeId = widget.savingsId?.trim();
     if (routeId != null && routeId.isNotEmpty && routeId != 'member-savings') {
-      return routeId;
+      return accounts.any((account) => _accountProductId(account) == routeId)
+          ? routeId
+          : null;
     }
-    if (_selectedSavingsId != null) return _selectedSavingsId;
+    if (_selectedSavingsId != null &&
+        accounts.any(
+          (account) => _accountProductId(account) == _selectedSavingsId,
+        )) {
+      return _selectedSavingsId;
+    }
     return accounts.length == 1 ? _accountProductId(accounts.single) : null;
   }
 
@@ -114,8 +122,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       return;
     }
 
-    final message =
-        'This payment is unavailable because no matching backend operation is configured. No payment has been made.';
+    const message =
+        'This payment type is not configured. No payment has been made.';
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
@@ -130,10 +138,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final savingsAccounts = ref.read(savingsProvider).valueOrNull ?? const [];
     final savingsId = _resolvedSavingsId(savingsAccounts);
 
-    if (amount <= 0) {
+    if (amount < AppConstants.minimumSavingsDeposit) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid deposit amount.')),
+        SnackBar(
+          content: Text(
+            'The minimum deposit is GH₵ ${AppConstants.minimumSavingsDeposit.toStringAsFixed(2)}.',
+          ),
+        ),
       );
       return;
     }
@@ -300,7 +312,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final showMomoPhoneError =
         isMomo && momoPhone.isNotEmpty && !isMomoPhoneValid;
     final canProceed =
-        amt > 0 &&
+        (isDepositFlow ? amt >= AppConstants.minimumSavingsDeposit : amt > 0) &&
         (!isMomo || isMomoPhoneValid) &&
         (!isDepositFlow || (isMomo && selectedSavingsId != null));
     final selectedSource = useExistingAccount
@@ -784,7 +796,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                             ? _isReceiveMoneyFlow
                                   ? 'Request MoMo Deposit'
                                   : 'Deposit now'
-                            : 'Payment unavailable',
+                            : 'Payment option not set up',
                       ),
                       style: FilledButton.styleFrom(
                         elevation: 0,

@@ -1779,7 +1779,7 @@ class SavingsService extends BaseService {
                   AppConstants.minimumSavingsBalanceAfterWithdrawal) {
         throw ValidationException(
           message:
-              'A minimum balance of GH₵'
+              'Insufficient balance. At least GH₵'
               '${AppConstants.minimumSavingsBalanceAfterWithdrawal.toStringAsFixed(2)} '
               'must remain in your account after withdrawal.',
         );
@@ -2098,11 +2098,23 @@ class PaymentService extends BaseService {
       final status = data['status'];
       final normalizedStatus = status?.toString().trim().toLowerCase();
       final responseCode = data['ResponseCode']?.toString().trim();
+      final responseMessage =
+          data['message']?.toString() ??
+          data['Message']?.toString() ??
+          data['error']?.toString() ??
+          '';
+      final indicatesInsufficientBalance = RegExp(
+        r'insufficient\s+(?:(?:account|available)\s+)?(?:funds?|balance)|'
+        r'(?:not enough|too low).{0,40}(?:funds?|balance)|'
+        r'(?:funds?|balance).{0,40}(?:not enough|too low)',
+        caseSensitive: false,
+      ).hasMatch(responseMessage);
       final isExplicitFailure =
           status == false ||
           normalizedStatus == '0' ||
           data['success'] == false ||
           data['is_success'] == false ||
+          indicatesInsufficientBalance ||
           const {
             'cancelled',
             'canceled',
@@ -2115,10 +2127,9 @@ class PaymentService extends BaseService {
           }.contains(normalizedStatus);
       if (isExplicitFailure) {
         throw GenericException(
-          message:
-              data['message']?.toString() ??
-              data['Message']?.toString() ??
-              failureMessage,
+          message: responseMessage.isNotEmpty
+              ? responseMessage
+              : failureMessage,
         );
       }
 

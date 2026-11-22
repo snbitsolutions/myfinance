@@ -40,6 +40,28 @@ class SavingsTip {
 
 enum GoalsSortOption { closestToGoal, highestBalance, newest }
 
+class _FixedDepositTag extends StatelessWidget {
+  final String label;
+
+  const _FixedDepositTag({required this.label});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF2EAF7),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Text(
+      label,
+      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+        color: const Color(0xFF74468A),
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
+}
+
 class _SavingsScreenState extends ConsumerState<SavingsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
@@ -445,85 +467,6 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
     });
   }
 
-  Future<void> _showCreateSavingsTypePicker() async {
-    final selected = await showModalBottomSheet<SavingsType>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) {
-        final theme = Theme.of(sheetContext);
-        final maxListHeight = MediaQuery.sizeOf(sheetContext).height * 0.45;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Choose Savings Type',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Pick the type you want to create before continuing.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacitySafe(0.62),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: maxListHeight),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: SavingsType.values
-                          .map(
-                            (type) => ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: CircleAvatar(
-                                backgroundColor: _goalAccentColor(
-                                  theme,
-                                  type,
-                                ).withOpacitySafe(0.14),
-                                child: Icon(
-                                  type.icon,
-                                  color: _goalAccentColor(theme, type),
-                                ),
-                              ),
-                              title: Text(type.label),
-                              subtitle: Text(type.description),
-                              trailing: const Icon(Icons.chevron_right_rounded),
-                              onTap: () => Navigator.of(sheetContext).pop(type),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-
-    if (!mounted || selected == null) return;
-
-    final typeQuery = switch (selected) {
-      SavingsType.memberSaving => 'member',
-      SavingsType.currentSaving => 'current',
-      SavingsType.kiddySaving => 'kiddy',
-      SavingsType.fixedDeposit => 'fixed',
-    };
-    context.go('/savings/create?type=$typeQuery');
-  }
-
   Future<void> _showSavingsTypeLongPressPicker() async {
     final selected = await showModalBottomSheet<SavingsType>(
       context: context,
@@ -574,14 +517,6 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                   ),
                 ),
                 const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.of(sheetContext).pop();
-                    context.go('/savings/types');
-                  },
-                  icon: const Icon(Icons.category_outlined),
-                  label: const Text('Open Full Type Catalog'),
-                ),
               ],
             ),
           ),
@@ -608,11 +543,13 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
     final theme = Theme.of(context);
 
     final apiSavingsAsync = ref.watch(savingsProvider);
+    final fixedDepositsAsync = ref.watch(fixedDepositsProvider);
     final apiSavings = (apiSavingsAsync.valueOrNull ?? [])
         .map(_mapToSavings)
         .where((s) => s.id.isNotEmpty || s.title.isNotEmpty)
         .toList();
     final allSavings = apiSavings;
+    final fixedDepositAccounts = fixedDepositsAsync.valueOrNull ?? const [];
     final balance = allSavings.fold<double>(0, (sum, s) => sum + s.balance);
     final hasBalances = allSavings.every((s) => s.balanceAvailable);
     final accountList = allSavings.take(2).toList();
@@ -629,13 +566,6 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           tooltip: 'Back',
         ),
-        actions: [
-          IconButton(
-            onPressed: () => context.go('/savings/create'),
-            icon: const Icon(Icons.add_circle_outline_rounded),
-            tooltip: 'Open New Savings',
-          ),
-        ],
       ),
       body: SafeArea(
         top: false,
@@ -698,8 +628,10 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                             context,
                             icon: Icons.account_balance_wallet,
                             label: 'Total Accounts',
-                            value: apiSavingsAsync.hasValue
-                                ? '${accountList.length}'
+                            value:
+                                apiSavingsAsync.hasValue &&
+                                    fixedDepositsAsync.hasValue
+                                ? '${accountList.length + fixedDepositAccounts.length}'
                                 : '—',
                           ),
                         ),
@@ -956,6 +888,161 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                           ],
                         ),
                       ),
+                    ),
+                  );
+                }),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Fixed Deposit Accounts',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: const Color(0xFF1D2B26),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  if (fixedDepositsAsync.hasValue)
+                    Text(
+                      '${fixedDepositAccounts.length}',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: const Color(0xFF6D7B73),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              if (fixedDepositsAsync.isLoading)
+                const AppCard(
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      SizedBox(width: 12),
+                      Text('Loading fixed deposit accounts…'),
+                    ],
+                  ),
+                )
+              else if (fixedDepositsAsync.hasError)
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Fixed deposit accounts are unavailable.'),
+                      TextButton.icon(
+                        onPressed: () => ref.invalidate(fixedDepositsProvider),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              else if (fixedDepositAccounts.isEmpty)
+                const AppCard(child: Text('No fixed deposit accounts found.'))
+              else
+                ...fixedDepositAccounts.map((deposit) {
+                  final id = deposit['id']?.toString().trim() ?? '';
+                  final plan =
+                      deposit['plan']?.toString().trim().isNotEmpty == true
+                      ? deposit['plan'].toString()
+                      : 'Fixed Deposit';
+                  final principal = _toDouble(deposit['principal']);
+                  final hasPrincipal = deposit['principal'] != null;
+                  final interestRate = deposit['interest_rate']?.toString();
+                  final maturityDate = deposit['maturity_date']
+                      ?.toString()
+                      .trim();
+
+                  return AppCard(
+                    padding: const EdgeInsets.all(14),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    onTap: id.isEmpty
+                        ? null
+                        : () => context.go(
+                            '/investments/${Uri.encodeComponent(id)}',
+                          ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF2EAF7),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(
+                            Icons.lock_clock_rounded,
+                            color: Color(0xFF8E5AA8),
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                plan,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: const Color(0xFF1D2B26),
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  if (interestRate != null &&
+                                      interestRate.isNotEmpty)
+                                    _FixedDepositTag(
+                                      label: '$interestRate% interest',
+                                    ),
+                                  if (maturityDate != null &&
+                                      maturityDate.isNotEmpty &&
+                                      maturityDate != '—')
+                                    _FixedDepositTag(
+                                      label: 'Matures $maturityDate',
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              hasPrincipal
+                                  ? 'GH₵${principal.toStringAsFixed(2)}'
+                                  : 'Unavailable',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: const Color(0xFF1A8F5A),
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Principal',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: const Color(0xFF6B7A74),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: Color(0xFF6B7A74),
+                        ),
+                      ],
                     ),
                   );
                 }),
@@ -1239,25 +1326,6 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                           ),
                         ],
                       ),
-                      // Open new savings action placeholder
-                      InkWell(
-                        onTap: _showCreateSavingsTypePicker,
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.add_circle_outline,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Open New Savings',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.95),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -1452,11 +1520,6 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
-                TextButton.icon(
-                  onPressed: _showCreateSavingsTypePicker,
-                  icon: const Icon(Icons.add_circle_outline, size: 18),
-                  label: const Text('New Goal'),
                 ),
               ],
             ),
@@ -1665,11 +1728,6 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                               spacing: 10,
                               runSpacing: 10,
                               children: [
-                                FilledButton.icon(
-                                  onPressed: _showCreateSavingsTypePicker,
-                                  icon: const Icon(Icons.add_circle_outline),
-                                  label: const Text('New Goal'),
-                                ),
                                 if (_selectedTypeFilter != null)
                                   OutlinedButton.icon(
                                     onPressed: () {

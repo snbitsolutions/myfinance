@@ -72,7 +72,7 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
 
   String _maskedAccountNumber(String accountNumber) {
     final trimmed = accountNumber.trim();
-    if (trimmed.isEmpty) return 'Account number unavailable';
+    if (trimmed.isEmpty) return '—';
     final suffix = trimmed.length <= 4
         ? trimmed
         : trimmed.substring(trimmed.length - 4);
@@ -228,8 +228,8 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
                         balance <
                                 AppConstants
                                     .minimumSavingsBalanceAfterWithdrawal
-                            ? 'Your balance is below the required minimum of GH₵${AppConstants.minimumSavingsBalanceAfterWithdrawal.toStringAsFixed(2)}.'
-                            : 'Reduce the amount to leave at least GH₵${AppConstants.minimumSavingsBalanceAfterWithdrawal.toStringAsFixed(2)} in your account.',
+                            ? 'Insufficient balance. You need at least GH₵${AppConstants.minimumSavingsBalanceAfterWithdrawal.toStringAsFixed(2)} in this account to withdraw.'
+                            : 'Insufficient balance. Reduce the amount so at least GH₵${AppConstants.minimumSavingsBalanceAfterWithdrawal.toStringAsFixed(2)} remains.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.error,
                           fontWeight: FontWeight.w600,
@@ -485,9 +485,7 @@ class _WithdrawalBalanceCard extends StatelessWidget {
               ),
               const SizedBox(height: 5),
               Text(
-                availableBalance == null
-                    ? 'Unavailable'
-                    : 'GH₵ ${availableBalance.toStringAsFixed(2)}',
+                'GH₵ ${(availableBalance ?? 0).toStringAsFixed(2)}',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 25,

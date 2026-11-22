@@ -15,18 +15,23 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final dateFormat = data.processedAt != null
         ? '${data.processedAt!.day}/${data.processedAt!.month}/${data.processedAt!.year} at ${data.processedAt!.hour}:${data.processedAt!.minute.toString().padLeft(2, '0')}'
-        : 'N/A';
+        : '—';
+    final reference = data.reference?.trim().isNotEmpty == true
+        ? data.reference!
+        : '—';
+    final balance = data.isPending
+        ? 'Pending confirmation'
+        : 'GH₵ ${(data.newBalance ?? 0).toStringAsFixed(2)}';
     final receiptText = [
       'ADEPA - Withdrawal Receipt',
       'Status: ${data.isPending ? 'Pending' : 'Provider reported completion'}',
       'Amount: GH₵ ${data.amount.toStringAsFixed(2)}',
       'Date: $dateFormat',
-      'Reference: ${data.reference ?? 'N/A'}',
+      'Reference: $reference',
       'Withdrawal method: ${data.method}',
       'Destination: ${data.phoneNumber}',
       'Account: ${data.fromAccount}',
-      if (data.newBalance != null && !data.isPending)
-        'New balance: GH₵ ${data.newBalance!.toStringAsFixed(2)}',
+      'New balance: $balance',
     ].join('\n');
 
     return Scaffold(
@@ -196,7 +201,7 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
                           data.isPending
                               ? 'Request Reference'
                               : 'Provider Reference',
-                          data.reference ?? 'N/A',
+                          reference,
                           theme,
                         ),
                         _Divider(theme),
@@ -228,9 +233,7 @@ class ReceiptWithdrawalScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          data.isPending || data.newBalance == null
-                              ? 'Unavailable'
-                              : 'GH₵ ${data.newBalance!.toStringAsFixed(2)}',
+                          balance,
                           style: theme.textTheme.displaySmall?.copyWith(
                             fontWeight: FontWeight.w800,
                             color: theme.colorScheme.primary,

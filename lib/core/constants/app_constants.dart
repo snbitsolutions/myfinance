@@ -47,6 +47,7 @@ class AppConstants {
   static const double savingsMinTarget = 50;
   static const double savingsMaxTarget = 1000000;
   static const double savingsInterestRate = 2.5; // 2.5% p.a.
+  static const double minimumSavingsDeposit = 10;
   static const double minimumSavingsBalanceAfterWithdrawal = 50;
 
   // UI

@@ -21,52 +21,211 @@ class InvestmentDetailScreen extends ConsumerWidget {
               investmentId,
         )
         .firstOrNull;
+    final isFixedDeposit =
+        '${investment?['type'] ?? investment?['investment_type'] ?? ''}'
+            .toLowerCase() ==
+        'fixed deposit';
+    final title = isFixedDeposit ? 'Fixed Deposit' : 'Investment Details';
 
     return AppScaffold(
-      title: 'Investment Details',
+      title: title,
       child: investments.isLoading
           ? const Center(child: CircularProgressIndicator())
           : investments.hasError
           ? const _Unavailable(
-              title: 'Investment data unavailable',
+              title: 'Account data unavailable',
               body:
-                  'The documented customer API does not provide an investments endpoint.',
+                  'We could not load this account right now. Please try again.',
             )
           : investment == null
           ? const _Unavailable(
-              title: 'Investment details unavailable',
+              title: 'Account details unavailable',
               body:
-                  'No documented investment detail record matches this account.',
+                  'No account record matches this selection.',
             )
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                AppCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${investment['type'] ?? investment['investment_type'] ?? 'Investment'}',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Current value: ${_amount(investment['current_value'] ?? investment['value'] ?? investment['balance'])}',
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Interest, maturity, and transaction history: Unavailable',
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+          : _AccountDetails(
+              investment: investment,
+              isFixedDeposit: isFixedDeposit,
             ),
     );
   }
 
-  static String _amount(Object? value) =>
-      value is num ? 'GH₵ ${value.toStringAsFixed(2)}' : 'Unavailable';
+  static String _amount(Object? value) {
+    final amount = value is num
+        ? value.toDouble()
+        : double.tryParse(value?.toString().replaceAll(',', '') ?? '');
+    return amount == null ? 'Unavailable' : 'GH₵ ${amount.toStringAsFixed(2)}';
+  }
+}
+
+class _AccountDetails extends StatelessWidget {
+  final Map<String, dynamic> investment;
+  final bool isFixedDeposit;
+
+  const _AccountDetails({
+    required this.investment,
+    required this.isFixedDeposit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final principal = investment['principal'];
+    final currentValue =
+        investment['current_value'] ??
+        investment['value'] ??
+        investment['balance'];
+    final plan =
+        investment['plan'] ??
+        investment['plan_name'] ??
+        investment['pro_name'] ??
+        'Investment Plan';
+    final details = <(String, String)>[
+      if (principal != null)
+        ('Principal', InvestmentDetailScreen._amount(principal)),
+      if (investment['interest_rate'] != null)
+        ('Interest rate', '${investment['interest_rate']}%'),
+      if (investment['duration'] != null) ('Term', '${investment['duration']} days'),
+      if (investment['start_date'] != null)
+        ('Opened', '${investment['start_date']}'),
+      if (investment['maturity_date'] != null &&
+          investment['maturity_date'] != '—')
+        ('Maturity date', '${investment['maturity_date']}'),
+      if (investment['status'] != null) ('Status', '${investment['status']}'),
+    ];
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0D6B4D), Color(0xFF2D8E66)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0D6B4D).withValues(alpha: 0.18),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      isFixedDeposit
+                          ? Icons.lock_clock_rounded
+                          : Icons.account_balance_rounded,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '$plan',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Current value',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.78),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                InvestmentDetailScreen._amount(currentValue),
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          'Account details',
+          style: theme.textTheme.titleMedium?.copyWith(
+            color: const Color(0xFF1D2B26),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 10),
+        AppCard(
+          margin: EdgeInsets.zero,
+          child: Column(
+            children: [
+              for (var index = 0; index < details.length; index++) ...[
+                _DetailRow(label: details[index].$1, value: details[index].$2),
+                if (index < details.length - 1)
+                  const Divider(height: 18, color: Color(0xFFE3EAE6)),
+              ],
+              if (details.isEmpty)
+                Text(
+                  'Additional account details are not available.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF6B7A74),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _DetailRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        label,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: const Color(0xFF6B7A74),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      const SizedBox(width: 12),
+      Flexible(
+        child: Text(
+          value,
+          textAlign: TextAlign.end,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: const Color(0xFF1D2B26),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    ],
+  );
 }
 
 class _Unavailable extends StatelessWidget {

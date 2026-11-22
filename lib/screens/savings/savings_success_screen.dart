@@ -217,22 +217,6 @@ class _SavingsSuccessScreenState extends State<SavingsSuccessScreen>
 
             const SizedBox(height: 12),
 
-            // Secondary Action: Create Another Goal
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  // Navigate back to type picker
-                  context.go('/savings/types');
-                },
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Create Another Goal'),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
             // Tertiary Action: Back to Savings
             SizedBox(
               width: double.infinity,

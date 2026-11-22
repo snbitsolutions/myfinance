@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/exceptions/app_exceptions.dart';
 import '../../../core/app_scaffold.dart';
 import '../../../core/color_ext.dart';
 import '../../../core/providers/app_providers.dart';
@@ -94,9 +95,11 @@ class _ProcessingWithdrawalScreenState
       if (!mounted) return;
       AppLogger.error('Withdrawal outcome could not be confirmed.', error);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'We could not confirm the withdrawal. Check your balance or transaction history before trying again.',
+            error is AppException
+                ? error.message
+                : 'We could not confirm the withdrawal. Check your balance or transaction history before trying again.',
           ),
         ),
       );

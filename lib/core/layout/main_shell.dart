@@ -47,81 +47,81 @@ class MainShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final currentLocation = GoRouterState.of(context).matchedLocation;
     final currentIndex = _resolveIndex(currentLocation);
-    final isStandaloneSavingsView =
-        currentLocation == '/savings' || currentLocation.startsWith('/savings/');
-    final isStandalonePaymentView =
-        currentLocation == '/payment' || currentLocation.startsWith('/payment/');
-    final isStandaloneLoansView =
-        currentLocation == '/loans' || currentLocation.startsWith('/loans/');
 
     return Scaffold(
       body: SafeArea(child: child),
-      bottomNavigationBar: isStandaloneSavingsView || isStandalonePaymentView || isStandaloneLoansView
-          ? null
-          : Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 12,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                  child: BottomNavigationBar(
-                    currentIndex: currentIndex,
-                    type: BottomNavigationBarType.fixed,
-                    backgroundColor: Colors.transparent,
-                    selectedItemColor: const Color(0xFF0F8E5D),
-                    unselectedItemColor: const Color(0xFF7B8A7F),
-                    selectedFontSize: 11,
-                    unselectedFontSize: 10,
-                    showSelectedLabels: true,
-                    showUnselectedLabels: true,
-                    elevation: 0,
-                    selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),
-                    unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-                    onTap: (index) {
-                      final destination = _items[index].route;
-                      if (currentLocation != destination) {
-                        context.go(destination);
-                      }
-                    },
-                    items: _items
-                        .map(
-                          (item) => BottomNavigationBarItem(
-                            icon: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                                color: currentLocation == item.route
-                                    ? const Color(0xFFEAF5EE)
-                                    : Colors.transparent,
-                              ),
-                              child: Icon(item.icon, size: 22),
-                            ),
-                            activeIcon: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                                color: const Color(0xFFEAF5EE),
-                              ),
-                              child: Icon(item.icon, size: 22, color: const Color(0xFF0F8E5D)),
-                            ),
-                            label: item.label,
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ),
-              ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 12,
+              offset: const Offset(0, -2),
             ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            child: BottomNavigationBar(
+              currentIndex: currentIndex,
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: Colors.transparent,
+              selectedItemColor: const Color(0xFF0F8E5D),
+              unselectedItemColor: const Color(0xFF7B8A7F),
+              selectedFontSize: 11,
+              unselectedFontSize: 10,
+              showSelectedLabels: true,
+              showUnselectedLabels: true,
+              elevation: 0,
+              selectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.w700,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.w600,
+              ),
+              onTap: (index) {
+                final destination = _items[index].route;
+                if (currentLocation != destination) {
+                  context.go(destination);
+                }
+              },
+              items: _items
+                  .map(
+                    (item) => BottomNavigationBarItem(
+                      icon: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: currentLocation == item.route
+                              ? const Color(0xFFEAF5EE)
+                              : Colors.transparent,
+                        ),
+                        child: Icon(item.icon, size: 22),
+                      ),
+                      activeIcon: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: const Color(0xFFEAF5EE),
+                        ),
+                        child: Icon(
+                          item.icon,
+                          size: 22,
+                          color: const Color(0xFF0F8E5D),
+                        ),
+                      ),
+                      label: item.label,
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -614,23 +614,6 @@ class AppRouter {
             return RepaymentScreen(loanId: loanId);
           },
         ),
-        GoRoute(
-          path: '/investments',
-          builder: (context, state) => const InvestmentsScreen(),
-          routes: [
-            GoRoute(
-              path: ':id',
-              builder: (context, state) {
-                final investmentId = state.pathParameters['id'];
-                return InvestmentDetailScreen(investmentId: investmentId);
-              },
-            ),
-          ],
-        ),
-        GoRoute(
-          path: '/investment/activity',
-          redirect: (context, state) => '/investments',
-        ),
         // Withdrawal flow routes
         GoRoute(
           path: '/withdrawal',
@@ -756,16 +739,7 @@ class AppRouter {
             ),
             GoRoute(
               path: '/savings/create',
-              builder: (context, state) {
-                final type = state.uri.queryParameters['type'];
-                final selectedType = switch (type) {
-                  'current' => SavingsType.currentSaving,
-                  'kiddy' => SavingsType.kiddySaving,
-                  'fixed' => SavingsType.fixedDeposit,
-                  _ => SavingsType.memberSaving,
-                };
-                return CreateSavingsScreen(initialType: selectedType);
-              },
+              builder: (context, state) => const CreateSavingsScreen(),
             ),
             GoRoute(
               path: '/savings/types',
@@ -889,6 +863,23 @@ class AppRouter {
             GoRoute(
               path: '/more',
               builder: (context, state) => const ProfileScreen(),
+            ),
+            GoRoute(
+              path: '/investments',
+              builder: (context, state) => const InvestmentsScreen(),
+              routes: [
+                GoRoute(
+                  path: ':id',
+                  builder: (context, state) {
+                    final investmentId = state.pathParameters['id'];
+                    return InvestmentDetailScreen(investmentId: investmentId);
+                  },
+                ),
+              ],
+            ),
+            GoRoute(
+              path: '/investment/activity',
+              redirect: (context, state) => '/investments',
             ),
             GoRoute(
               path: '/loans',

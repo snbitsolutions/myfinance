@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/constants/app_constants.dart';
@@ -80,6 +81,84 @@ Future<void> _seedDebugBypassIdentity(SharedPreferences prefs) async {
 
   if (debugPin.isNotEmpty) {
     await SecureAuthStorage.instance.storePin(debugPin);
+  }
+}
+
+class InactivityAutoExit extends StatefulWidget {
+  const InactivityAutoExit({
+    super.key,
+    required this.child,
+    this.timeout = const Duration(seconds: 60),
+    this.onTimeout,
+  });
+
+  final Widget child;
+  final Duration timeout;
+  final VoidCallback? onTimeout;
+
+  @override
+  State<InactivityAutoExit> createState() => _InactivityAutoExitState();
+}
+
+class _InactivityAutoExitState extends State<InactivityAutoExit>
+    with WidgetsBindingObserver {
+  Timer? _idleTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startIdleTimer();
+  }
+
+  void _startIdleTimer() {
+    _idleTimer?.cancel();
+    _idleTimer = Timer(widget.timeout, _handleIdleTimeout);
+  }
+
+  void _handleIdleTimeout() {
+    if (!mounted) return;
+    if (widget.onTimeout != null) {
+      widget.onTimeout!();
+    } else {
+      SystemNavigator.pop();
+    }
+  }
+
+  void _recordActivity([PointerEvent? _]) {
+    if (mounted) {
+      _startIdleTimer();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startIdleTimer();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      _idleTimer?.cancel();
+    }
+  }
+
+  @override
+  void dispose() {
+    _idleTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: _recordActivity,
+      onPointerMove: _recordActivity,
+      onPointerUp: _recordActivity,
+      onPointerCancel: _recordActivity,
+      child: widget.child,
+    );
   }
 }
 
@@ -194,7 +273,12 @@ class AdepaTeachersApp extends StatelessWidget {
         return ValueListenableBuilder<bool>(
           valueListenable: AppRouter.redirectLoading,
           builder: (_, isLoading, inner) {
-            return RedirectLoadingOverlay(isLoading: isLoading, child: inner!);
+            return InactivityAutoExit(
+              child: RedirectLoadingOverlay(
+                isLoading: isLoading,
+                child: inner!,
+              ),
+            );
           },
           child: constrainedChild,
         );

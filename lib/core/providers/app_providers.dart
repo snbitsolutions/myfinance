@@ -1527,6 +1527,69 @@ final sharesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   return result;
 });
 
+final fixedDepositsProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
+  final credentials = ref.watch(memberCredentialsProvider);
+  final account = credentials['account']?.trim() ?? '';
+  if (account.isEmpty) {
+    throw ValidationException(
+      message: 'Your account details are missing. Please sign in again.',
+    );
+  }
+
+  final imeiNumber = await ref
+      .watch(deviceIdentityServiceProvider)
+      .getBackendDeviceNumber();
+  final response = await ref
+      .watch(savingsServiceProvider)
+      .getFixedDeposits(accountNumber: account, imeiNumber: imeiNumber);
+  final data = response['data'];
+  if (data is! List) return [];
+
+  return data.whereType<Map<String, dynamic>>().map((deposit) {
+    final principal =
+        deposit['principal'] ??
+        deposit['principal_amount'] ??
+        deposit['deposit_amount'] ??
+        deposit['initial_amount'] ??
+        deposit['amount'] ??
+        deposit['balance'];
+    final currentValue =
+        deposit['current_value'] ??
+        deposit['maturity_value'] ??
+        deposit['maturity_amount'] ??
+        deposit['balance'] ??
+        principal;
+    return {
+      ...deposit,
+      'id':
+          deposit['investment_id'] ??
+          deposit['fixed_deposit_id'] ??
+          deposit['savings_id'] ??
+          deposit['id'] ??
+          '',
+      'type': 'Fixed Deposit',
+      'plan':
+          deposit['plan'] ??
+          deposit['product_name'] ??
+          deposit['pro_name'] ??
+          deposit['name'] ??
+          'Fixed Deposit',
+      'status': deposit['status'] ?? deposit['pro_status'],
+      'principal': principal,
+      'current_value': currentValue,
+      'total_interest':
+          deposit['total_interest'] ?? deposit['interest_earned'],
+      'maturity_date':
+          deposit['maturity_date'] ??
+          deposit['maturity'] ??
+          deposit['end_date'] ??
+          '—',
+    };
+  }).toList();
+});
+
 final investmentsApiProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
@@ -1559,58 +1622,7 @@ final investmentsApiProvider = FutureProvider<List<Map<String, dynamic>>>((
   }
 
   try {
-    final imeiNumber = await ref
-        .watch(deviceIdentityServiceProvider)
-        .getBackendDeviceNumber();
-    final response = await ref
-        .watch(savingsServiceProvider)
-        .getFixedDeposits(accountNumber: account, imeiNumber: imeiNumber);
-    final data = response['data'];
-    if (data is List) {
-      investmentRecords.addAll(
-        data.whereType<Map<String, dynamic>>().map((deposit) {
-          final principal =
-              deposit['principal'] ??
-              deposit['principal_amount'] ??
-              deposit['deposit_amount'] ??
-              deposit['initial_amount'] ??
-              deposit['amount'] ??
-              deposit['balance'];
-          final currentValue =
-              deposit['current_value'] ??
-              deposit['maturity_value'] ??
-              deposit['maturity_amount'] ??
-              deposit['balance'] ??
-              principal;
-          return {
-            ...deposit,
-            'id':
-                deposit['investment_id'] ??
-                deposit['fixed_deposit_id'] ??
-                deposit['savings_id'] ??
-                deposit['id'] ??
-                '',
-            'type': 'Fixed Deposit',
-            'plan':
-                deposit['plan'] ??
-                deposit['product_name'] ??
-                deposit['pro_name'] ??
-                deposit['name'] ??
-                'Fixed Deposit',
-            'status': deposit['status'] ?? deposit['pro_status'],
-            'principal': principal,
-            'current_value': currentValue,
-            'total_interest':
-                deposit['total_interest'] ?? deposit['interest_earned'],
-            'maturity_date':
-                deposit['maturity_date'] ??
-                deposit['maturity'] ??
-                deposit['end_date'] ??
-                '—',
-          };
-        }),
-      );
-    }
+    investmentRecords.addAll(await ref.watch(fixedDepositsProvider.future));
   } on AppException catch (error) {
     if (investmentRecords.isEmpty) {
       rethrow;
@@ -1751,6 +1763,7 @@ Future<void> refreshMemberAccountData(
     }
   }
   if (refreshInvestments) {
+    ref.invalidate(fixedDepositsProvider);
     ref.invalidate(investmentsApiProvider);
     try {
       await ref.read(investmentsApiProvider.future);

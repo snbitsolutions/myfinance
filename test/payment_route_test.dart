@@ -183,4 +183,75 @@ void main() {
     expect(find.text('Deposit now'), findsOneWidget);
     expect(find.text('Deposit Amount'), findsOneWidget);
   });
+
+  testWidgets('deposit payment requires at least GH₵10', (tester) async {
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const PaymentScreen(
+            sourceLabel: 'Deposit',
+            initialAmount: 9.99,
+            savingsId: '59656',
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          savingsProvider.overrideWith(
+            (ref) async => [
+              {'savings_id': '59656', 'name': 'Test Savings'},
+            ],
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final amountField = find.byType(TextField).first;
+    await tester.enterText(find.byType(TextField).last, '0241234567');
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Deposit now'),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    await tester.enterText(amountField, '10');
+    await tester.pump();
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Deposit now'),
+          )
+          .onPressed,
+      isNotNull,
+    );
+  });
+
+  testWidgets('unconfigured payment uses clear setup wording', (tester) async {
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        GoRoute(path: '/', builder: (context, state) => const PaymentScreen()),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(child: MaterialApp.router(routerConfig: router)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Payment option not set up'), findsOneWidget);
+    expect(find.textContaining('unavailable'), findsNothing);
+  });
 }

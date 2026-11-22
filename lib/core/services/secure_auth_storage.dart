@@ -201,6 +201,26 @@ class SecureAuthStorage {
     return null;
   }
 
+  Future<void> verifyPin(String candidate) async {
+    final normalized = candidate.trim();
+    if (!RegExp(r'^\d{4}$').hasMatch(normalized)) {
+      throw ValidationException(message: 'PIN must be exactly 4 digits.');
+    }
+
+    final storedPin = await readPin();
+    if (storedPin == null || storedPin.isEmpty) {
+      throw ValidationException(
+        message:
+            'No securely saved PIN is available. Sign in again to continue.',
+      );
+    }
+    if (storedPin.trim() != normalized) {
+      throw ValidationException(
+        message: 'Incorrect PIN. Enter your mobile banking PIN.',
+      );
+    }
+  }
+
   Future<void> clearPin() async {
     await initialize();
     try {
