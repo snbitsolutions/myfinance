@@ -256,12 +256,6 @@ class SecureAuthStorage {
     await _storage.delete(
       key: AppConstants.secureStorageKeyDeviceVerifiedSession,
     );
-    try {
-      await _storage.delete(key: AppConstants.secureStorageKeyUserPin);
-    } catch (_) {}
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(AppConstants.sharedPrefKeyUserPin);
   }
 
   Future<void> _migrateLegacyTokens() async {
