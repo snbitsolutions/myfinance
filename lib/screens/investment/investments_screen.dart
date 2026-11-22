@@ -22,6 +22,16 @@ class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
     final investmentsAsync = ref.watch(investmentsApiProvider);
     final apiInvestments = investmentsAsync.valueOrNull ?? const [];
     final displayedInvestments = apiInvestments.map(_mapApiInvestment).toList();
+    final fixedDeposits = displayedInvestments
+        .where(
+          (item) =>
+              '${item['type'] ?? ''}'.toLowerCase().contains('fixed') ||
+              '${item['plan'] ?? ''}'.toLowerCase().contains('fixed deposit'),
+        )
+        .toList();
+    final otherInvestments = displayedInvestments
+        .where((item) => !fixedDeposits.contains(item))
+        .toList();
 
     final totalBalance = displayedInvestments.fold<double>(
       0,
@@ -184,6 +194,58 @@ class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
               ),
               const SizedBox(height: 16),
 
+              // Fixed Deposits Section
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Fixed Deposits',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (!investmentsAsync.isLoading && !investmentsAsync.hasError)
+                    Text(
+                      '${fixedDeposits.length}',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (investmentsAsync.isLoading)
+                const AppCard(child: Center(child: CircularProgressIndicator()))
+              else if (investmentsAsync.hasError)
+                AppCard(
+                  child: Text(
+                    'Fixed deposit accounts are unavailable.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                )
+              else if (fixedDeposits.isEmpty)
+                AppCard(
+                  child: Text(
+                    'You do not have any fixed deposit accounts yet.',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                )
+              else
+                ...fixedDeposits.map(
+                  (investment) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _InvestmentCard(
+                      investment: investment,
+                      theme: theme,
+                      onTap: () => context.go(
+                        '/investments/${investment['id'] ?? 'unknown'}',
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 16),
+
               // My Investments Section
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -223,7 +285,7 @@ class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
                     ],
                   ),
                 )
-              else if (displayedInvestments.isEmpty)
+              else if (otherInvestments.isEmpty)
                 AppCard(
                   child: Text(
                     'You do not have any investment accounts yet.',
@@ -231,7 +293,7 @@ class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
                   ),
                 )
               else
-                ...displayedInvestments.map(
+                ...otherInvestments.map(
                   (investment) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _InvestmentCard(

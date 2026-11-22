@@ -40,28 +40,6 @@ class SavingsTip {
 
 enum GoalsSortOption { closestToGoal, highestBalance, newest }
 
-class _FixedDepositTag extends StatelessWidget {
-  final String label;
-
-  const _FixedDepositTag({required this.label});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(
-      color: const Color(0xFFF2EAF7),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Text(
-      label,
-      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-        color: const Color(0xFF74468A),
-        fontWeight: FontWeight.w700,
-      ),
-    ),
-  );
-}
-
 class _SavingsScreenState extends ConsumerState<SavingsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
@@ -543,13 +521,11 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
     final theme = Theme.of(context);
 
     final apiSavingsAsync = ref.watch(savingsProvider);
-    final fixedDepositsAsync = ref.watch(fixedDepositsProvider);
     final apiSavings = (apiSavingsAsync.valueOrNull ?? [])
         .map(_mapToSavings)
         .where((s) => s.id.isNotEmpty || s.title.isNotEmpty)
         .toList();
     final allSavings = apiSavings;
-    final fixedDepositAccounts = fixedDepositsAsync.valueOrNull ?? const [];
     final balance = allSavings.fold<double>(0, (sum, s) => sum + s.balance);
     final hasBalances = allSavings.every((s) => s.balanceAvailable);
     final accountList = allSavings.take(2).toList();
@@ -628,10 +604,8 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                             context,
                             icon: Icons.account_balance_wallet,
                             label: 'Total Accounts',
-                            value:
-                                apiSavingsAsync.hasValue &&
-                                    fixedDepositsAsync.hasValue
-                                ? '${accountList.length + fixedDepositAccounts.length}'
+                            value: apiSavingsAsync.hasValue
+                                ? '${accountList.length}'
                                 : '—',
                           ),
                         ),
@@ -888,161 +862,6 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                           ],
                         ),
                       ),
-                    ),
-                  );
-                }),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Fixed Deposit Accounts',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: const Color(0xFF1D2B26),
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  if (fixedDepositsAsync.hasValue)
-                    Text(
-                      '${fixedDepositAccounts.length}',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: const Color(0xFF6D7B73),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              if (fixedDepositsAsync.isLoading)
-                const AppCard(
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      SizedBox(width: 12),
-                      Text('Loading fixed deposit accounts…'),
-                    ],
-                  ),
-                )
-              else if (fixedDepositsAsync.hasError)
-                AppCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Fixed deposit accounts are unavailable.'),
-                      TextButton.icon(
-                        onPressed: () => ref.invalidate(fixedDepositsProvider),
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                )
-              else if (fixedDepositAccounts.isEmpty)
-                const AppCard(child: Text('No fixed deposit accounts found.'))
-              else
-                ...fixedDepositAccounts.map((deposit) {
-                  final id = deposit['id']?.toString().trim() ?? '';
-                  final plan =
-                      deposit['plan']?.toString().trim().isNotEmpty == true
-                      ? deposit['plan'].toString()
-                      : 'Fixed Deposit';
-                  final principal = _toDouble(deposit['principal']);
-                  final hasPrincipal = deposit['principal'] != null;
-                  final interestRate = deposit['interest_rate']?.toString();
-                  final maturityDate = deposit['maturity_date']
-                      ?.toString()
-                      .trim();
-
-                  return AppCard(
-                    padding: const EdgeInsets.all(14),
-                    margin: const EdgeInsets.only(bottom: 10),
-                    onTap: id.isEmpty
-                        ? null
-                        : () => context.go(
-                            '/investments/${Uri.encodeComponent(id)}',
-                          ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF2EAF7),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Icon(
-                            Icons.lock_clock_rounded,
-                            color: Color(0xFF8E5AA8),
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                plan,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  color: const Color(0xFF1D2B26),
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 5),
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 4,
-                                children: [
-                                  if (interestRate != null &&
-                                      interestRate.isNotEmpty)
-                                    _FixedDepositTag(
-                                      label: '$interestRate% interest',
-                                    ),
-                                  if (maturityDate != null &&
-                                      maturityDate.isNotEmpty &&
-                                      maturityDate != '—')
-                                    _FixedDepositTag(
-                                      label: 'Matures $maturityDate',
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              hasPrincipal
-                                  ? 'GH₵${principal.toStringAsFixed(2)}'
-                                  : 'Unavailable',
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                color: const Color(0xFF1A8F5A),
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              'Principal',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: const Color(0xFF6B7A74),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.chevron_right_rounded,
-                          color: Color(0xFF6B7A74),
-                        ),
-                      ],
                     ),
                   );
                 }),

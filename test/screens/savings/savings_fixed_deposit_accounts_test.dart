@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('shows existing fixed deposits in the savings account list', (
+  testWidgets('does not show fixed deposits in the savings account list', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -30,11 +30,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Fixed Deposit Accounts'), findsOneWidget);
-    expect(find.text('91 days'), findsOneWidget);
-    expect(find.text('GH₵16000.00'), findsOneWidget);
-    expect(find.text('Principal'), findsOneWidget);
-    expect(find.text('9.50% interest'), findsOneWidget);
-    expect(find.text('Matures 2027-01-16'), findsOneWidget);
+    expect(find.text('Fixed Deposit Accounts'), findsNothing);
+    expect(find.text('91 days'), findsNothing);
   });
 }
