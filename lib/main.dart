@@ -112,7 +112,7 @@ class _InactivityAutoExitState extends State<InactivityAutoExit>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     if (widget.enabled) {
-      _startIdleTimer();
+      _resetIdleTimer();
     }
   }
 
@@ -122,11 +122,11 @@ class _InactivityAutoExitState extends State<InactivityAutoExit>
     if (!widget.enabled) {
       _idleTimer?.cancel();
     } else if (!oldWidget.enabled || oldWidget.timeout != widget.timeout) {
-      _startIdleTimer();
+      _resetIdleTimer();
     }
   }
 
-  void _startIdleTimer() {
+  void _resetIdleTimer() {
     if (!widget.enabled) {
       _idleTimer?.cancel();
       return;
@@ -146,7 +146,7 @@ class _InactivityAutoExitState extends State<InactivityAutoExit>
 
   void _recordActivity([PointerEvent? _]) {
     if (mounted && widget.enabled) {
-      _startIdleTimer();
+      _resetIdleTimer();
     }
   }
 
@@ -154,7 +154,7 @@ class _InactivityAutoExitState extends State<InactivityAutoExit>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       if (widget.enabled) {
-        _startIdleTimer();
+        _resetIdleTimer();
       }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
@@ -175,9 +175,6 @@ class _InactivityAutoExitState extends State<InactivityAutoExit>
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: _recordActivity,
-      onPointerMove: _recordActivity,
-      onPointerUp: _recordActivity,
-      onPointerCancel: _recordActivity,
       child: widget.child,
     );
   }
