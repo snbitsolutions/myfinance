@@ -2,11 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/constants/app_constants.dart';
-import 'core/providers/app_providers.dart';
 import 'core/services/device_identity_service.dart';
 import 'core/services/http_client.dart';
 import 'core/services/network_service.dart';
@@ -85,101 +83,6 @@ Future<void> _seedDebugBypassIdentity(SharedPreferences prefs) async {
   }
 }
 
-class InactivityAutoExit extends StatefulWidget {
-  const InactivityAutoExit({
-    super.key,
-    required this.child,
-    this.timeout = const Duration(seconds: 60),
-    this.enabled = true,
-    this.onTimeout,
-  });
-
-  final Widget child;
-  final Duration timeout;
-  final bool enabled;
-  final VoidCallback? onTimeout;
-
-  @override
-  State<InactivityAutoExit> createState() => _InactivityAutoExitState();
-}
-
-class _InactivityAutoExitState extends State<InactivityAutoExit>
-    with WidgetsBindingObserver {
-  Timer? _idleTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    if (widget.enabled) {
-      _resetIdleTimer();
-    }
-  }
-
-  @override
-  void didUpdateWidget(InactivityAutoExit oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (!widget.enabled) {
-      _idleTimer?.cancel();
-    } else if (!oldWidget.enabled || oldWidget.timeout != widget.timeout) {
-      _resetIdleTimer();
-    }
-  }
-
-  void _resetIdleTimer() {
-    if (!widget.enabled) {
-      _idleTimer?.cancel();
-      return;
-    }
-    _idleTimer?.cancel();
-    _idleTimer = Timer(widget.timeout, _handleIdleTimeout);
-  }
-
-  void _handleIdleTimeout() {
-    if (!mounted || !widget.enabled) return;
-    if (widget.onTimeout != null) {
-      widget.onTimeout!();
-    } else {
-      SystemNavigator.pop();
-    }
-  }
-
-  void _recordActivity([PointerEvent? _]) {
-    if (mounted && widget.enabled) {
-      _resetIdleTimer();
-    }
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      if (widget.enabled) {
-        _resetIdleTimer();
-      }
-    } else if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden ||
-        state == AppLifecycleState.detached) {
-      _idleTimer?.cancel();
-    }
-  }
-
-  @override
-  void dispose() {
-    _idleTimer?.cancel();
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Listener(
-      behavior: HitTestBehavior.translucent,
-      onPointerDown: _recordActivity,
-      child: widget.child,
-    );
-  }
-}
-
 class RedirectLoadingOverlay extends StatelessWidget {
   final bool isLoading;
   final Widget child;
@@ -234,12 +137,11 @@ class RedirectLoadingOverlay extends StatelessWidget {
   }
 }
 
-class AdepaTeachersApp extends ConsumerWidget {
+class AdepaTeachersApp extends StatelessWidget {
   const AdepaTeachersApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isAuthenticated = ref.watch(authProvider).isAuthenticated;
+  Widget build(BuildContext context) {
     const appColorScheme = ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF2E8B57),
@@ -292,13 +194,7 @@ class AdepaTeachersApp extends ConsumerWidget {
         return ValueListenableBuilder<bool>(
           valueListenable: AppRouter.redirectLoading,
           builder: (_, isLoading, inner) {
-            return InactivityAutoExit(
-              enabled: isAuthenticated,
-              child: RedirectLoadingOverlay(
-                isLoading: isLoading,
-                child: inner!,
-              ),
-            );
+            return RedirectLoadingOverlay(isLoading: isLoading, child: inner!);
           },
           child: constrainedChild,
         );
