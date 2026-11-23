@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,8 +9,10 @@ import '../../core/app_card.dart';
 import '../../core/app_scaffold.dart';
 import '../../core/color_ext.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/exceptions/app_exceptions.dart';
 import '../../core/layout/responsive.dart';
 import '../../core/providers/app_providers.dart';
+import '../../core/services/api_service.dart';
 import '../../core/services/device_identity_service.dart';
 import '../../core/services/biometric_auth_service.dart';
 import '../../core/services/notification_service.dart';
@@ -30,6 +34,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final Future<_DeviceSecurityDetails> _deviceSecurityFuture;
   final _notificationService = NotificationService.instance;
   final _biometricAuthService = BiometricAuthService();
+  final _authService = AuthService();
+  final TextEditingController _deleteAccountOtpController =
+      TextEditingController();
 
   @override
   void initState() {
@@ -37,6 +44,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _deviceSecurityFuture = _loadDeviceSecurityDetails();
     _loadNotificationPreferences();
     _loadBiometricPreference();
+  }
+
+  @override
+  void dispose() {
+    _deleteAccountOtpController.dispose();
+    super.dispose();
   }
 
   @override
@@ -302,7 +315,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Account deletion is unavailable from this app',
+                        'Permanently delete your account and related data',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurface.withOpacitySafe(
                             0.7,
@@ -817,14 +830,141 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _showDeleteAccountDialog(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Account deletion is unavailable because the backend does not provide a delete endpoint. No account changes were made.',
+  Future<void> _showDeleteAccountDialog(BuildContext context) async {
+    _deleteAccountOtpController.clear();
+    late String requestId;
+    final imeiNumber = await DeviceIdentityService().getBackendDeviceNumber();
+
+    final shouldStartDeletion = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete account?'),
+        content: const Text(
+          'This action permanently deletes your account and related local session data. This action cannot be undone.',
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Continue'),
+          ),
+        ],
       ),
     );
+
+    if (shouldStartDeletion != true || !mounted) return;
+
+    try {
+      final requestResponse = await _authService.requestAccountDeletion(
+        imeiNumber: imeiNumber,
+      );
+      requestId = requestResponse['request_id']?.toString() ?? '';
+      if (requestId.isEmpty) {
+        throw ValidationException(
+          message: 'The deletion request did not return a valid request ID.',
+        );
+      }
+
+      final otp = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Verify deletion'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Enter the 4-digit code sent to your registered device.',
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _deleteAccountOtpController,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                decoration: const InputDecoration(
+                  labelText: 'Verification code',
+                  counterText: '',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(
+                dialogContext,
+                _deleteAccountOtpController.text.trim(),
+              ),
+              child: const Text('Verify'),
+            ),
+          ],
+        ),
+      );
+
+      if (otp == null || otp.isEmpty || !mounted) return;
+      await _authService.verifyAccountDeletionOtp(
+        requestId: requestId,
+        otp: otp,
+      );
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Confirm account deletion'),
+          content: const Text(
+            'This final step deletes your account permanently. Confirm to continue.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Delete account'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true || !mounted) return;
+      await _authService.deleteAccount(
+        requestId: requestId,
+        imeiNumber: imeiNumber,
+      );
+
+      final secureStorage = SecureAuthStorage.instance;
+      await secureStorage.clearAuthSecrets();
+      await SharedPreferences.getInstance().then((prefs) => prefs.clear());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Account deleted successfully.')),
+      );
+      context.go('/login');
+    } on AppException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to delete your account right now.'),
+        ),
+      );
+    }
   }
 
   void _showComingSoon(BuildContext context) {

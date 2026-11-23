@@ -99,32 +99,55 @@ class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
 
       final reference = widget.reference!.trim().toLowerCase();
       final matchingTransaction = transactions.where((transaction) {
-        final transactionReference =
-            (transaction['transaction_id'] ?? transaction['reference'])
-                ?.toString()
-                .trim()
-                .toLowerCase();
-        return transactionReference == reference;
+        for (final key in const [
+          'transaction_id',
+          'transactionId',
+          'reference',
+          'trans_id',
+          'id',
+          'external_transaction_id',
+          'client_reference',
+        ]) {
+          final transactionReference = transaction[key]
+              ?.toString()
+              .trim()
+              .toLowerCase();
+          if (transactionReference == reference) return true;
+        }
+        return false;
       }).firstOrNull;
-      final status = matchingTransaction?['status']
-          ?.toString()
-          .trim()
-          .toLowerCase();
+      String? status;
+      if (matchingTransaction != null) {
+        for (final key in const [
+          'status',
+          'state',
+          'transaction_status',
+          'payment_status',
+        ]) {
+          final value = matchingTransaction[key]?.toString().trim();
+          if (value != null && value.isNotEmpty) {
+            status = value.toLowerCase();
+            break;
+          }
+        }
+      }
 
       if (const {
         '1',
         'complete',
         'completed',
+        'confirmed',
+        'done',
         'paid',
         'success',
         'successful',
+        'approved',
+        'settled',
       }.contains(status)) {
         _statusCheckTimer?.cancel();
-        ref.invalidate(savingsProvider);
-        ref.invalidate(userProfileProvider);
         setState(() => _isConfirmed = true);
-      } else if (status == '0' ||
-          status == 'false' ||
+        await refreshMemberAccountData(ref);
+      } else if (status == 'false' ||
           const {
             'cancelled',
             'canceled',
@@ -231,14 +254,14 @@ class _PaymentSuccessContent extends StatelessWidget {
 
   String _formatAmount() {
     final value = amount;
-    return value == null ? 'Unavailable' : 'GH₵${value.toStringAsFixed(2)}';
+    return value == null ? '—' : 'GH₵${value.toStringAsFixed(2)}';
   }
 
   String _formatReference() {
     if (reference != null && reference!.trim().isNotEmpty) {
       return reference!.trim();
     }
-    return 'Unavailable';
+    return '—';
   }
 
   @override
@@ -444,9 +467,11 @@ class _PaymentSuccessContent extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          isPending || isFailed || resolvedNewBalance == null
-                              ? 'Balance unavailable'
-                              : 'GH₵${resolvedNewBalance.toStringAsFixed(2)}',
+                          isPending
+                              ? 'Pending confirmation'
+                              : isFailed
+                              ? 'Not updated'
+                              : 'GH₵${(resolvedNewBalance ?? 0).toStringAsFixed(2)}',
                           style: theme.textTheme.bodyLarge?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
@@ -475,7 +500,7 @@ class _PaymentSuccessContent extends StatelessWidget {
 
   String _formatDateTime() {
     final date = processedAt;
-    if (date == null) return 'Unavailable';
+    if (date == null) return '—';
     final months = [
       'Jan',
       'Feb',

@@ -110,4 +110,20 @@ void main() {
       expect(prefs.containsKey(AppConstants.sharedPrefKeyUserPin), isFalse);
     },
   );
+
+  test('clears session secrets without deleting the transaction PIN', () async {
+    final storage = SecureAuthStorage();
+    await storage.storePin('4321');
+    await storage.storeSession(
+      authToken: 'token',
+      refreshToken: 'refresh',
+      deviceFingerprint: 'device',
+    );
+    await storage.storeDeviceVerifiedSession(deviceFingerprint: 'device');
+
+    await storage.clearAuthSecrets();
+
+    expect(await storage.readPin(), '4321');
+    expect(await storage.readAuthToken(), isNull);
+  });
 }

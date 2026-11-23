@@ -92,6 +92,40 @@ void main() {
     },
   );
 
+  test('loads fixed deposits from the documented products response', () async {
+    adapter = _DepositResponseAdapter(
+      '{"status":1,"message":"Product found","products":['
+      '{"id":"5293","pro_name":"91 days","pro_status":"Approved",'
+      '"principal":"16000.00","interest_rate":"9.50","duration":"91",'
+      '"maturity_amount":"16378.96","start_date":"2026-10-16",'
+      '"maturity_date":"2027-01-16"}]}',
+    );
+    savingsDio.httpClientAdapter = adapter;
+
+    final result = await SavingsService().getFixedDeposits(
+      accountNumber: '0010500000133848',
+      imeiNumber: 100200300,
+    );
+
+    expect(result['data'], [
+      {
+        'id': '5293',
+        'pro_name': '91 days',
+        'pro_status': 'Approved',
+        'principal': '16000.00',
+        'interest_rate': '9.50',
+        'duration': '91',
+        'maturity_amount': '16378.96',
+        'start_date': '2026-10-16',
+        'maturity_date': '2027-01-16',
+        'savings_id': '5293',
+        'name': '91 days',
+        'balance': '16000.00',
+        'type': 'fixed_deposit',
+      },
+    ]);
+  });
+
   test(
     'returns an empty list when the fixed deposit API has no records',
     () async {
@@ -478,6 +512,31 @@ void main() {
     );
   });
 
+  test(
+    'rejects insufficient-balance airtime responses instead of pending',
+    () async {
+      for (final body in [
+        '{"status":"pending","Message":"Insufficient balance"}',
+        '{"status":"success","message":"Not enough funds for this purchase"}',
+      ]) {
+        adapter = _DepositResponseAdapter(body);
+        dio.httpClientAdapter = adapter;
+
+        await expectLater(
+          PaymentService().buyAirtime(
+            phoneNumber: '233241234567',
+            channel: 'mtn-gh',
+            amount: 10,
+            username: 'Test Member',
+            productId: '51437',
+            pin: '1234',
+          ),
+          throwsA(isA<GenericException>()),
+        );
+      }
+    },
+  );
+
   test('rejects documented non-success airtime status', () async {
     adapter = _DepositResponseAdapter(
       '{"status":"0","message":"Amount per transaction exceeded"}',
@@ -601,7 +660,7 @@ void main() {
     expect(adapter.request, isNull);
   });
 
-  test('withdrawal cannot reduce balance below GH₵50', () async {
+  test('insufficient withdrawal balance includes required minimum', () async {
     await expectLater(
       SavingsService().withdrawSavings(
         phoneNumber: '233241234567',
@@ -611,7 +670,13 @@ void main() {
         currentBalance: 500,
         imeiNumber: 123456,
       ),
-      throwsA(isA<ValidationException>()),
+      throwsA(
+        isA<ValidationException>().having(
+          (error) => error.message,
+          'message',
+          'Insufficient balance. At least GH₵50.00 must remain in your account after withdrawal.',
+        ),
+      ),
     );
 
     expect(adapter.request, isNull);

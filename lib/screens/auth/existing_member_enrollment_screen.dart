@@ -1389,7 +1389,7 @@ class _ExistingMemberEnrollmentScreenState
         _buildTextField(
           label: 'Password',
           controller: _passwordController,
-          hint: 'Create a strong password',
+          hint: 'At least 8 characters',
           icon: Icons.lock_outline_rounded,
           obscureText: !_isPasswordVisible,
           suffixIcon: IconButton(

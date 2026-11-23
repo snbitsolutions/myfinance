@@ -404,6 +404,11 @@ class AuthService extends BaseService {
           message: 'Transaction PIN must be exactly 4 digits.',
         );
       }
+      if (normalizedTransactionPin == null) {
+        throw ValidationException(
+          message: 'Transaction PIN is required for registration.',
+        );
+      }
 
       final request = <String, dynamic>{
         'acc_number':
@@ -413,10 +418,8 @@ class AuthService extends BaseService {
         'password': ?normalizedPassword,
         if (normalizedPin != null)
           'pin': int.tryParse(normalizedPin) ?? normalizedPin,
-        if (normalizedTransactionPin != null)
-          'trans_pin':
-              int.tryParse(normalizedTransactionPin) ??
-              normalizedTransactionPin,
+        'trans_pin':
+            int.tryParse(normalizedTransactionPin) ?? normalizedTransactionPin,
         // The API's legacy field name is imei_number; the value is an
         // app-installation ID because iOS and modern Android do not expose IMEI.
         'imei_number': imeiNumber,
@@ -536,7 +539,7 @@ class AuthService extends BaseService {
 
       final request = <String, dynamic>{
         'phone_number': int.parse(normalizedPhone),
-        'password': normalizedPassword,
+        'password': _normalizeNumberLikeJsonValue(normalizedPassword),
         's_key': AppConstants.defaultMobileApiSKey,
         'imei_number': imeiNumber,
       };
@@ -545,6 +548,9 @@ class AuthService extends BaseService {
       final response = await _httpClient.post<dynamic>(
         ApiEndpoints.login,
         data: request,
+        options: Options(
+          extra: {'skipAuthHeader': true, 'skipAuthRefresh': true},
+        ),
       );
       final data = normalizeResponsePayload(response.data);
       AppLogger.logApiResponse(
@@ -611,6 +617,250 @@ class AuthService extends BaseService {
         data,
         statusCode: response.statusCode,
       );
+
+      return data;
+    });
+  }
+
+  /// Request a password reset code using the documented mobile-app contract.
+  Future<Map<String, dynamic>> requestPasswordReset({
+    required String accountNumber,
+    required int imeiNumber,
+  }) async {
+    return handleApiCall(() async {
+      final normalizedAccount = accountNumber.replaceAll(RegExp(r'\D'), '');
+      if (normalizedAccount.isEmpty) {
+        throw ValidationException(message: 'Account number is required.');
+      }
+
+      final request = <String, dynamic>{
+        'account_number': normalizedAccount,
+        'imei_number': imeiNumber,
+        's_key': AppConstants.defaultMobileApiSKey,
+      };
+
+      AppLogger.logApiRequest(
+        'POST',
+        ApiEndpoints.requestPasswordReset,
+        request,
+      );
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.requestPasswordReset,
+        data: request,
+      );
+
+      final data = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse(
+        'POST',
+        ApiEndpoints.requestPasswordReset,
+        data,
+        statusCode: response.statusCode,
+      );
+
+      if (hasExplicitFailure(data)) {
+        throw AuthException(
+          message:
+              data['message']?.toString() ??
+              'We could not send the reset code. Please try again.',
+        );
+      }
+
+      return data;
+    });
+  }
+
+  /// Verify the one-time password sent during a reset request.
+  Future<Map<String, dynamic>> verifyPasswordResetOtp({
+    required String requestId,
+    required String otp,
+  }) async {
+    return handleApiCall(() async {
+      final request = <String, dynamic>{
+        'request_id': requestId,
+        'otp': int.tryParse(otp.trim()) ?? otp.trim(),
+      };
+
+      AppLogger.logApiRequest(
+        'POST',
+        ApiEndpoints.verifyPasswordResetOtp,
+        request,
+      );
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.verifyPasswordResetOtp,
+        data: request,
+      );
+
+      final data = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse(
+        'POST',
+        ApiEndpoints.verifyPasswordResetOtp,
+        data,
+        statusCode: response.statusCode,
+      );
+
+      if (hasExplicitFailure(data)) {
+        throw AuthException(
+          message:
+              data['message']?.toString() ??
+              'The reset code could not be verified.',
+        );
+      }
+
+      return data;
+    });
+  }
+
+  /// Complete the password reset using the verified request ID and the new password.
+  Future<Map<String, dynamic>> passwordReset({
+    required String requestId,
+    required String newPassword,
+    required int imeiNumber,
+  }) async {
+    return handleApiCall(() async {
+      final normalizedPassword = newPassword.trim();
+      if (normalizedPassword.isEmpty) {
+        throw ValidationException(message: 'New password is required.');
+      }
+
+      final request = <String, dynamic>{
+        'imei_number': imeiNumber,
+        'password': int.tryParse(normalizedPassword) ?? normalizedPassword,
+        'request_id': requestId,
+        's_key': AppConstants.defaultMobileApiSKey,
+      };
+
+      AppLogger.logApiRequest('POST', ApiEndpoints.passwordReset, request);
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.passwordReset,
+        data: request,
+      );
+
+      final data = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse(
+        'POST',
+        ApiEndpoints.passwordReset,
+        data,
+        statusCode: response.statusCode,
+      );
+
+      if (hasExplicitFailure(data)) {
+        throw AuthException(
+          message:
+              data['message']?.toString() ??
+              'The password could not be reset. Please try again.',
+        );
+      }
+
+      return data;
+    });
+  }
+
+  /// Request an account deletion verification code.
+  Future<Map<String, dynamic>> requestAccountDeletion({
+    required int imeiNumber,
+  }) async {
+    return handleApiCall(() async {
+      final request = <String, dynamic>{
+        'imei_number': imeiNumber,
+        's_key': AppConstants.defaultMobileApiSKey,
+      };
+
+      AppLogger.logApiRequest('POST', ApiEndpoints.requestDeletion, request);
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.requestDeletion,
+        data: request,
+      );
+
+      final data = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse(
+        'POST',
+        ApiEndpoints.requestDeletion,
+        data,
+        statusCode: response.statusCode,
+      );
+
+      if (hasExplicitFailure(data)) {
+        throw AuthException(
+          message:
+              data['message']?.toString() ??
+              'We could not start account deletion. Please try again.',
+        );
+      }
+
+      return data;
+    });
+  }
+
+  /// Verify the OTP used to authorize account deletion.
+  Future<Map<String, dynamic>> verifyAccountDeletionOtp({
+    required String requestId,
+    required String otp,
+  }) async {
+    return handleApiCall(() async {
+      final request = <String, dynamic>{
+        'request_id': requestId,
+        'otp': int.tryParse(otp.trim()) ?? otp.trim(),
+      };
+
+      AppLogger.logApiRequest('POST', ApiEndpoints.verifyDeletionOtp, request);
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.verifyDeletionOtp,
+        data: request,
+      );
+
+      final data = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse(
+        'POST',
+        ApiEndpoints.verifyDeletionOtp,
+        data,
+        statusCode: response.statusCode,
+      );
+
+      if (hasExplicitFailure(data)) {
+        throw AuthException(
+          message:
+              data['message']?.toString() ??
+              'The deletion code could not be verified.',
+        );
+      }
+
+      return data;
+    });
+  }
+
+  /// Permanently delete the account after verification.
+  Future<Map<String, dynamic>> deleteAccount({
+    required String requestId,
+    required int imeiNumber,
+  }) async {
+    return handleApiCall(() async {
+      final request = <String, dynamic>{
+        'request_id': requestId,
+        'imei_number': imeiNumber,
+        's_key': AppConstants.defaultMobileApiSKey,
+      };
+
+      AppLogger.logApiRequest('POST', ApiEndpoints.deleteAccount, request);
+      final response = await _httpClient.post<dynamic>(
+        ApiEndpoints.deleteAccount,
+        data: request,
+      );
+
+      final data = normalizeResponsePayload(response.data);
+      AppLogger.logApiResponse(
+        'POST',
+        ApiEndpoints.deleteAccount,
+        data,
+        statusCode: response.statusCode,
+      );
+
+      if (hasExplicitFailure(data)) {
+        throw AuthException(
+          message:
+              data['message']?.toString() ??
+              'Account deletion could not be completed. Please try again.',
+        );
+      }
 
       return data;
     });
@@ -1295,10 +1545,12 @@ class SavingsService extends BaseService {
           'name': textValue([
             entry['name'],
             entry['product_name'],
+            entry['pro_name'],
             entry['account_name'],
           ], 'Fixed Deposit'),
           'balance':
               entry['balance'] ??
+              entry['principal'] ??
               entry['principal_amount'] ??
               entry['deposit_amount'] ??
               entry['amount'] ??
@@ -1527,7 +1779,7 @@ class SavingsService extends BaseService {
                   AppConstants.minimumSavingsBalanceAfterWithdrawal) {
         throw ValidationException(
           message:
-              'A minimum balance of GH₵'
+              'Insufficient balance. At least GH₵'
               '${AppConstants.minimumSavingsBalanceAfterWithdrawal.toStringAsFixed(2)} '
               'must remain in your account after withdrawal.',
         );
@@ -1811,7 +2063,12 @@ class PaymentService extends BaseService {
       }
       if (pin.trim().isEmpty) {
         throw ValidationException(
-          message: 'A saved PIN is required to authorize this purchase.',
+          message: 'Your 4-digit transaction PIN is required to authorize this purchase.',
+        );
+      }
+      if (!RegExp(r'^\d{4}$').hasMatch(pin.trim())) {
+        throw ValidationException(
+          message: 'Transaction PIN must be exactly 4 digits.',
         );
       }
 
@@ -1846,11 +2103,23 @@ class PaymentService extends BaseService {
       final status = data['status'];
       final normalizedStatus = status?.toString().trim().toLowerCase();
       final responseCode = data['ResponseCode']?.toString().trim();
+      final responseMessage =
+          data['message']?.toString() ??
+          data['Message']?.toString() ??
+          data['error']?.toString() ??
+          '';
+      final indicatesInsufficientBalance = RegExp(
+        r'insufficient\s+(?:(?:account|available)\s+)?(?:funds?|balance)|'
+        r'(?:not enough|too low).{0,40}(?:funds?|balance)|'
+        r'(?:funds?|balance).{0,40}(?:not enough|too low)',
+        caseSensitive: false,
+      ).hasMatch(responseMessage);
       final isExplicitFailure =
           status == false ||
           normalizedStatus == '0' ||
           data['success'] == false ||
           data['is_success'] == false ||
+          indicatesInsufficientBalance ||
           const {
             'cancelled',
             'canceled',
@@ -1863,10 +2132,9 @@ class PaymentService extends BaseService {
           }.contains(normalizedStatus);
       if (isExplicitFailure) {
         throw GenericException(
-          message:
-              data['message']?.toString() ??
-              data['Message']?.toString() ??
-              failureMessage,
+          message: responseMessage.isNotEmpty
+              ? responseMessage
+              : failureMessage,
         );
       }
 
@@ -2192,7 +2460,12 @@ class TransactionService extends BaseService {
 
         return {
           'transaction_id':
-              (txn['id'] ?? txn['transaction_id'] ?? txn['reference'])
+              (txn['id'] ??
+                      txn['transaction_id'] ??
+                      txn['trans_id'] ??
+                      txn['reference'] ??
+                      txn['external_transaction_id'] ??
+                      txn['client_reference'])
                   ?.toString()
                   .trim() ??
               '',
@@ -2208,7 +2481,15 @@ class TransactionService extends BaseService {
                   .trim() ??
               '',
           'date': rawDate?.toString(),
-          'status': (txn['status'] ?? 'unknown').toString().toLowerCase(),
+          'status':
+              (txn['status'] ??
+                      txn['state'] ??
+                      txn['transaction_status'] ??
+                      txn['payment_status'] ??
+                      'unknown')
+                  .toString()
+                  .trim()
+                  .toLowerCase(),
           'balance': _toDoubleOrNull(txn['balance'] ?? txn['running_balance']),
         };
       }).toList();

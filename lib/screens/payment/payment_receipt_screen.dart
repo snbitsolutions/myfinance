@@ -25,7 +25,7 @@ class PaymentReceiptScreen extends StatelessWidget {
   });
 
   String _money(double? value) =>
-      value == null ? 'Unavailable' : 'GH₵ ${value.toStringAsFixed(2)}';
+      value == null ? '—' : 'GH₵ ${value.toStringAsFixed(2)}';
 
   String _month(int month) => const [
     'Jan',
@@ -54,16 +54,19 @@ class PaymentReceiptScreen extends StatelessWidget {
     final date = processedAt;
     final ref = reference?.trim().isNotEmpty == true
         ? reference!
-        : 'Unavailable';
+        : '—';
+    final balance = isPending
+        ? 'Pending confirmation'
+        : _money(newBalance ?? 0);
     final receiptText = [
       'ADEPA - Deposit Receipt',
       'Status: ${isPending ? 'Pending' : 'Provider reported completion'}',
       'Amount: ${_money(amount)}',
       'Account: ${account ?? 'Member Savings'}',
-      'Date: ${date?.toIso8601String() ?? 'Unavailable'}',
+      'Date: ${date?.toIso8601String() ?? '—'}',
       'Reference: $ref',
       'Payment method: ${paymentMethod ?? 'Mobile Money'}',
-      if (newBalance != null && !isPending) 'Balance: ${_money(newBalance)}',
+      'Balance: $balance',
     ].join('\n');
 
     return Scaffold(
@@ -250,7 +253,7 @@ class PaymentReceiptScreen extends StatelessWidget {
                         _ReceiptDetailRow(
                           'Date & Time',
                           date == null
-                              ? 'Unavailable'
+                              ? '—'
                               : '${date.day} ${_month(date.month)} ${date.year} • ${_time(date)}',
                           theme,
                         ),
@@ -290,7 +293,7 @@ class PaymentReceiptScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                _money(isPending ? null : newBalance),
+                                balance,
                                 style: theme.textTheme.bodyLarge?.copyWith(
                                   fontWeight: FontWeight.w700,
                                 ),

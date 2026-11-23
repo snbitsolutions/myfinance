@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/app_scaffold.dart';
 import '../../../core/color_ext.dart';
-import '../../../core/services/secure_auth_storage.dart';
 import 'withdrawal_model.dart';
 
 class AuthenticateWithdrawalScreen extends StatefulWidget {
@@ -21,7 +20,13 @@ class _AuthenticateWithdrawalScreenState
   String? _errorMessage;
   bool _isValidating = false;
 
+  @override
+  void initState() {
+    super.initState();
+  }
+
   void _appendDigit(String digit) {
+    if (_isValidating) return;
     if (_pinCode.length < 4) {
       setState(() {
         _pinCode += digit;
@@ -36,7 +41,7 @@ class _AuthenticateWithdrawalScreenState
   }
 
   void _deleteDigit() {
-    if (_pinCode.isNotEmpty) {
+    if (!_isValidating && _pinCode.isNotEmpty) {
       setState(() {
         _pinCode = _pinCode.substring(0, _pinCode.length - 1);
         _errorMessage = null;
@@ -45,40 +50,17 @@ class _AuthenticateWithdrawalScreenState
   }
 
   Future<void> _validateAndProceed() async {
-    if (_isValidating) return;
+    if (!mounted || _isValidating) return;
     if (_pinCode.length != 4) {
       setState(() => _errorMessage = 'PIN must be 4 digits');
       return;
     }
 
     setState(() => _isValidating = true);
-    try {
-      // Get stored PIN from secure storage
-      final storedPin = await SecureAuthStorage.instance.readPin();
-      if (!mounted) return;
-
-      if (storedPin == _pinCode) {
-        // PIN is correct, proceed to processing
-        context.push(
-          '/withdrawal/processing',
-          extra: widget.data.copyWith(pin: _pinCode),
-        );
-      } else {
-        // PIN is incorrect
-        setState(() {
-          _isValidating = false;
-          _errorMessage = 'Invalid PIN. Please try again.';
-          _pinCode = '';
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isValidating = false;
-        _errorMessage = 'Error validating PIN. Please try again.';
-        _pinCode = '';
-      });
-    }
+    context.push(
+      '/withdrawal/processing',
+      extra: widget.data.copyWith(pin: _pinCode),
+    );
   }
 
   @override
@@ -118,7 +100,7 @@ class _AuthenticateWithdrawalScreenState
             const SizedBox(height: 8),
             // Subtitle
             Text(
-              'Please enter your 4-digit PIN to authorize this withdrawal.',
+              'Enter the 4-digit transaction PIN you created during signup.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
               ),
@@ -188,7 +170,10 @@ class _AuthenticateWithdrawalScreenState
                       onPressed: () => _appendDigit(digit.toString()),
                     ),
                   ),
-                  _KeypadButton(label: '0', onPressed: () => _appendDigit('0')),
+                  _KeypadButton(
+                    label: '0',
+                    onPressed: () => _appendDigit('0'),
+                  ),
                   _KeypadButton(
                     label: '⌫',
                     onPressed: _deleteDigit,

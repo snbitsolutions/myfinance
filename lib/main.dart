@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/constants/app_constants.dart';
+import 'core/providers/app_providers.dart';
 import 'core/services/device_identity_service.dart';
 import 'core/services/http_client.dart';
 import 'core/services/network_service.dart';
@@ -137,6 +138,93 @@ class RedirectLoadingOverlay extends StatelessWidget {
   }
 }
 
+class IdleSignInRedirector extends ConsumerStatefulWidget {
+  const IdleSignInRedirector({
+    super.key,
+    required this.child,
+    this.idleTimeout = const Duration(seconds: 60),
+  });
+
+  final Widget child;
+  final Duration idleTimeout;
+
+  @override
+  ConsumerState<IdleSignInRedirector> createState() =>
+      _IdleSignInRedirectorState();
+}
+
+class _IdleSignInRedirectorState extends ConsumerState<IdleSignInRedirector>
+    with WidgetsBindingObserver {
+  Timer? _idleTimer;
+  bool _enabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  void _resetIdleTimer() {
+    if (!_enabled) return;
+    _idleTimer?.cancel();
+    _idleTimer = Timer(widget.idleTimeout, _returnToSignIn);
+  }
+
+  Future<void> _returnToSignIn() async {
+    if (!mounted || !_enabled) return;
+    _idleTimer?.cancel();
+    await ref.read(authProvider.notifier).logout();
+    AppRouter.invalidateSessionCache();
+    if (mounted) {
+      AppRouter.router.go('/login');
+    }
+  }
+
+  void _recordActivity([PointerEvent? event]) {
+    if (_enabled) _resetIdleTimer();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_enabled) return;
+    if (state == AppLifecycleState.resumed) {
+      _resetIdleTimer();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      _idleTimer?.cancel();
+    }
+  }
+
+  @override
+  void dispose() {
+    _idleTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isAuthenticated = ref.watch(authProvider).isAuthenticated;
+    if (isAuthenticated != _enabled) {
+      _enabled = isAuthenticated;
+      if (_enabled) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _resetIdleTimer();
+        });
+      } else {
+        _idleTimer?.cancel();
+      }
+    }
+
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: _recordActivity,
+      child: widget.child,
+    );
+  }
+}
+
 class AdepaTeachersApp extends StatelessWidget {
   const AdepaTeachersApp({super.key});
 
@@ -194,7 +282,12 @@ class AdepaTeachersApp extends StatelessWidget {
         return ValueListenableBuilder<bool>(
           valueListenable: AppRouter.redirectLoading,
           builder: (_, isLoading, inner) {
-            return RedirectLoadingOverlay(isLoading: isLoading, child: inner!);
+            return IdleSignInRedirector(
+              child: RedirectLoadingOverlay(
+                isLoading: isLoading,
+                child: inner!,
+              ),
+            );
           },
           child: constrainedChild,
         );

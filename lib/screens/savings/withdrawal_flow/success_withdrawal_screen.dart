@@ -175,7 +175,9 @@ class SuccessWithdrawalScreen extends StatelessWidget {
                           isPending
                               ? 'Request Reference'
                               : 'Provider Reference',
-                          data.reference ?? 'Unavailable',
+                          data.reference?.trim().isNotEmpty == true
+                              ? data.reference!
+                              : '—',
                           theme,
                         ),
                       ],
@@ -208,9 +210,9 @@ class SuccessWithdrawalScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                isPending || data.newBalance == null
-                                    ? 'Unavailable'
-                                    : 'GH₵ ${data.newBalance!.toStringAsFixed(2)}',
+                                isPending
+                                    ? 'Pending confirmation'
+                                    : 'GH₵ ${(data.newBalance ?? 0).toStringAsFixed(2)}',
                                 style: theme.textTheme.bodyLarge?.copyWith(
                                   fontWeight: FontWeight.w700,
                                 ),

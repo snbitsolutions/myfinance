@@ -82,6 +82,8 @@ void main() {
       expect(find.text('Savings Goals'), findsNothing);
       expect(find.text('Persisted Goal 42'), findsNothing);
       expect(find.text('Account number unavailable'), findsNothing);
+      expect(find.text('Open New Savings'), findsNothing);
+      expect(find.text('New Goal'), findsNothing);
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();

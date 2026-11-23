@@ -53,11 +53,19 @@ class _FixedDepositSavingsService extends SavingsService {
       'status': 'success',
       'data': [
         {
-          'fixed_deposit_id': 'fd-1',
-          'product_name': '90 Day Fixed Deposit',
-          'principal_amount': '250.00',
-          'maturity_value': '265.00',
-          'maturity_date': '2026-12-01',
+          'id': '5293',
+          'pro_name': '91 days',
+          'pro_status': 'Approved',
+          'principal': '16000.00',
+          'interest_rate': '9.50',
+          'duration': '91',
+          'maturity_amount': '16378.96',
+          'start_date': '2026-10-16',
+          'maturity_date': '2027-01-16',
+          'savings_id': '5293',
+          'name': '91 days',
+          'balance': '16000.00',
+          'type': 'fixed_deposit',
         },
       ],
     };
@@ -192,11 +200,12 @@ void main() {
 
     expect(savingsService.fixedDepositRequests, 1);
     expect(investments, hasLength(1));
-    expect(investments.single['id'], 'fd-1');
+    expect(investments.single['id'], '5293');
     expect(investments.single['type'], 'Fixed Deposit');
-    expect(investments.single['plan'], '90 Day Fixed Deposit');
-    expect(investments.single['principal'], '250.00');
-    expect(investments.single['current_value'], '265.00');
-    expect(investments.single['maturity_date'], '2026-12-01');
+    expect(investments.single['plan'], '91 days');
+    expect(investments.single['status'], 'Approved');
+    expect(investments.single['principal'], '16000.00');
+    expect(investments.single['current_value'], '16378.96');
+    expect(investments.single['maturity_date'], '2027-01-16');
   });
 }

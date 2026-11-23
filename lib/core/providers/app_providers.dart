@@ -227,6 +227,50 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return _prefs ??= await SharedPreferences.getInstance();
   }
 
+  Future<Map<String, dynamic>> _authenticateWithDeviceNumberFallback({
+    required int deviceNumber,
+    required Future<Map<String, dynamic>> Function(int) authenticate,
+  }) async {
+    try {
+      final response = await authenticate(deviceNumber);
+      if (_isSuccessfulAuthResponse(response)) {
+        await deviceIdentityService.rememberBackendDeviceNumber(deviceNumber);
+        return response;
+      }
+      if (!_isDeviceAuthenticationFailure(response['message']?.toString()) ||
+          deviceNumber == AppConstants.legacyMobileApiImeiNumber) {
+        return response;
+      }
+    } on AuthException catch (error) {
+      if (!_isDeviceAuthenticationFailure(error.message) ||
+          deviceNumber == AppConstants.legacyMobileApiImeiNumber) {
+        rethrow;
+      }
+    }
+
+    // Older app builds registered devices with this shared number.
+    final response = await authenticate(AppConstants.legacyMobileApiImeiNumber);
+    if (_isSuccessfulAuthResponse(response)) {
+      await deviceIdentityService.rememberBackendDeviceNumber(
+        AppConstants.legacyMobileApiImeiNumber,
+      );
+    }
+    return response;
+  }
+
+  bool _isSuccessfulAuthResponse(Map<String, dynamic> response) {
+    return AuthSession.isSuccessStatus(response['status']) ||
+        AuthSession.isSuccessStatus(response['success']) ||
+        AuthSession.isSuccessStatus(response['is_success']) ||
+        AuthSession.fromResponse(response) != null;
+  }
+
+  bool _isDeviceAuthenticationFailure(String? message) {
+    final normalized = message?.trim().toLowerCase() ?? '';
+    return normalized.contains('device authentication failed') ||
+        normalized.contains('device auth failed');
+  }
+
   /// Load stored authentication from SharedPreferences
   void _loadStoredAuth() {
     _restoreStoredAuth();
@@ -325,10 +369,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     try {
       final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
-      final response = await authService.login(
-        phoneNumber: phoneNumber,
-        password: password,
-        imeiNumber: imeiNumber,
+      final response = await _authenticateWithDeviceNumberFallback(
+        deviceNumber: imeiNumber,
+        authenticate: (number) => authService.login(
+          phoneNumber: phoneNumber,
+          password: password,
+          imeiNumber: number,
+        ),
       );
       AppLogger.info('Login password accepted by backend.');
 
@@ -420,10 +467,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
       final fingerprint = await deviceIdentityService
           .getInstallationFingerprint();
-      final response = await authService.loginWithPhonePin(
-        phoneNumber: phoneNumber,
-        pin: pin,
-        imeiNumber: imeiNumber,
+      final response = await _authenticateWithDeviceNumberFallback(
+        deviceNumber: imeiNumber,
+        authenticate: (number) => authService.loginWithPhonePin(
+          phoneNumber: phoneNumber,
+          pin: pin,
+          imeiNumber: number,
+        ),
       );
       final session = AuthSession.fromResponse(response);
       final status = response['status'];
@@ -523,10 +573,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     try {
       final imeiNumber = await deviceIdentityService.getBackendDeviceNumber();
-      final response = await authService.loginWithPhonePin(
-        phoneNumber: phoneNumber,
-        pin: pin,
-        imeiNumber: imeiNumber,
+      final response = await _authenticateWithDeviceNumberFallback(
+        deviceNumber: imeiNumber,
+        authenticate: (number) => authService.loginWithPhonePin(
+          phoneNumber: phoneNumber,
+          pin: pin,
+          imeiNumber: number,
+        ),
       );
       final status = response['status'];
       final accountNumber = _findAccountNumber(response).trim();
@@ -979,6 +1032,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
       }
 
+      await deviceIdentityService.rememberBackendDeviceNumber(imeiNumber);
+
       // The register response confirms enrollment but does not include an OTP.
       // Request the SMS code explicitly before opening the verification screen.
       await authService.sendLoginOtp(
@@ -1046,6 +1101,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
             : 'New member registration failed. Please try again.',
       );
     }
+    await deviceIdentityService.rememberBackendDeviceNumber(imeiNumber);
+
     final generatedAccountNumber = _findAccountNumber(response).trim();
     _lastRegisteredAccountNumber = generatedAccountNumber.isEmpty
         ? null
@@ -1470,6 +1527,69 @@ final sharesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   return result;
 });
 
+final fixedDepositsProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
+  final credentials = ref.watch(memberCredentialsProvider);
+  final account = credentials['account']?.trim() ?? '';
+  if (account.isEmpty) {
+    throw ValidationException(
+      message: 'Your account details are missing. Please sign in again.',
+    );
+  }
+
+  final imeiNumber = await ref
+      .watch(deviceIdentityServiceProvider)
+      .getBackendDeviceNumber();
+  final response = await ref
+      .watch(savingsServiceProvider)
+      .getFixedDeposits(accountNumber: account, imeiNumber: imeiNumber);
+  final data = response['data'];
+  if (data is! List) return [];
+
+  return data.whereType<Map<String, dynamic>>().map((deposit) {
+    final principal =
+        deposit['principal'] ??
+        deposit['principal_amount'] ??
+        deposit['deposit_amount'] ??
+        deposit['initial_amount'] ??
+        deposit['amount'] ??
+        deposit['balance'];
+    final currentValue =
+        deposit['current_value'] ??
+        deposit['maturity_value'] ??
+        deposit['maturity_amount'] ??
+        deposit['balance'] ??
+        principal;
+    return {
+      ...deposit,
+      'id':
+          deposit['investment_id'] ??
+          deposit['fixed_deposit_id'] ??
+          deposit['savings_id'] ??
+          deposit['id'] ??
+          '',
+      'type': 'Fixed Deposit',
+      'plan':
+          deposit['plan'] ??
+          deposit['product_name'] ??
+          deposit['pro_name'] ??
+          deposit['name'] ??
+          'Fixed Deposit',
+      'status': deposit['status'] ?? deposit['pro_status'],
+      'principal': principal,
+      'current_value': currentValue,
+      'total_interest':
+          deposit['total_interest'] ?? deposit['interest_earned'],
+      'maturity_date':
+          deposit['maturity_date'] ??
+          deposit['maturity'] ??
+          deposit['end_date'] ??
+          '—',
+    };
+  }).toList();
+});
+
 final investmentsApiProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
@@ -1502,55 +1622,7 @@ final investmentsApiProvider = FutureProvider<List<Map<String, dynamic>>>((
   }
 
   try {
-    final imeiNumber = await ref
-        .watch(deviceIdentityServiceProvider)
-        .getBackendDeviceNumber();
-    final response = await ref
-        .watch(savingsServiceProvider)
-        .getFixedDeposits(accountNumber: account, imeiNumber: imeiNumber);
-    final data = response['data'];
-    if (data is List) {
-      investmentRecords.addAll(
-        data.whereType<Map<String, dynamic>>().map((deposit) {
-          final principal =
-              deposit['principal'] ??
-              deposit['principal_amount'] ??
-              deposit['deposit_amount'] ??
-              deposit['initial_amount'] ??
-              deposit['amount'] ??
-              deposit['balance'];
-          final currentValue =
-              deposit['current_value'] ??
-              deposit['maturity_value'] ??
-              deposit['balance'] ??
-              principal;
-          return {
-            ...deposit,
-            'id':
-                deposit['investment_id'] ??
-                deposit['fixed_deposit_id'] ??
-                deposit['savings_id'] ??
-                deposit['id'] ??
-                '',
-            'type': 'Fixed Deposit',
-            'plan':
-                deposit['plan'] ??
-                deposit['product_name'] ??
-                deposit['name'] ??
-                'Fixed Deposit',
-            'principal': principal,
-            'current_value': currentValue,
-            'total_interest':
-                deposit['total_interest'] ?? deposit['interest_earned'],
-            'maturity_date':
-                deposit['maturity_date'] ??
-                deposit['maturity'] ??
-                deposit['end_date'] ??
-                '—',
-          };
-        }),
-      );
-    }
+    investmentRecords.addAll(await ref.watch(fixedDepositsProvider.future));
   } on AppException catch (error) {
     if (investmentRecords.isEmpty) {
       rethrow;
@@ -1646,6 +1718,60 @@ final transactionsProvider = FutureProvider<List<Map<String, dynamic>>>((
     rethrow;
   }
 });
+
+Future<void> refreshMemberAccountData(
+  WidgetRef ref, {
+  bool refreshLoans = false,
+  bool refreshShares = false,
+  bool refreshInvestments = false,
+}) async {
+  ref.invalidate(userProfileProvider);
+  try {
+    await ref.read(userProfileProvider.future);
+  } on AppException catch (error) {
+    AppLogger.warning('Profile balance refresh failed', error);
+  }
+
+  ref.invalidate(savingsProvider);
+  try {
+    await ref.read(savingsProvider.future);
+  } on AppException catch (error) {
+    AppLogger.warning('Savings balance refresh failed', error);
+  }
+
+  ref.invalidate(transactionsProvider);
+  try {
+    await ref.read(transactionsProvider.future);
+  } on AppException catch (error) {
+    AppLogger.warning('Transaction refresh failed', error);
+  }
+
+  if (refreshLoans) {
+    ref.invalidate(loansProvider);
+    try {
+      await ref.read(loansProvider.future);
+    } on AppException catch (error) {
+      AppLogger.warning('Loan refresh failed', error);
+    }
+  }
+  if (refreshShares) {
+    ref.invalidate(sharesProvider);
+    try {
+      await ref.read(sharesProvider.future);
+    } on AppException catch (error) {
+      AppLogger.warning('Shares refresh failed', error);
+    }
+  }
+  if (refreshInvestments) {
+    ref.invalidate(fixedDepositsProvider);
+    ref.invalidate(investmentsApiProvider);
+    try {
+      await ref.read(investmentsApiProvider.future);
+    } on AppException catch (error) {
+      AppLogger.warning('Investment refresh failed', error);
+    }
+  }
+}
 
 Future<Map<String, String>> _runBackendProbe({
   required Future<void> Function() action,

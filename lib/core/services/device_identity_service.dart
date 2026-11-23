@@ -23,11 +23,30 @@ class DeviceIdentityService {
   Future<String> getInstallationId() => _getOrCreateInstallationId();
 
   Future<int> getBackendDeviceNumber() async {
+    if (AppConstants.defaultMobileApiImeiNumber > 0) {
+      return AppConstants.defaultMobileApiImeiNumber;
+    }
+
+    final registeredNumber = await SecureAuthStorage.instance
+        .readBackendDeviceNumber();
+    if (registeredNumber != null && registeredNumber > 0) {
+      return registeredNumber;
+    }
+
     final installationId = await _getOrCreateInstallationId();
     return backendDeviceNumber(installationId);
   }
 
+  Future<void> rememberBackendDeviceNumber(int deviceNumber) {
+    return SecureAuthStorage.instance.writeBackendDeviceNumber(deviceNumber);
+  }
+
   Future<String> getBackendDeviceMake() async {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      final info = await _deviceInfoPlugin.iosInfo;
+      return info.localizedModel;
+    }
+
     final identity = await collectIdentity();
     final manufacturer = identity['manufacturer']?.toString().trim() ?? '';
     final model = identity['device_model']?.toString().trim() ?? '';
@@ -129,7 +148,7 @@ class DeviceIdentityService {
           final info = await _deviceInfoPlugin.iosInfo;
           return {
             ...base,
-            'device_model': info.utsname.machine,
+            'device_model': info.localizedModel,
             'os_version': 'iOS ${info.systemVersion}',
             'manufacturer': 'Apple',
             'is_physical_device': info.isPhysicalDevice,

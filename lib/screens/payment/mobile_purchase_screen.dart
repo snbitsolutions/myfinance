@@ -9,7 +9,6 @@ import '../../core/app_card.dart';
 import '../../core/exceptions/app_exceptions.dart';
 import '../../core/modern_input.dart';
 import '../../core/providers/app_providers.dart';
-import '../../core/services/secure_auth_storage.dart';
 import '../../core/utils/receipt_clipboard.dart';
 
 class MobilePurchaseScreen extends ConsumerStatefulWidget {
@@ -24,6 +23,8 @@ class MobilePurchaseScreen extends ConsumerStatefulWidget {
 
 class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
   static const List<String> _networks = ['MTN', 'Telecel', 'AirtelTigo'];
+  static const Duration _statusCheckInterval = Duration(seconds: 5);
+  static const int _maxAutomaticStatusChecks = 24;
 
   static const List<int> _presetAmounts = [5, 10, 20, 50, 100];
   static const String _airtimeProductId = '51437';
@@ -31,14 +32,191 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
 
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _pinController = TextEditingController();
 
   String _selectedNetwork = _networks.first;
   int _currentStep = 0;
   bool _isProcessing = false;
   bool _isPending = false;
+  bool _isFailed = false;
+  bool _isConfirmed = false;
   String? _transactionReference;
   DateTime? _submittedAt;
   String? _submissionError;
+  Timer? _statusCheckTimer;
+  int _automaticStatusChecks = 0;
+  bool _isCheckingStatus = false;
+  String? _statusCheckError;
+
+  void _startStatusPolling() {
+    if (!_isPending) return;
+    _statusCheckTimer?.cancel();
+    _automaticStatusChecks = 0;
+    _checkPurchaseStatus();
+    _statusCheckTimer = Timer.periodic(_statusCheckInterval, (_) {
+      if (_automaticStatusChecks >= _maxAutomaticStatusChecks) {
+        _statusCheckTimer?.cancel();
+        if (mounted) {
+          setState(() {
+            _statusCheckError =
+                'Confirmation is still pending. Check transaction history or try again.';
+          });
+        }
+        return;
+      }
+      _automaticStatusChecks++;
+      _checkPurchaseStatus();
+    });
+  }
+
+  Future<void> _checkPurchaseStatus() async {
+    if (!mounted ||
+        !_isPending ||
+        _isCheckingStatus ||
+        ((_transactionReference ?? '').trim().isEmpty &&
+            _submittedAt == null)) {
+      return;
+    }
+    _isCheckingStatus = true;
+    if (mounted) {
+      setState(() {
+        _statusCheckError = null;
+      });
+    }
+    try {
+      ref.invalidate(transactionsProvider);
+      final transactions = await ref.read(transactionsProvider.future);
+      if (!mounted) return;
+
+      final reference = _transactionReference?.trim().toLowerCase();
+      Map<String, dynamic>? matchingTransaction;
+      if (reference != null && reference.isNotEmpty) {
+        matchingTransaction = transactions.where((transaction) {
+          for (final key in const [
+            'transaction_id',
+            'transactionId',
+            'reference',
+            'trans_id',
+            'id',
+            'external_transaction_id',
+            'client_reference',
+          ]) {
+            final transactionReference = transaction[key]
+                ?.toString()
+                .trim()
+                .toLowerCase();
+            if (transactionReference == reference) return true;
+          }
+          return false;
+        }).firstOrNull;
+      }
+
+      matchingTransaction ??= transactions.where((transaction) {
+        final amount = switch (transaction['amount']) {
+          num value => value.toDouble(),
+          String value => double.tryParse(value.replaceAll(',', '').trim()),
+          _ => null,
+        };
+        if (amount == null || (amount - _selectedAmount).abs() > 0.001) {
+          return false;
+        }
+
+        final description =
+            '${transaction['description'] ?? ''} ${transaction['narration'] ?? ''}'
+                .toLowerCase();
+        final type = '${transaction['type'] ?? ''}'.toLowerCase();
+        final looksLikePurchase =
+            description.contains(_serviceName.toLowerCase()) ||
+            description.contains('airtime') ||
+            description.contains('data') ||
+            description.contains('edeposit') ||
+            description.contains('mobile') ||
+            type.contains('purchase');
+        if (!looksLikePurchase) return false;
+
+        final dateValue =
+            transaction['date'] ?? transaction['transaction_date'];
+        final transactionDate = DateTime.tryParse(dateValue?.toString() ?? '');
+        return _submittedAt == null ||
+            transactionDate == null ||
+            !transactionDate.isBefore(
+              _submittedAt!.subtract(const Duration(minutes: 10)),
+            );
+      }).firstOrNull;
+      if (matchingTransaction == null) return;
+
+      String? status;
+      for (final key in const [
+        'status',
+        'state',
+        'transaction_status',
+        'payment_status',
+      ]) {
+        final value = matchingTransaction[key]?.toString().trim().toLowerCase();
+        if (value != null && value.isNotEmpty) {
+          status = value;
+          break;
+        }
+      }
+
+      if (const {
+        '1',
+        'complete',
+        'completed',
+        'confirmed',
+        'done',
+        'paid',
+        'success',
+        'successful',
+        'approved',
+        'settled',
+      }.contains(status)) {
+        _statusCheckTimer?.cancel();
+        if (!mounted) return;
+        setState(() {
+          _isPending = false;
+          _isFailed = false;
+          _isConfirmed = true;
+        });
+        await refreshMemberAccountData(ref);
+      } else if (const {
+        '0',
+        'cancelled',
+        'canceled',
+        'declined',
+        'denied',
+        'error',
+        'expired',
+        'failed',
+        'failure',
+        'rejected',
+      }.contains(status)) {
+        _statusCheckTimer?.cancel();
+        if (!mounted) return;
+        setState(() {
+          _isPending = false;
+          _isFailed = true;
+          _isConfirmed = false;
+        });
+      }
+    } catch (error) {
+      debugPrint('Mobile purchase status check failed: $error');
+      if (mounted) {
+        setState(() {
+          _statusCheckError =
+              'We could not check the status just now. Please try again.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCheckingStatus = false;
+        });
+      } else {
+        _isCheckingStatus = false;
+      }
+    }
+  }
 
   bool get _isPhoneValid {
     final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
@@ -52,6 +230,15 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
     return parsed ?? 0;
   }
 
+  double? _readAvailableBalance(dynamic value) {
+    if (value is num) {
+      return value.isFinite && value >= 0 ? value.toDouble() : null;
+    }
+    final normalized = value?.toString().replaceAll(',', '').trim();
+    final parsed = normalized == null ? null : double.tryParse(normalized);
+    return parsed != null && parsed.isFinite && parsed >= 0 ? parsed : null;
+  }
+
   bool get _canProceed {
     switch (_currentStep) {
       case 0:
@@ -59,7 +246,7 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
       case 1:
         return _selectedAmount > 0;
       case 2:
-        return true;
+        return RegExp(r'^\d{4}$').hasMatch(_pinController.text);
       case 3:
         return false;
       case 4:
@@ -78,29 +265,36 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
     if (!_canProceed) return;
 
     if (_currentStep == 2) {
+      final pin = _pinController.text.trim();
       setState(() {
         _isProcessing = true;
         _submissionError = null;
         _currentStep = 3;
       });
       try {
-        final profile = ref.read(userProfileProvider).valueOrNull;
+        ref.invalidate(userProfileProvider);
+        final profile = await ref.read(userProfileProvider.future);
         final phone = _toInternationalPhone(_phoneController.text);
         final channel = _selectedNetwork.toLowerCase() == 'mtn'
             ? 'mtn-gh'
             : '${_selectedNetwork.toLowerCase()}-gh';
-        final username = (profile?['name'] ?? '').toString().trim();
+        final username = (profile['name'] ?? '').toString().trim();
         if (username.isEmpty) {
-          throw StateError('Customer name is unavailable.');
-        }
-
-        final paymentService = ref.read(paymentServiceProvider);
-        final pin = await SecureAuthStorage.instance.readPin();
-        if (pin == null || pin.isEmpty) {
           throw StateError(
-            'A securely saved PIN is required. Sign in again before purchasing.',
+            'Your profile is missing a customer name. Update your profile before purchasing.',
           );
         }
+
+        final availableBalance = _readAvailableBalance(profile['balance']);
+        if (availableBalance != null && _selectedAmount > availableBalance) {
+          throw StateError(
+            'Insufficient balance. Your available balance is GH₵ '
+            '${availableBalance.toStringAsFixed(2)}.',
+          );
+        }
+
+        _pinController.clear();
+        final paymentService = ref.read(paymentServiceProvider);
         final Map<String, dynamic> result;
         if (widget.isData) {
           result = await paymentService.buyDataBundle(
@@ -123,11 +317,15 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
         }
         if (!mounted) return;
         _isPending = result['is_pending'] == true;
+        _isConfirmed = !_isPending;
+        _isFailed = false;
         _transactionReference =
             (result['reference'] ?? result['transaction_id'])?.toString();
         _submittedAt = DateTime.now();
-        ref.invalidate(transactionsProvider);
+        await refreshMemberAccountData(ref);
+        if (!mounted) return;
         setState(() => _currentStep = 4);
+        _startStatusPolling();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -179,7 +377,9 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
 
   void _applyPresetAmount(int value) {
     _amountController.text = value.toString();
-    setState(() {});
+    setState(() {
+      _submissionError = null;
+    });
   }
 
   void _goBack() {
@@ -202,8 +402,10 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
 
   @override
   void dispose() {
+    _statusCheckTimer?.cancel();
     _phoneController.dispose();
     _amountController.dispose();
+    _pinController.dispose();
     super.dispose();
   }
 
@@ -301,7 +503,9 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
           errorText: _phoneController.text.length == 10 && !_isPhoneValid
               ? 'Enter a valid number starting with 0.'
               : null,
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => setState(() {
+            _submissionError = null;
+          }),
         ),
       ],
     );
@@ -324,7 +528,9 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
           label: 'Amount',
           hintText: 'Enter an amount',
           prefixText: 'GH₵ ',
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => setState(() {
+            _submissionError = null;
+          }),
         ),
         const SizedBox(height: 16),
         Wrap(
@@ -369,21 +575,34 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
             label: 'Amount',
             value: 'GH₵ ${amount.toStringAsFixed(2)}',
           ),
-          const SizedBox(height: 12),
-          const _ReviewRow(label: 'Fee', value: 'Not provided by provider'),
           const Divider(height: 24),
           _ReviewRow(
-            label: 'Total before any unquoted fee',
+            label: 'Total',
             value: 'GH₵ ${amount.toStringAsFixed(2)}',
             isStrong: true,
           ),
           const SizedBox(height: 12),
           Text(
-            'The provider has not supplied a fee quote. Any additional charge '
-            'is not included in this total.',
+            'Enter the 4-digit transaction PIN you created during signup.',
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: const Color(0xFF5A625D)),
+          ),
+          const SizedBox(height: 10),
+          ModernInput(
+            controller: _pinController,
+            label: 'Transaction PIN',
+            hintText: '4-digit PIN',
+            keyboardType: TextInputType.number,
+            obscureText: true,
+            maxLength: 4,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(4),
+            ],
+            onChanged: (_) => setState(() {
+              _submissionError = null;
+            }),
           ),
           if (_submissionError case final error?) ...[
             const SizedBox(height: 12),
@@ -434,6 +653,25 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
   }
 
   Widget _buildSuccessStep() {
+    final title = _isFailed
+        ? '$_serviceTitle Failed'
+        : _isConfirmed
+        ? '$_serviceTitle Successful'
+        : _isPending
+        ? '$_serviceTitle Pending'
+        : '$_serviceTitle request initiated';
+    final message = _isFailed
+        ? 'The provider reported that the purchase failed.'
+        : _isConfirmed
+        ? 'The provider confirmed your purchase.'
+        : _isPending
+        ? 'Your request was accepted and is awaiting confirmation.'
+        : 'The request was sent. The provider has not confirmed completion.';
+    final icon = _isPending
+        ? Icons.hourglass_top_rounded
+        : _isConfirmed
+        ? Icons.check_circle_outline_rounded
+        : Icons.info_outline_rounded;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -450,19 +688,11 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
               color: const Color(0xFFEAF5EE),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              _isPending
-                  ? Icons.hourglass_top_rounded
-                  : Icons.info_outline_rounded,
-              size: 42,
-              color: Color(0xFF2E8B57),
-            ),
+            child: Icon(icon, size: 42, color: Color(0xFF2E8B57)),
           ),
           const SizedBox(height: 18),
           Text(
-            _isPending
-                ? '$_serviceTitle Pending'
-                : '$_serviceTitle request initiated',
+            title,
             textAlign: TextAlign.center,
             style: Theme.of(
               context,
@@ -470,37 +700,61 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            _isPending
-                ? 'Your request was accepted and is awaiting confirmation.'
-                : 'The request was sent. The provider has not confirmed completion.',
+            message,
             textAlign: TextAlign.center,
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF5A625D)),
           ),
+          if (_isPending) ...[
+            const SizedBox(height: 8),
+            if (_statusCheckError case final error?)
+              Text(
+                error,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            TextButton.icon(
+              onPressed: _isCheckingStatus ? null : _checkPurchaseStatus,
+              icon: _isCheckingStatus
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh_rounded),
+              label: Text(
+                _isCheckingStatus ? 'Checking status…' : 'Check status now',
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           _InfoRow(label: 'Network', value: _selectedNetwork),
           const SizedBox(height: 8),
           _InfoRow(label: 'Phone', value: _phoneController.text),
           const SizedBox(height: 8),
-          _InfoRow(
-            label: 'Reference',
-            value: _transactionReference ?? 'Unavailable',
-          ),
+          _InfoRow(label: 'Reference', value: _transactionReference ?? '—'),
         ],
       ),
     );
   }
 
   Widget _buildReceiptStep() {
+    final status = _isFailed
+        ? 'Failed'
+        : _isPending
+        ? 'Pending'
+        : 'Provider reported completion';
     final receiptText = [
       'ADEPA - $_serviceTitle Receipt',
-      'Status: ${_isPending ? 'Pending' : 'Provider reported completion'}',
+      'Status: $status',
       'Network: $_selectedNetwork',
       'Phone: ${_phoneController.text}',
       'Amount: GH₵ ${_selectedAmount.toStringAsFixed(2)}',
-      'Date: ${_submittedAt?.toIso8601String() ?? 'Unavailable'}',
-      'Reference: ${_transactionReference ?? 'Unavailable'}',
+      'Date: ${_submittedAt?.toIso8601String() ?? '—'}',
+      'Reference: ${_transactionReference ?? '—'}',
     ].join('\n');
 
     return AppCard(
@@ -542,13 +796,10 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
           const SizedBox(height: 10),
           _InfoRow(
             label: 'Date',
-            value: _submittedAt?.toLocal().toString() ?? 'Unavailable',
+            value: _submittedAt?.toLocal().toString() ?? '—',
           ),
           const SizedBox(height: 10),
-          _InfoRow(
-            label: 'Reference',
-            value: _transactionReference ?? 'Unavailable',
-          ),
+          _InfoRow(label: 'Reference', value: _transactionReference ?? '—'),
           const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,

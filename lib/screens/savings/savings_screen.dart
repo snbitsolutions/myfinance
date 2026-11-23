@@ -445,85 +445,6 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
     });
   }
 
-  Future<void> _showCreateSavingsTypePicker() async {
-    final selected = await showModalBottomSheet<SavingsType>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) {
-        final theme = Theme.of(sheetContext);
-        final maxListHeight = MediaQuery.sizeOf(sheetContext).height * 0.45;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Choose Savings Type',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Pick the type you want to create before continuing.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacitySafe(0.62),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: maxListHeight),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: SavingsType.values
-                          .map(
-                            (type) => ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: CircleAvatar(
-                                backgroundColor: _goalAccentColor(
-                                  theme,
-                                  type,
-                                ).withOpacitySafe(0.14),
-                                child: Icon(
-                                  type.icon,
-                                  color: _goalAccentColor(theme, type),
-                                ),
-                              ),
-                              title: Text(type.label),
-                              subtitle: Text(type.description),
-                              trailing: const Icon(Icons.chevron_right_rounded),
-                              onTap: () => Navigator.of(sheetContext).pop(type),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-
-    if (!mounted || selected == null) return;
-
-    final typeQuery = switch (selected) {
-      SavingsType.memberSaving => 'member',
-      SavingsType.currentSaving => 'current',
-      SavingsType.kiddySaving => 'kiddy',
-      SavingsType.fixedDeposit => 'fixed',
-    };
-    context.go('/savings/create?type=$typeQuery');
-  }
-
   Future<void> _showSavingsTypeLongPressPicker() async {
     final selected = await showModalBottomSheet<SavingsType>(
       context: context,
@@ -574,14 +495,6 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                   ),
                 ),
                 const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.of(sheetContext).pop();
-                    context.go('/savings/types');
-                  },
-                  icon: const Icon(Icons.category_outlined),
-                  label: const Text('Open Full Type Catalog'),
-                ),
               ],
             ),
           ),
@@ -629,13 +542,6 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           tooltip: 'Back',
         ),
-        actions: [
-          IconButton(
-            onPressed: () => context.go('/savings/create'),
-            icon: const Icon(Icons.add_circle_outline_rounded),
-            tooltip: 'Open New Savings',
-          ),
-        ],
       ),
       body: SafeArea(
         top: false,
@@ -1239,25 +1145,6 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                           ),
                         ],
                       ),
-                      // Open new savings action placeholder
-                      InkWell(
-                        onTap: _showCreateSavingsTypePicker,
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.add_circle_outline,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Open New Savings',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.95),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -1452,11 +1339,6 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
-                TextButton.icon(
-                  onPressed: _showCreateSavingsTypePicker,
-                  icon: const Icon(Icons.add_circle_outline, size: 18),
-                  label: const Text('New Goal'),
                 ),
               ],
             ),
@@ -1665,11 +1547,6 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen>
                               spacing: 10,
                               runSpacing: 10,
                               children: [
-                                FilledButton.icon(
-                                  onPressed: _showCreateSavingsTypePicker,
-                                  icon: const Icon(Icons.add_circle_outline),
-                                  label: const Text('New Goal'),
-                                ),
                                 if (_selectedTypeFilter != null)
                                   OutlinedButton.icon(
                                     onPressed: () {

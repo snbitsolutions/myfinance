@@ -51,6 +51,7 @@ void main() {
     expect(copiedText, contains('ADEPA - Deposit Receipt'));
     expect(copiedText, contains('Pending'));
     expect(copiedText, contains('deposit-ref-123'));
+    expect(copiedText, isNot(contains('Unavailable')));
     expect(find.text('Receipt copied'), findsOneWidget);
   });
 
@@ -114,6 +115,26 @@ void main() {
 
     expect(find.text('Pending'), findsOneWidget);
     expect(find.text('Amount Requested'), findsOneWidget);
+  });
+
+  testWidgets('deposit status and receipt show no unavailable placeholders', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _testApp(const PaymentSuccessScreen(amount: 25)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('unavailable', skipOffstage: false), findsNothing);
+    expect(find.text('GH₵0.00'), findsOneWidget);
+    expect(find.text('—'), findsNWidgets(2));
+
+    await tester.pumpWidget(_testApp(const PaymentReceiptScreen(amount: 25)));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('unavailable', skipOffstage: false), findsNothing);
+    expect(find.text('GH₵ 0.00'), findsOneWidget);
+    expect(find.text('—'), findsNWidgets(2));
   });
 
   testWidgets(

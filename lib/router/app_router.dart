@@ -22,6 +22,7 @@ import '../screens/legal/terms_of_service_screen.dart';
 // Auth
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
+import '../screens/auth/forgot_password_screen.dart';
 import '../screens/auth/existing_member_enrollment_screen.dart';
 import '../screens/auth/otp_screen.dart';
 import '../screens/auth/registration_success_screen.dart';
@@ -110,6 +111,7 @@ class AppRouter {
   static const Set<String> _authRoutes = {
     '/login',
     '/signup',
+    '/forgot-password',
     '/existing-member-enrollment',
     '/otp',
     '/set-pin',
@@ -145,9 +147,23 @@ class AppRouter {
         environmentValue ??
         const bool.fromEnvironment('DEBUG_AUTH_BYPASS', defaultValue: false);
 
-    return (queryValue == 'true') ||
-        (savedPreferenceValue ?? false) ||
-        effectiveEnvironmentValue;
+    if (queryValue != null) {
+      final normalizedQueryValue = queryValue.trim().toLowerCase();
+      if (normalizedQueryValue == 'true' ||
+          normalizedQueryValue == '1' ||
+          normalizedQueryValue == 'yes' ||
+          normalizedQueryValue == 'on') {
+        return true;
+      }
+      if (normalizedQueryValue == 'false' ||
+          normalizedQueryValue == '0' ||
+          normalizedQueryValue == 'no' ||
+          normalizedQueryValue == 'off') {
+        return false;
+      }
+    }
+
+    return (savedPreferenceValue ?? false) || effectiveEnvironmentValue;
   }
 
   static Future<bool> _hasBoundSession() async {
@@ -353,6 +369,10 @@ class AppRouter {
           path: '/signup',
           builder: (context, state) =>
               SignupScreen(reason: state.uri.queryParameters['reason']),
+        ),
+        GoRoute(
+          path: '/forgot-password',
+          builder: (context, state) => const ForgotPasswordScreen(),
         ),
         GoRoute(
           path: '/existing-member-enrollment',
@@ -594,23 +614,6 @@ class AppRouter {
             return RepaymentScreen(loanId: loanId);
           },
         ),
-        GoRoute(
-          path: '/investments',
-          builder: (context, state) => const InvestmentsScreen(),
-          routes: [
-            GoRoute(
-              path: ':id',
-              builder: (context, state) {
-                final investmentId = state.pathParameters['id'];
-                return InvestmentDetailScreen(investmentId: investmentId);
-              },
-            ),
-          ],
-        ),
-        GoRoute(
-          path: '/investment/activity',
-          redirect: (context, state) => '/investments',
-        ),
         // Withdrawal flow routes
         GoRoute(
           path: '/withdrawal',
@@ -736,16 +739,7 @@ class AppRouter {
             ),
             GoRoute(
               path: '/savings/create',
-              builder: (context, state) {
-                final type = state.uri.queryParameters['type'];
-                final selectedType = switch (type) {
-                  'current' => SavingsType.currentSaving,
-                  'kiddy' => SavingsType.kiddySaving,
-                  'fixed' => SavingsType.fixedDeposit,
-                  _ => SavingsType.memberSaving,
-                };
-                return CreateSavingsScreen(initialType: selectedType);
-              },
+              builder: (context, state) => const CreateSavingsScreen(),
             ),
             GoRoute(
               path: '/savings/types',
@@ -869,6 +863,23 @@ class AppRouter {
             GoRoute(
               path: '/more',
               builder: (context, state) => const ProfileScreen(),
+            ),
+            GoRoute(
+              path: '/investments',
+              builder: (context, state) => const InvestmentsScreen(),
+              routes: [
+                GoRoute(
+                  path: ':id',
+                  builder: (context, state) {
+                    final investmentId = state.pathParameters['id'];
+                    return InvestmentDetailScreen(investmentId: investmentId);
+                  },
+                ),
+              ],
+            ),
+            GoRoute(
+              path: '/investment/activity',
+              redirect: (context, state) => '/investments',
             ),
             GoRoute(
               path: '/loans',

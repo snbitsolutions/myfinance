@@ -177,8 +177,8 @@ class _RepaymentScreenState extends ConsumerState<RepaymentScreen> {
           );
       if (!mounted) return;
 
-      ref.invalidate(loansProvider);
-      ref.invalidate(transactionsProvider);
+      await refreshMemberAccountData(ref, refreshLoans: true);
+      if (!mounted) return;
       final isPending = result['is_pending'] == true;
       final loanName = loan['name']?.toString() ?? 'Loan';
       context.go(

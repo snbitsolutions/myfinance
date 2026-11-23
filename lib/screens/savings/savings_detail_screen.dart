@@ -267,7 +267,10 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
       balance: goal.balanceAvailable ? goal.balance : null,
       interest: goal.interestRate,
       monthlyDeposit: null,
-      createdLabel: 'Creation date unavailable',
+      createdLabel:
+          '${goal.createdAt.day.toString().padLeft(2, '0')}/'
+          '${goal.createdAt.month.toString().padLeft(2, '0')}/'
+          '${goal.createdAt.year}',
       transactions: const [],
       isRemote: goal.isRemote,
     );
@@ -337,6 +340,7 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(savingsProvider);
     final liveSavings = widget.savings ?? _findLiveSavings();
     final baseSavings = liveSavings != null
         ? _fromSavedGoal(liveSavings)
@@ -675,11 +679,6 @@ class _SavingsDetailScreenState extends ConsumerState<SavingsDetailScreen> {
                       valueColor: savings.isRemote
                           ? null
                           : const Color(0xFF2E8B57),
-                    ),
-                    _DetailRow(
-                      label: 'Next Interest Payout',
-                      value: 'Unavailable',
-                      icon: Icons.schedule_rounded,
                     ),
                   ],
                 ),

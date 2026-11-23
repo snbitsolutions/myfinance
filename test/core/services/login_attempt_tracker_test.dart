@@ -8,10 +8,12 @@ void main() {
 
   group('LoginAttemptTracker', () {
     late LoginAttemptTracker tracker;
+    late DateTime now;
 
     setUp(() {
       SharedPreferences.setMockInitialValues({});
-      tracker = LoginAttemptTracker();
+      now = DateTime(2026, 11, 11, 11);
+      tracker = LoginAttemptTracker(now: () => now);
     });
 
     test(
@@ -26,6 +28,61 @@ void main() {
           await tracker.recordFailedAttempt('233501234567'),
           AppConstants.maxFailedLoginAttempts,
         );
+        expect(
+          await tracker.getLockoutRemaining('233501234567'),
+          LoginAttemptTracker.lockoutDuration,
+        );
+      },
+    );
+
+    test('expires the temporary lock after two minutes', () async {
+      await tracker.recordFailedAttempt('233501234567');
+      await tracker.recordFailedAttempt('233501234567');
+      await tracker.recordFailedAttempt('233501234567');
+
+      now = now.add(const Duration(minutes: 2));
+
+      expect(await tracker.getFailedAttempts('233501234567'), 0);
+      expect(await tracker.getLockoutRemaining('233501234567'), isNull);
+      expect(await tracker.isPermanentlyLocked('233501234567'), isFalse);
+    });
+
+    test(
+      'starts a two-minute cooldown for an existing locked account',
+      () async {
+        await tracker.recordFailedAttempt('233501234567');
+        await tracker.recordFailedAttempt('233501234567');
+        await tracker.recordFailedAttempt('233501234567');
+
+        final preferences = await SharedPreferences.getInstance();
+        final lockoutKey = preferences.getKeys().singleWhere(
+          (key) => key.startsWith('loginAttemptLockoutUntil_'),
+        );
+        await preferences.remove(lockoutKey);
+
+        expect(await tracker.getFailedAttempts('233501234567'), 3);
+        expect(
+          await tracker.getLockoutRemaining('233501234567'),
+          LoginAttemptTracker.lockoutDuration,
+        );
+
+        now = now.add(const Duration(minutes: 2));
+        expect(await tracker.getFailedAttempts('233501234567'), 0);
+      },
+    );
+
+    test(
+      'permanently locks after the first wrong attempt post-cooldown',
+      () async {
+        await tracker.recordFailedAttempt('233501234567');
+        await tracker.recordFailedAttempt('233501234567');
+        await tracker.recordFailedAttempt('233501234567');
+        now = now.add(const Duration(minutes: 2));
+
+        expect(await tracker.recordFailedAttempt('233501234567'), 3);
+        expect(await tracker.isPermanentlyLocked('233501234567'), isTrue);
+        expect(await tracker.getLockoutRemaining('233501234567'), isNull);
+        expect(await tracker.recordFailedAttempt('233501234567'), 3);
       },
     );
 
@@ -44,9 +101,15 @@ void main() {
 
     test('clears the stored attempts for the phone number', () async {
       await tracker.recordFailedAttempt('233501234567');
+      await tracker.recordFailedAttempt('233501234567');
+      await tracker.recordFailedAttempt('233501234567');
+      now = now.add(const Duration(minutes: 2));
+      await tracker.recordFailedAttempt('233501234567');
       await tracker.resetFailedAttempts('233501234567');
 
       expect(await tracker.getFailedAttempts('233501234567'), 0);
+      expect(await tracker.getLockoutRemaining('233501234567'), isNull);
+      expect(await tracker.isPermanentlyLocked('233501234567'), isFalse);
     });
   });
 }
