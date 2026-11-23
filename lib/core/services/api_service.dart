@@ -2063,7 +2063,12 @@ class PaymentService extends BaseService {
       }
       if (pin.trim().isEmpty) {
         throw ValidationException(
-          message: 'A saved PIN is required to authorize this purchase.',
+          message: 'Your 4-digit transaction PIN is required to authorize this purchase.',
+        );
+      }
+      if (!RegExp(r'^\d{4}$').hasMatch(pin.trim())) {
+        throw ValidationException(
+          message: 'Transaction PIN must be exactly 4 digits.',
         );
       }
 

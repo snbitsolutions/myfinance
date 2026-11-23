@@ -1,54 +1,19 @@
 import 'package:adepa_teachers/screens/payment/mobile_purchase_screen.dart';
-import 'package:adepa_teachers/core/constants/app_constants.dart';
+import 'package:adepa_teachers/core/exceptions/app_exceptions.dart';
 import 'package:adepa_teachers/core/providers/app_providers.dart';
+import 'package:adepa_teachers/core/services/api_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  const secureStorageChannel = MethodChannel(
-    'plugins.it_nomads.com/flutter_secure_storage',
-  );
-  final secureStore = <String, String>{};
-
-  setUp(() {
-    secureStore.clear();
-    SharedPreferences.setMockInitialValues({});
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(secureStorageChannel, (call) async {
-          final arguments =
-              (call.arguments as Map?)?.cast<String, dynamic>() ??
-              <String, dynamic>{};
-          final key = arguments['key'] as String?;
-          switch (call.method) {
-            case 'read':
-              return key == null ? null : secureStore[key];
-            case 'write':
-              if (key != null) {
-                secureStore[key] = arguments['value']?.toString() ?? '';
-              }
-              return null;
-            case 'delete':
-              if (key != null) secureStore.remove(key);
-              return null;
-            default:
-              return null;
-          }
-        });
-  });
-
-  tearDown(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(secureStorageChannel, null);
-  });
 
   Future<void> openReviewStep(
     WidgetTester tester, {
     double? availableBalance,
+    PaymentService? paymentService,
   }) async {
     final router = GoRouter(
       initialLocation: '/airtime',
@@ -66,20 +31,16 @@ void main() {
     );
 
     final app = MaterialApp.router(routerConfig: router);
+    final overrides = <Override>[
+      if (availableBalance != null)
+        userProfileProvider.overrideWith(
+          (ref) async => {'name': 'Test Member', 'balance': availableBalance},
+        ),
+      if (paymentService != null)
+        paymentServiceProvider.overrideWith((ref) => paymentService),
+    ];
     await tester.pumpWidget(
-      availableBalance == null
-          ? app
-          : ProviderScope(
-              overrides: [
-                userProfileProvider.overrideWith(
-                  (ref) async => {
-                    'name': 'Test Member',
-                    'balance': availableBalance,
-                  },
-                ),
-              ],
-              child: app,
-            ),
+      overrides.isEmpty ? app : ProviderScope(overrides: overrides, child: app),
     );
     await tester.pumpAndSettle();
 
@@ -110,12 +71,10 @@ void main() {
     expect(find.textContaining('unquoted fee'), findsNothing);
   }
 
-  testWidgets('authorizes airtime with the existing mobile banking PIN', (
-    tester,
-  ) async {
+  testWidgets('accepts a 4-digit transaction PIN for purchase', (tester) async {
     await openReviewStep(tester);
 
-    expect(find.text('Mobile banking PIN'), findsOneWidget);
+    expect(find.text('Transaction PIN'), findsOneWidget);
     expect(
       tester.widget<TextField>(find.byType(TextField).last).obscureText,
       isTrue,
@@ -164,18 +123,41 @@ void main() {
     expect(find.text('Airtime Purchase Pending'), findsNothing);
   });
 
-  testWidgets('rejects a wrong PIN before submitting airtime', (tester) async {
-    secureStore[AppConstants.secureStorageKeyUserPin] = '1234';
-    await openReviewStep(tester, availableBalance: 100);
+  testWidgets(
+    'submits the entered transaction PIN for purchase authorization',
+    (tester) async {
+      final paymentService = _RejectingPaymentService();
+      await openReviewStep(
+        tester,
+        availableBalance: 100,
+        paymentService: paymentService,
+      );
 
-    await tester.enterText(find.byType(TextField).last, '9999');
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Buy Airtime'));
-    await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, '9999');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Buy Airtime'));
+      await tester.pumpAndSettle();
 
-    expect(
-      find.text('Incorrect PIN. Enter your mobile banking PIN.'),
-      findsOneWidget,
-    );
-  });
+      expect(paymentService.submittedPin, '9999');
+      expect(find.text('Incorrect transaction PIN.'), findsOneWidget);
+    },
+  );
+}
+
+class _RejectingPaymentService extends PaymentService {
+  String? submittedPin;
+
+  @override
+  Future<Map<String, dynamic>> buyAirtime({
+    required String phoneNumber,
+    required String channel,
+    required double amount,
+    required String username,
+    required String productId,
+    required String pin,
+    String email = '',
+  }) async {
+    submittedPin = pin;
+    throw AuthException(message: 'Incorrect transaction PIN.');
+  }
 }

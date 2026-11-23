@@ -2,59 +2,14 @@ import 'package:adepa_teachers/screens/savings/withdrawal_flow/authenticate_with
 import 'package:adepa_teachers/screens/savings/withdrawal_flow/review_withdrawal_screen.dart';
 import 'package:adepa_teachers/screens/savings/withdrawal_flow/withdrawal_model.dart';
 import 'package:adepa_teachers/screens/savings/withdrawal_flow/withdrawal_screen.dart';
-import 'package:adepa_teachers/core/constants/app_constants.dart';
 import 'package:adepa_teachers/core/providers/app_providers.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  const secureStorageChannel = MethodChannel(
-    'plugins.it_nomads.com/flutter_secure_storage',
-  );
-  final secureValues = <String, String>{};
-  var failPinRead = false;
-
-  setUp(() async {
-    secureValues.clear();
-    failPinRead = false;
-    SharedPreferences.setMockInitialValues({});
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(secureStorageChannel, (call) async {
-          final key = call.arguments is Map
-              ? (call.arguments as Map)['key'] as String?
-              : null;
-          switch (call.method) {
-            case 'read':
-              if (failPinRead && key == AppConstants.secureStorageKeyUserPin) {
-                throw PlatformException(code: 'secure_storage_unavailable');
-              }
-              return key == null ? null : secureValues[key];
-            case 'write':
-              if (key != null) {
-                secureValues[key] = (call.arguments as Map)['value'] as String;
-              }
-              return null;
-            case 'delete':
-              if (key != null) secureValues.remove(key);
-              return null;
-            case 'deleteAll':
-              secureValues.clear();
-              return null;
-            default:
-              return null;
-          }
-        });
-  });
-
-  tearDown(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(secureStorageChannel, null);
-  });
 
   testWidgets('withdraw back button returns to the savings account safely', (
     tester,
@@ -232,7 +187,7 @@ void main() {
     expect(find.text('Enter your PIN'), findsOneWidget);
   });
 
-  testWidgets('missing secure PIN offers sign-in instead of PIN entry', (
+  testWidgets('withdrawal uses the transaction PIN entered by the member', (
     tester,
   ) async {
     final router = _authenticationRouter();
@@ -242,47 +197,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text(
-        'No securely saved PIN is available. Sign in again to continue.',
-      ),
+      find.text('Enter the 4-digit transaction PIN you created during signup.'),
       findsOneWidget,
     );
-    expect(find.text('Sign in again'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    await tester.tap(find.text('Sign in again'));
-    await tester.pumpAndSettle();
-    expect(find.text('Login screen'), findsOneWidget);
-  });
-
-  testWidgets('secure PIN is rechecked and keypad is shown when present', (
-    tester,
-  ) async {
-    secureValues[AppConstants.secureStorageKeyUserPin] = '1234';
-    final router = _authenticationRouter();
-    addTearDown(router.dispose);
-
-    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
-    await tester.pumpAndSettle();
-
     expect(find.text('Sign in again'), findsNothing);
     expect(find.text('1'), findsOneWidget);
-  });
 
-  testWidgets('unreadable secure PIN offers sign-in recovery', (tester) async {
-    failPinRead = true;
-    final router = _authenticationRouter();
-    addTearDown(router.dispose);
-
-    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    for (final digit in ['1', '2', '3', '4']) {
+      await tester.ensureVisible(find.text(digit));
+      await tester.tap(find.text(digit));
+    }
+    await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('Your saved PIN could not be read. Sign in again to continue.'),
-      findsOneWidget,
-    );
-    expect(find.text('Sign in again'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('Withdrawal PIN: 1234'), findsOneWidget);
   });
 }
 
@@ -305,6 +233,13 @@ GoRouter _authenticationRouter() {
       GoRoute(
         path: '/login',
         builder: (context, state) => const Text('Login screen'),
+      ),
+      GoRoute(
+        path: '/withdrawal/processing',
+        builder: (context, state) {
+          final data = state.extra! as WithdrawalData;
+          return Text('Withdrawal PIN: ${data.pin}');
+        },
       ),
     ],
   );

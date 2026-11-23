@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/app_scaffold.dart';
 import '../../../core/color_ext.dart';
-import '../../../core/exceptions/app_exceptions.dart';
-import '../../../core/services/secure_auth_storage.dart';
 import 'withdrawal_model.dart';
 
 class AuthenticateWithdrawalScreen extends StatefulWidget {
@@ -21,39 +19,14 @@ class _AuthenticateWithdrawalScreenState
   String _pinCode = '';
   String? _errorMessage;
   bool _isValidating = false;
-  bool _isCheckingStoredPin = true;
-  bool _hasStoredPin = false;
 
   @override
   void initState() {
     super.initState();
-    _checkStoredPin();
-  }
-
-  Future<void> _checkStoredPin() async {
-    try {
-      final pin = await SecureAuthStorage.instance.readPin();
-      if (!mounted) return;
-      setState(() {
-        _hasStoredPin = pin != null && pin.isNotEmpty;
-        _isCheckingStoredPin = false;
-        _errorMessage = _hasStoredPin
-            ? null
-            : 'No securely saved PIN is available. Sign in again to continue.';
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _hasStoredPin = false;
-        _isCheckingStoredPin = false;
-        _errorMessage =
-            'Your saved PIN could not be read. Sign in again to continue.';
-      });
-    }
   }
 
   void _appendDigit(String digit) {
-    if (!_hasStoredPin || _isCheckingStoredPin || _isValidating) return;
+    if (_isValidating) return;
     if (_pinCode.length < 4) {
       setState(() {
         _pinCode += digit;
@@ -68,7 +41,7 @@ class _AuthenticateWithdrawalScreenState
   }
 
   void _deleteDigit() {
-    if (_hasStoredPin && !_isCheckingStoredPin && _pinCode.isNotEmpty) {
+    if (!_isValidating && _pinCode.isNotEmpty) {
       setState(() {
         _pinCode = _pinCode.substring(0, _pinCode.length - 1);
         _errorMessage = null;
@@ -84,30 +57,10 @@ class _AuthenticateWithdrawalScreenState
     }
 
     setState(() => _isValidating = true);
-    try {
-      await SecureAuthStorage.instance.verifyPin(_pinCode);
-      if (!mounted) return;
-      context.push(
-        '/withdrawal/processing',
-        extra: widget.data.copyWith(pin: _pinCode),
-      );
-    } on AppException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _isValidating = false;
-        _errorMessage = error.message;
-        _pinCode = '';
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _isValidating = false;
-        _hasStoredPin = false;
-        _errorMessage =
-            'Your saved PIN could not be read. Sign in again to continue.';
-        _pinCode = '';
-      });
-    }
+    context.push(
+      '/withdrawal/processing',
+      extra: widget.data.copyWith(pin: _pinCode),
+    );
   }
 
   @override
@@ -147,25 +100,13 @@ class _AuthenticateWithdrawalScreenState
             const SizedBox(height: 8),
             // Subtitle
             Text(
-              'Please enter your 4-digit PIN to authorize this withdrawal.',
+              'Enter the 4-digit transaction PIN you created during signup.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurface.withOpacitySafe(0.6),
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
-            if (_isCheckingStoredPin) ...[
-              const CircularProgressIndicator(),
-              const SizedBox(height: 12),
-              const Text('Checking secure PIN…'),
-            ],
-            if (!_isCheckingStoredPin && !_hasStoredPin) ...[
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: () => context.go('/login'),
-                child: const Text('Sign in again'),
-              ),
-            ],
             // PIN Display
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -214,34 +155,33 @@ class _AuthenticateWithdrawalScreenState
               ),
             const SizedBox(height: 20),
             // Numeric Keypad
-            if (_hasStoredPin)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 48),
-                child: GridView.count(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(
-                      (digit) => _KeypadButton(
-                        label: digit.toString(),
-                        onPressed: () => _appendDigit(digit.toString()),
-                      ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 48),
+              child: GridView.count(
+                crossAxisCount: 3,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(
+                    (digit) => _KeypadButton(
+                      label: digit.toString(),
+                      onPressed: () => _appendDigit(digit.toString()),
                     ),
-                    _KeypadButton(
-                      label: '0',
-                      onPressed: () => _appendDigit('0'),
-                    ),
-                    _KeypadButton(
-                      label: '⌫',
-                      onPressed: _deleteDigit,
-                      isDelete: true,
-                    ),
-                  ],
-                ),
+                  ),
+                  _KeypadButton(
+                    label: '0',
+                    onPressed: () => _appendDigit('0'),
+                  ),
+                  _KeypadButton(
+                    label: '⌫',
+                    onPressed: _deleteDigit,
+                    isDelete: true,
+                  ),
+                ],
               ),
+            ),
             const SizedBox(height: 20),
             // Note
             Container(

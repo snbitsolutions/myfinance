@@ -9,7 +9,6 @@ import '../../core/app_card.dart';
 import '../../core/exceptions/app_exceptions.dart';
 import '../../core/modern_input.dart';
 import '../../core/providers/app_providers.dart';
-import '../../core/services/secure_auth_storage.dart';
 import '../../core/utils/receipt_clipboard.dart';
 
 class MobilePurchaseScreen extends ConsumerStatefulWidget {
@@ -294,7 +293,6 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
           );
         }
 
-        await SecureAuthStorage.instance.verifyPin(pin);
         _pinController.clear();
         final paymentService = ref.read(paymentServiceProvider);
         final Map<String, dynamic> result;
@@ -585,7 +583,7 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Enter your 4-digit mobile banking PIN to authorize this purchase.',
+            'Enter the 4-digit transaction PIN you created during signup.',
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: const Color(0xFF5A625D)),
@@ -593,7 +591,7 @@ class _MobilePurchaseScreenState extends ConsumerState<MobilePurchaseScreen> {
           const SizedBox(height: 10),
           ModernInput(
             controller: _pinController,
-            label: 'Mobile banking PIN',
+            label: 'Transaction PIN',
             hintText: '4-digit PIN',
             keyboardType: TextInputType.number,
             obscureText: true,
